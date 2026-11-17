@@ -717,7 +717,9 @@ function renderBanner(){let h='';
   $('#banner').innerHTML=h;const gb=$('#gisBanner');if(gb)renderSignInButton(gb);const b=$('#initCfg');if(b)b.onclick=async()=>{const a=await ask({title:'Set up the first site',ok:'Create site',fields:[{l:'Site name',req:1,v:''},{l:'Number of units',t:'number',v:0}]});if(!a)return;
     CFG=DEFAULT_CFG();CFG.sites={c1:mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[1]||0)))};try{await putCfg();toast('Site created. Follow the setup checklist on the dashboard.');go('dash')}catch(e){CFG=null;writeErr(e)}}}
 
-function render(){renderHeader();renderNav();renderBanner();const v=$('#view');
+let API_STARTED=false;
+function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in screen until the app has started */
+  renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
   if(cur==='info')return renderInfo(v);if(cur==='archive')return renderArchive(v);
   if(cur==='sop')return renderSOP(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
@@ -1478,7 +1480,7 @@ async function bootApi(){
   API=makeApiDb();GAS=API;await API.load();
   let sess=null;try{sess=JSON.parse(localStorage.getItem('nh-session')||'null')}catch(e){}
   const applySess=u=>{MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_WRITE=u.role==='Admin'||u.role==='Staff';SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
-  let started=false;const startApp=()=>{if(started)return;started=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
+  let started=false;const startApp=()=>{if(started)return;started=true;API_STARTED=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
   const refresh=async()=>{try{const u=await API.run('whoami');if(sess&&sess.email&&u.email!==sess.email){await API.clearAll()}sess=u;localStorage.setItem('nh-session',JSON.stringify(u));applySess(u);startApp();render()}
     catch(e){if(e.code==='invalid_argument'){forgetToken();try{localStorage.removeItem('nh-session')}catch(x){}await API.clearAll();showSignIn(e.message)}
       else if(e.code==='unauthenticated'&&!started){AFTER_SIGNIN=refresh;showSignIn()}else if(!started){GAS_OFFLINE=true;showSignIn('No connection. Connect to the internet for the first sign-in on this device.')}}};
