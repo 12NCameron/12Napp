@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6b4a2f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="NH Site Docs">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="config.js"></script>
+</head>
+<body>
+<title>NH Site Docs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: dark binder-brown side nav + working area; drawer forms slide in from the right. */
+:root{
+  --bg:#f6f3ee; --panel:#ffffff; --panel2:#faf7f3; --ink:#24201c; --ink2:#5c544c; --ink3:#857b71; --line:#e4ddd3; --line2:#efe9e1;
+  --brand:#6b4a2f; --brand2:#8a6342; --brandSoft:#f1e8de; --onBrand:#ffffff; --accent:#2f6f6a; --accentSoft:#e3f0ee;
+  --ok:#2f7a45; --okSoft:#e3f2e7; --warn:#a0620a; --warnSoft:#fbf0dc; --bad:#b23a32; --badSoft:#fbe5e2;
+  --info:#355f9c; --infoSoft:#e5edf8; --purple:#6b4a9c; --purpleSoft:#efe8f8; --pink:#b03a6e; --pinkSoft:#fbe6ef;
+  --infoInk:#22406b; --warnInk:#6b4306;
+  --nav:#2b231c; --navInk:#eadfd2; --navMuted:#a8957f; --navHover:#3a3027; --navLine:#43382d; --scrim:rgba(30,22,15,.45);
+  --r:10px; --sh:0 1px 2px rgba(40,30,20,.06),0 4px 14px rgba(40,30,20,.06);
+  --font:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#191512; --panel:#231e1a; --panel2:#2a241f; --ink:#efe8e0; --ink2:#c7bcb0; --ink3:#9a8f84; --line:#3a322b; --line2:#2f2823;
+  --brand:#c08e62; --brand2:#d4a274; --brandSoft:#3a2c20; --onBrand:#1a120b; --accent:#6fc0b8; --accentSoft:#1f3533;
+  --ok:#6cc287; --okSoft:#1d3324; --warn:#e0a84a; --warnSoft:#3a2c14; --bad:#ef7b72; --badSoft:#3d1f1c;
+  --info:#8fb2ea; --infoSoft:#1e2a3d; --purple:#b99be6; --purpleSoft:#2c2240; --pink:#ec8fb6; --pinkSoft:#3b1f2c;
+  --infoInk:#bcd0f2; --warnInk:#f0cf96; --nav:#120f0c; --navHover:#241d17; --navLine:#2c241d; --scrim:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#191512; --panel:#231e1a; --panel2:#2a241f; --ink:#efe8e0; --ink2:#c7bcb0; --ink3:#9a8f84; --line:#3a322b; --line2:#2f2823;
+  --brand:#c08e62; --brand2:#d4a274; --brandSoft:#3a2c20; --onBrand:#1a120b; --accent:#6fc0b8; --accentSoft:#1f3533;
+  --ok:#6cc287; --okSoft:#1d3324; --warn:#e0a84a; --warnSoft:#3a2c14; --bad:#ef7b72; --badSoft:#3d1f1c;
+  --info:#8fb2ea; --infoSoft:#1e2a3d; --purple:#b99be6; --purpleSoft:#2c2240; --pink:#ec8fb6; --pinkSoft:#3b1f2c;
+  --infoInk:#bcd0f2; --warnInk:#f0cf96; --nav:#120f0c; --navHover:#241d17; --navLine:#2c241d; --scrim:rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.pair{display:flex;gap:6px}.pair select{min-width:120px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--font)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+nav.side{background:var(--nav);color:var(--navInk);padding:14px 10px;position:sticky;top:0;height:100vh;overflow:auto}
+.logo{display:flex;gap:10px;align-items:center;padding:4px 8px 14px;border-bottom:1px solid var(--navLine);margin-bottom:8px}
+.logo .mk{width:34px;height:34px;border-radius:8px;background:var(--brand2);display:grid;place-items:center;font-weight:700;color:var(--onBrand);font-size:13px;flex:none}
+.logo b{display:block;font-size:14px;color:var(--navInk)}.logo small{color:var(--navMuted);font-size:12px}
+.ngrp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--navMuted);margin:14px 10px 4px}
+.nitem{display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;background:none;border:0;color:var(--navInk);padding:7px 10px;border-radius:7px;cursor:pointer;font-size:14px}
+.nitem:hover{background:var(--navHover)}.nitem.on{background:var(--brand2);color:var(--onBrand)}
+.nitem .cnt{background:var(--bad);color:#fff;border-radius:10px;font-size:11px;padding:0 6px;min-width:18px;text-align:center}
+main{min-width:0}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-end;padding-block:10px;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));flex-wrap:wrap}
+header.top .menu{display:none}
+.tsel{display:flex;flex-direction:column;font-size:11px;color:var(--ink3);min-width:0}
+.tsel select{font-size:14px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);min-width:150px;max-width:100%}
+.shiftpill{margin-left:auto;background:var(--brandSoft);color:var(--brand);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600}
+.syncpill{font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:6px}
+.syncpill i{width:8px;height:8px;border-radius:50%;background:var(--ink3);display:inline-block}
+.syncpill.live i{background:var(--ok)}.syncpill.warn i{background:var(--warn)}
+.wrap{padding-block:20px 60px;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));max-width:1280px}
+h1{font-size:22px;margin:0 0 2px;text-wrap:balance}
+.sub{color:var(--ink2);margin:0 0 16px;font-size:14px;max-width:78ch}
+.sopref{display:inline-block;font-size:11px;background:var(--brandSoft);color:var(--brand);padding:1px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px;min-width:0}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi{padding:12px 14px}.kpi .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}.kpi .l{font-size:12px;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:14px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.btn:hover{border-color:var(--brand2)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:var(--onBrand)}.btn.pri:hover{background:var(--brand2)}
+.btn.acc{background:var(--accent);border-color:var(--accent);color:var(--onBrand)}
+.btn.danger{color:var(--bad)}.btn.dangerfill{background:var(--bad);border-color:var(--bad);color:#fff}.btn.sm{padding:4px 9px;font-size:13px}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+input.search{flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:4px 11px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--onBrand)}
+.tblwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{background:var(--panel2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink2);padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--panel2)}
+td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{padding:28px;text-align:center;color:var(--ink3)}
+.pill{display:inline-block;border-radius:12px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--line2);color:var(--ink2)}
+.p-ok{background:var(--okSoft);color:var(--ok)}.p-warn{background:var(--warnSoft);color:var(--warn)}.p-bad{background:var(--badSoft);color:var(--bad)}
+.p-info{background:var(--infoSoft);color:var(--info)}.p-purple{background:var(--purpleSoft);color:var(--purple)}.p-pink{background:var(--pinkSoft);color:var(--pink)}
+.p-acc{background:var(--accentSoft);color:var(--accent)}
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:20;display:flex;justify-content:flex-end}
+.drawer{background:var(--bg);width:min(720px,100%);height:100%;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.25);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.dhead{padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.dhead h2{font-size:18px;margin:0;flex:1}
+.dbody{padding:16px 20px;overflow:auto;flex:1}
+.dfoot{padding:12px 20px;background:var(--panel);border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
+.dfoot .sp{flex:1}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.full{grid-column:1/-1}
+.fld label{font-size:13px;font-weight:600;color:var(--ink2)}
+.fld label .req{color:var(--bad)}
+.fld .hint{font-size:12px;color:var(--ink3)}
+.fld input,.fld select,.fld textarea{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:var(--panel);width:100%}
+.fld textarea{min-height:84px;resize:vertical}
+.fld.err input,.fld.err select,.fld.err textarea,.fld.err .seg,.fld.err .chips{outline:2px solid var(--bad);outline-offset:1px;border-radius:8px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13px}
+.seg button.on{background:var(--brand);border-color:var(--brand);color:var(--onBrand)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips label{font-weight:400;font-size:13px;border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:4px 10px;cursor:pointer;color:var(--ink)}
+.chips label.on{background:var(--accentSoft);border-color:var(--accent);color:var(--accent)}
+.chips input{position:absolute;opacity:0;pointer-events:none}
+.secth{grid-column:1/-1;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--brand);border-bottom:1px solid var(--line);padding-bottom:4px;margin-top:8px;font-weight:700}
+.infob{grid-column:1/-1;background:var(--infoSoft);color:var(--infoInk);border-radius:8px;padding:9px 12px;font-size:13px}
+.infob.warn{background:var(--warnSoft);color:var(--warnInk)}
+.ynt{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.ynt td{padding:5px 8px}.ynt .seg{flex-wrap:nowrap;gap:4px}.ynt .seg button{padding:3px 9px}
+.ynt input{border:1px solid var(--line2);border-radius:6px;padding:4px 6px;width:100%;background:var(--panel)}
+.meta{font-size:12px;color:var(--ink3);margin-top:14px}
+.task{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line2)}
+.task:last-child{border-bottom:0}
+.task .tm{font-size:12px;color:var(--ink3);width:110px;flex:none;padding-top:2px}
+.task .tt{flex:1;min-width:0;background:none;border:0;text-align:left;padding:0;cursor:pointer}.task .tt b{display:block;font-size:14px}.task .tt span{font-size:13px;color:var(--ink2)}
+.task .st{flex:none}
+.tick{width:22px;height:22px;accent-color:var(--ok)}
+.alert{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:14px;cursor:pointer;border:0;width:100%;text-align:left;color:var(--ink)}
+.alert.bad{background:var(--badSoft)}.alert.warn{background:var(--warnSoft)}.alert.info{background:var(--infoSoft)}
+.alert .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.alert.bad .dot{background:var(--bad)}.alert.warn .dot{background:var(--warn)}.alert.info .dot{background:var(--info)}
+.qa{display:flex;flex-wrap:wrap;gap:8px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.rtile{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px 10px;cursor:pointer;text-align:left;min-height:74px;min-width:0}
+.rtile b{display:block;font-size:13px}.rtile small{display:block;color:var(--ink3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtile .pill{margin-top:5px}
+.rtile.Pass,.rtile.Exempt{border-color:var(--ok);background:var(--okSoft)}.rtile.Fail{border-color:var(--bad);background:var(--badSoft)}
+.rtile.Day-Off{border-color:var(--purple);background:var(--purpleSoft)}.rtile.Due{border-color:var(--pink);background:var(--pinkSoft)}
+.inv input,.inv select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--panel)}
+.inv input[type=number]{width:64px;text-align:right}
+.catrow td{background:var(--panel2);font-weight:700;color:var(--brand)}
+.ref h3{margin:0 0 6px;font-size:16px}.ref ol,.ref ul{margin:6px 0 0 18px;padding:0}.ref li{margin:3px 0}.ref p{margin:6px 0}
+.ref .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;margin-left:6px}
+.t-brown{background:var(--brandSoft);color:var(--brand)}.t-white{background:var(--line2);color:var(--ink2)}
+.toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--nav);color:var(--navInk);padding:9px 16px;border-radius:9px;z-index:60;font-size:14px;box-shadow:var(--sh);max-width:calc(100% - 32px)}
+.toast.err{background:var(--badSoft);color:var(--bad);border:1px solid var(--bad)}
+.banner{background:var(--warnSoft);color:var(--warnInk);padding-block:8px;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));font-size:13px;border-bottom:1px solid var(--line)}
+.dlg{position:fixed;inset:0;background:var(--scrim);z-index:50;display:grid;place-items:center;padding:16px}
+.dlg .box{background:var(--panel);border-radius:12px;max-width:460px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.dlg h3{margin:0 0 6px;font-size:17px}.dlg p{margin:0 0 12px;color:var(--ink2);white-space:pre-line}
+.dlg .fld{margin-bottom:10px}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  nav.side{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:30;transform:translateX(-100%);transition:transform .2s;padding-top:calc(14px + env(safe-area-inset-top,0px))}
+  nav.side.open{transform:none}
+  header.top .menu{display:inline-flex}
+  header.top{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g2{grid-template-columns:minmax(0,1fr)}
+  .fgrid{grid-template-columns:minmax(0,1fr)}
+  .shiftpill{margin-left:0}
+  .tsel select{min-width:0;width:100%}
+}
+@media (max-width:520px){.task .tm{width:78px}.tsel{flex:1 1 140px}}
+@media (prefers-reduced-motion:reduce){nav.side{transition:none}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<div class="app">
+  <nav class="side" id="side" aria-label="Sections"></nav>
+  <main>
+    <div id="banner"></div>
+    <header class="top">
+      <button class="btn sm menu" id="menuBtn" type="button">☰ Menu</button>
+      <div class="tsel"><label for="siteSel">Site</label><select id="siteSel"></select></div>
+      <div class="tsel"><label for="on1">On shift (2 staff)</label><div class="pair"><select id="on1" aria-label="First staff member on shift"></select><select id="on2" aria-label="Second staff member on shift"></select></div></div>
+      <div class="tsel"><label for="meSel">Logging as</label><select id="meSel"></select></div>
+      <span class="shiftpill" id="shiftPill"></span>
+      <span class="syncpill" id="sync"><i></i><span>Connecting…</span></span>
+    </header>
+    <div class="wrap" id="view"><p class="meta">Loading site records…</p></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   12 Neighbours · Neighbourly Homes — shared site documentation
+   Records live in this artifact's shared database (db capability).
+   Without it (signed out / local preview) the page falls back to this browser only.
+   ========================================================= */
+const $=(s,el=document)=>el.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const nowTime=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const hoursSince=iso=>(Date.now()-new Date(iso).getTime())/36e5;
+const fmtDate=ds=>{if(!ds)return'';const d=new Date(ds+'T12:00');return isNaN(d)?ds:d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})};
+const dow=ds=>new Date(ds+'T12:00').getDay();
+const clone=o=>JSON.parse(JSON.stringify(o));
+const SHIFTS=['Day (08:00–16:00)','Evening (16:00–00:00)','Night (00:00–08:00)'];
+function shiftFor(t){const h=+String(t||nowTime()).split(':')[0];return h>=8&&h<16?SHIFTS[0]:h>=16?SHIFTS[1]:SHIFTS[2]}
+
+/* ---------- Defaults (no personal data lives in the page itself) ---------- */
+const SEED_INV=[["INV-001","Consumable","Office Supplies","Pencils","Monthly",10],["INV-002","Consumable","Office Supplies","Pens","Monthly",15],["INV-003","Consumable","Office Supplies","Dry Erase Markers","Monthly",4],["INV-004","Consumable","Office Supplies","Sharpies - Regular","Monthly",2],["INV-005","Consumable","Office Supplies","Sharpies - Thick","Monthly",2],["INV-006","Consumable","Office Supplies","Highlighters","Quarterly",2],["INV-007","Persistent","Office Supplies","Scissors","As Needed",2],["INV-008","Persistent","Office Supplies","Stapler","As Needed",1],["INV-009","Consumable","Office Supplies","Staples","As Needed",2],["INV-010","Consumable","Office Supplies","Paper Clips - Standard","As Needed",50],["INV-011","Consumable","Office Supplies","Paper Clips - Large","As Needed",5],["INV-012","Consumable","Office Supplies","Paper - Printer","Monthly",200],["INV-013","Consumable","Office Supplies","Sticky Notes","Monthly",5],["INV-014","Consumable","Office Supplies","Tape - Clear Scotch","Monthly",2],["INV-015","Consumable","Office Supplies","Tape - Duct White","Monthly",1],["INV-016","Consumable","Office Supplies","Tape - Packing Clear","Monthly",1],["INV-017","Consumable","Office Supplies","Glue - Sticks","As Needed",1],["INV-018","Consumable","Office Supplies","Envelopes - Letter","As Needed",20],["INV-019","Consumable","Cleaning & Sanitation","Toilet Paper","Weekly",15],["INV-020","Consumable","Cleaning & Sanitation","Paper Towel","Weekly",6],["INV-021","Consumable","Cleaning & Sanitation","Dish Soap","Weekly",2],["INV-022","Consumable","Cleaning & Sanitation","Floor Cleaner","Monthly",2],["INV-023","Consumable","Cleaning & Sanitation","Multipurpose Cleaner","Bi-weekly",2],["INV-024","Consumable","Cleaning & Sanitation","Lysol Wipes","Weekly",4],["INV-025","Consumable","Cleaning & Sanitation","Sponges - Dish","Bi-weekly",4],["INV-026","Consumable","Cleaning & Sanitation","Bleach","Monthly",1],["INV-027","Consumable","Cleaning & Sanitation","Toilet Bowl Cleaner","Monthly",1],["INV-028","Consumable","Cleaning & Sanitation","Hand Soap Refill","Monthly",4],["INV-029","Consumable","Cleaning & Sanitation","Hand Sanitizer Refill","Monthly",2],["INV-030","Consumable","Cleaning & Sanitation","45L Long White Garbage Bags","Weekly",20],["INV-031","Consumable","Cleaning & Sanitation","Large Black Garbage Bags","Weekly",20],["INV-032","Consumable","Cleaning & Sanitation","Kleenex","Bi-weekly",5],["INV-033","Consumable","Cleaning & Sanitation","Laundry Pods","Monthly",50],["INV-034","Consumable","Cleaning & Sanitation","Mop Head Regular","Monthly",2],["INV-035","Consumable","Cleaning & Sanitation","Magic Eraser","Monthly",2],["INV-036","Consumable","Safety & Aid","Gloves - Nitrile","Monthly",200],["INV-037","Consumable","Safety & Aid","Facemasks","Monthly",50],["INV-038","Consumable","Safety & Aid","Naloxone Kits","Monthly",14],["INV-039","Persistent","Safety & Aid","First Aid Kit","Monthly",2],["INV-040","Consumable","Safety & Aid","AA Batteries","Monthly",4],["INV-041","Consumable","Safety & Aid","AAA Batteries","Monthly",10],["INV-042","Persistent","Safety & Aid","Flashlights","As Needed",4],["INV-043","Consumable","Programming & Meals","Coffee","Weekly",2],["INV-044","Consumable","Programming & Meals","Coffee Filters","Monthly",10]];
+const INV_CATS=["Office Supplies","Cleaning & Sanitation","Safety & Aid","Programming & Meals","Seasonal & Outdoor","Facilities & Storage","Appliances","Cleaning Equipment"];
+const seedInvItem=([id,type,cat,item,freq,par])=>({id,type,cat,item,freq,office:0,bath:0,guest:0,par,cond:'Good'});
+const DIRECTORY=[
+ /* Template roles only: each site fills in its own names and numbers under Participants & Contacts. */
+ ["Site Supervisor","","","Shift emergencies, urgent resident crises, appliance approvals, supervisor handoff"],
+ ["Site Manager","","","Escalations, on-call decisions, unit transfers and move-outs"],
+ ["Safety & Operations Lead","","","Equipment hazards, untrained task concerns, safety audit findings"],
+ ["HR — Office & Personnel Files","","","VSC results, non-urgent HR concerns, office admin"],
+ ["HR — Payroll, Benefits & Attendance","","","Payroll, time punches, benefits"],
+ ["HR — Governance & Safe Spaces","","","Confidential boundary concerns, whistleblower matters"],
+ ["Emergency Services","Police · Fire · EMS","911","Active violence, weapons, medical emergency, fire"],
+ ["Police — Non-Emergency","","","Trespass refusal, non-urgent police matters"]];
+/* ---------- Site lifecycle data model ----------
+   config/main            org settings + each site's details, units, contacts (managers edit)
+   sites/<site>/staff         one record per staff member (Active / Inactive / Archived)
+   sites/<site>/participants  one record per participant stay (Active / Archived, with move history)
+   log-<log>              live log entries;  arch-<log>  archived log entries (kept, searchable) */
+const UNIT_STATUSES=['Occupied','Vacant','Pending Move-in','Out of service'];
+const STAFF_STATUSES=['Active','Inactive','Archived'];
+const EXIT_REASONS=['Moved to permanent housing','Moved to other housing / family','Program completion','Voluntary exit','Eviction / placement ended','Transfer to another site','Hospital / treatment (long term)','Incarceration','Deceased','Other'];
+const DEFAULT_PORTAL='https://sites.google.com/12neighbours.com/12n-staff-portal-v1-0/home';
+const mkUnits=(n,start=1)=>Array.from({length:n},(_,i)=>({no:start+i,status:'Vacant',participantId:'',notes:''}));
+const DEFAULT_CONTACTS=()=>DIRECTORY.map(([role,name,reach,when])=>({role,name,reach,when}));
+const mkSite=(name,n)=>({name,address:'',status:'Active',opened:today(),closed:'',units:mkUnits(n),contacts:DEFAULT_CONTACTS(),nonEmergency:'',sitePhone:'',setupDone:false});
+const DEFAULT_CFG=()=>({portalUrl:DEFAULT_PORTAL,sites:{c1:mkSite('Site 1',0)}});
+/* Older setups kept staff lists and participant names inside the config. Keep them readable here;
+   a manager's device moves them into their own records the first time it loads (see migrateLegacy). */
+function normalizeCfg(c){if(!c||!c.sites)return c;
+  if(c.portalUrl==null)c.portalUrl=DEFAULT_PORTAL;
+  for(const k in c.sites){const s=c.sites[k];
+    if(!Array.isArray(s.staff)&&Array.isArray(c.staff))s.staff=clone(c.staff);
+    if(Array.isArray(s.staff))s.staff=s.staff.map(x=>typeof x==='string'?{name:x,active:true}:x);
+    if(!Array.isArray(s.contacts))s.contacts=DEFAULT_CONTACTS();
+    if(s.nonEmergency==null)s.nonEmergency=c.nonEmergency||'';
+    if(s.sitePhone==null)s.sitePhone=c.sitePhone||'';
+    if(!Array.isArray(s.units))s.units=[];
+    s.units.forEach(u=>{if(!UNIT_STATUSES.includes(u.status))u.status='Vacant';if(u.participantId==null)u.participantId=''});
+    if(!s.status)s.status='Active';if(s.address==null)s.address='';if(s.opened==null)s.opened='';if(s.closed==null)s.closed=''}
+  delete c.staff;delete c.nonEmergency;delete c.sitePhone;return c}
+
+/* =========================================================
+   STORE — shared db when available, else this browser only
+   ========================================================= */
+const MODS=['notes','handoff','patrols','incidents','visitors','roomchecks','wellness','requests','intakes','engagement','workorders','requisitions'];
+let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,MY_UID=null;
+let MODE='local',GAS_OFFLINE=false,SHEET_URL='',WEBAPP_URL='',ARCHIVE_URL='',GAS=null,ALLOWED_RAW=null,LAUNCH_SITE='',PENDING=0,SIGNIN_NEEDED=false,API=null,INSTALL_PROMPT=null;
+const SERVER=()=>MODE==='gas'||MODE==='api';
+let CFG=null,CFG_READY=false;const CACHE={};MODS.forEach(m=>CACHE[m]=[]);
+const STAFF={},PPL={};const SUBREADY=new Set();
+const INV={};let CHECKS={},AUDIT=null;let invReady={};
+const confirmed=new Set();let syncTimedOut=false;
+const LOCAL_KEY='12n-nh-shared-fallback-v1',PREF_KEY='12n-nh-pref-v1';
+let PREF={meBy:{},site:''};try{PREF=Object.assign(PREF,JSON.parse(localStorage.getItem(PREF_KEY)||'{}'))}catch(e){}
+function savePref(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREF))}catch(e){}}
+let LOCAL=null;
+function loadLocal(){try{LOCAL=JSON.parse(localStorage.getItem(LOCAL_KEY)||'null')}catch(e){}
+  if(!LOCAL)LOCAL={cfg:DEFAULT_CFG(),rec:{},inv:{},checks:{},audits:{}};
+  for(const x of ['staff','participants','arch'])LOCAL[x]=LOCAL[x]||{};
+  CFG=normalizeCfg(LOCAL.cfg);CFG_READY=true;MODS.forEach(m=>CACHE[m]=LOCAL.rec[m]||(LOCAL.rec[m]=[]));
+  localSites()}
+function localSites(){for(const k in CFG.sites){INV[k]=LOCAL.inv[k]||(LOCAL.inv[k]=[]);invReady[k]=true;
+  STAFF[k]=LOCAL.staff[k]||(LOCAL.staff[k]=[]);PPL[k]=LOCAL.participants[k]||(LOCAL.participants[k]=[]);
+  SUBREADY.add('staff-'+k);SUBREADY.add('ppl-'+k);setTimeout(()=>migrateLegacy(k),0)}}
+function persistLocal(){try{localStorage.setItem(LOCAL_KEY,JSON.stringify(LOCAL))}catch(e){toast('This browser is not keeping data. Export a backup.','err')}}
+const S=()=>CFG||DEFAULT_CFG();
+/* Sites this account may use (Access tab "Sites" column in the standalone app); null list = all. */
+function allowedSites(){const keys=Object.keys(S().sites);if(!ALLOWED_RAW)return keys;
+  const want=ALLOWED_RAW.map(x=>String(x).trim().toLowerCase());return keys.filter(k=>want.includes(k.toLowerCase())||want.includes(String(S().sites[k].name).trim().toLowerCase()))}
+/* Sites shown in the site picker: open sites first; a closed site only if nothing else is open. */
+function visibleSites(){const a=allowedSites();const open=a.filter(k=>S().sites[k].status!=='Archived');return open.length?open:a}
+function curSite(){const v=visibleSites();if(!v.includes(PREF.site)&&!(allowedSites().includes(PREF.site)&&SHOW_CLOSED))PREF.site=v[0]||'';return PREF.site}
+let SHOW_CLOSED=false;
+const site=()=>S().sites[curSite()]||{name:'—',units:[],contacts:[],nonEmergency:'',sitePhone:'',status:'Active'};
+function staffOf(k){const s=S().sites[k]||{};if((STAFF[k]||[]).length||!Array.isArray(s.staff))return STAFF[k]||[];
+  return s.staff.map((x,i)=>({id:'legacy-'+i,name:x.name,role:x.role||'',phone:x.phone||'',email:x.email||'',status:x.active===false?'Inactive':'Active',legacy:true}))}
+const pplOf=k=>PPL[k]||[];
+const staffNames=()=>staffOf(curSite()).filter(s=>s.status==='Active'&&s.name).map(s=>s.name);
+const personById=(id,k=curSite())=>pplOf(k).find(p=>p.id===id);
+const me=()=>(PREF.meBy||{})[curSite()]||'';
+/* Two staff work each shift. The pair is shared (stored with today's shift checks) so every device sees who is on. */
+const shiftIdx=()=>SHIFTS.indexOf(shiftFor());
+const pair2=()=>{const p=CHECKS['staff_'+shiftIdx()];return Array.isArray(p)?[p[0]||'',p[1]||'']:['','']};
+const pair=()=>pair2().filter(Boolean);
+async function cfgSave(mut,msg){const before=clone(CFG);mut();try{await putCfg();if(msg)toast(msg)}catch(e){CFG=before;writeErr(e);render()}}
+const recs=m=>CACHE[m];
+const siteRecs=m=>CACHE[m].filter(r=>r.site===curSite());
+const units=()=>site().units;
+const unitOf=no=>units().find(x=>String(x.no)===String(no));
+const unitPid=no=>(unitOf(no)||{}).participantId||'';
+function unitName(u){if(!u)return'';const p=u.participantId&&personById(u.participantId);return p?p.name:(u.name||'')}
+function unitLabel(no){if(no===''||no==null)return'';if(isNaN(+no))return String(no);const n=unitName(unitOf(no));return `Unit ${no}${n?' · '+n:''}`}
+
+function writeErr(e){
+  if(e&&e.code==='invalid_argument')return toast('Not saved: your access to this page is view-only. Ask the owner to share it with you as a Contributor.','err');
+  if(e&&e.code==='quota_exceeded')return toast('Not saved: the shared database is full. Export to Excel, then ask the owner to archive old records.','err');
+  toast('Not saved: '+(e&&e.message||'connection problem')+'. Try again.','err')}
+async function putRec(m,r){
+  r=clone(r);
+  if(SHARED){await DBX.collection('log-'+m).doc(r.id).set(r);
+    const i=CACHE[m].findIndex(x=>x.id===r.id);if(i<0)CACHE[m].unshift(r);else CACHE[m][i]=r}
+  else{const a=LOCAL.rec[m];const i=a.findIndex(x=>x.id===r.id);if(i<0)a.unshift(r);else a[i]=r;persistLocal()}
+  scheduleRender()}
+async function removeRec(m,id){
+  if(SHARED)await DBX.collection('log-'+m).doc(id).delete();
+  const a=SHARED?CACHE[m]:LOCAL.rec[m];const i=a.findIndex(x=>x.id===id);if(i>=0)a.splice(i,1);
+  if(!SHARED)persistLocal();scheduleRender()}
+async function putCfg(){if(SHARED){await DBX.doc('config/main').set(clone(CFG));subscribeSiteRecords()}else{persistLocal();localSites()}scheduleRender()}
+async function putInv(k,item){item=clone(item);
+  if(SHARED)await DBX.collection('inv-'+k).doc(item.id).set(item);
+  const a=INV[k]||(INV[k]=[]);const i=a.findIndex(x=>x.id===item.id);if(i<0)a.push(item);else a[i]=item;
+  if(!SHARED)persistLocal();scheduleRender()}
+async function delInvItem(k,id){if(SHARED)await DBX.collection('inv-'+k).doc(id).delete();
+  const a=INV[k];a.splice(a.findIndex(x=>x.id===id),1);if(!SHARED)persistLocal();scheduleRender()}
+const checksDocId=()=>`${curSite()}_${today()}`;
+async function putChecks(){if(SHARED)await DBX.doc('checks/'+checksDocId()).set(clone(CHECKS));else{LOCAL.checks[checksDocId()]=CHECKS;persistLocal()}scheduleRender()}
+async function putAudit(a){AUDIT=a;if(SHARED)await DBX.doc('checks/audit_'+curSite()).set(a);else{LOCAL.audits[curSite()]=a;persistLocal()}scheduleRender()}
+/* Staff and participant records (kind = 'staff' | 'participants'). */
+async function putSub(k,kind,obj){obj=clone(obj);
+  if(SHARED)await DBX.collection(`sites/${k}/${kind}`).doc(obj.id).set(obj);
+  const store=kind==='staff'?STAFF:PPL;const a=store[k]||(store[k]=[]);const i=a.findIndex(x=>x.id===obj.id);if(i<0)a.push(obj);else a[i]=obj;
+  if(!SHARED)persistLocal();scheduleRender()}
+/* Move legacy staff lists and participant names out of the config into their own records (managers only, once). */
+const migrating=new Set();
+async function migrateLegacy(k){
+  if(!CAN_ADMIN||!CAN_WRITE||migrating.has(k)||!CFG||!CFG.sites[k])return;
+  if(!SUBREADY.has('staff-'+k)||!SUBREADY.has('ppl-'+k))return;
+  const s=CFG.sites[k];const hasStaff=Array.isArray(s.staff);const legacyUnits=s.units.some(u=>u.name&&!u.participantId);
+  if(!hasStaff&&!legacyUnits&&!s.units.some(u=>'name' in u||'moveIn' in u||'appliances' in u))return;
+  migrating.add(k);
+  try{
+    if(hasStaff&&!(STAFF[k]||[]).length)for(const x of s.staff)if(x.name)await putSub(k,'staff',{id:uid(),name:x.name,role:x.role||'',phone:x.phone||'',email:x.email||'',status:x.active===false?'Inactive':'Active',start:'',end:''});
+    const us=clone(s.units);
+    for(const u of us)if(u.name&&!u.participantId){const p={id:uid(),name:u.name,unit:u.no,status:'Active',moveIn:u.moveIn||'',moveOut:'',exitReason:'',appliances:u.appliances||'',notes:'',
+      history:[{date:u.moveIn||today(),event:'Moved in (carried over from the earlier roster)',unit:u.no,by:me()||'Setup'}]};
+      await putSub(k,'participants',p);u.participantId=p.id;if(u.status==='Vacant')u.status='Occupied'}
+    const before=clone(CFG);CFG.sites[k].units=us.map(({name,appliances,moveIn,...rest})=>rest);delete CFG.sites[k].staff;
+    try{await putCfg()}catch(e){CFG=before;throw e}
+  }catch(e){migrating.delete(k);writeErr(e)}}
+
+/* ---------- Archive: closed log entries older than a cutoff move out of the live log, kept and searchable ---------- */
+const recDate=r=>r.date||String(r.createdAt||'').slice(0,10);
+const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
+  incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!r.roomStatus||r.roomStatus==='Clean'||r.checkInDone==='Yes',
+  requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
+  requisitions:r=>['Received','Denied'].includes(r.status)};
+function archiveCandidates(months){const cutoff=addDays(today(),-Math.round(months*30.44));const ok=new Set(allowedSites());
+  return Object.fromEntries(MODS.map(m=>[m,recs(m).filter(r=>ok.has(r.site)&&recDate(r)&&recDate(r)<cutoff&&IS_CLOSED[m](r))]))}
+async function archiveEntries(m,list,progress){
+  if(!list.length)return 0;let n=0;
+  if(SERVER()){for(let i=0;i<list.length;i+=200){const ids=list.slice(i,i+200).map(r=>r.id);await GAS.run('archiveMove',m,ids);n+=ids.length;progress&&progress(n)}}
+  else if(SHARED){for(const r of list){await DBX.collection('arch-'+m).doc(r.id).set(clone(r));await DBX.collection('log-'+m).doc(r.id).delete();n++;if(n%20===0)progress&&progress(n)}}
+  else{const a=LOCAL.arch[m]||(LOCAL.arch[m]=[]);for(const r of list){a.push(clone(r));const i=LOCAL.rec[m].findIndex(x=>x.id===r.id);if(i>=0)LOCAL.rec[m].splice(i,1);n++}persistLocal()}
+  const gone=new Set(list.map(r=>r.id));CACHE[m]=(SHARED?CACHE[m]:LOCAL.rec[m]).filter(r=>!gone.has(r.id));if(!SHARED)CACHE[m]=LOCAL.rec[m];scheduleRender();return n}
+async function loadArchive(m,k,from,to){let list=[];
+  if(SERVER())list=await GAS.run('archiveQuery',m,k,from||'',to||'');
+  else if(SHARED){const s=await DBX.collection('arch-'+m).where('site','==',k).limit(1000).get();list=s.docs.map(d=>d.data())}
+  else list=(LOCAL.arch[m]||[]).filter(r=>r.site===k);
+  return sorted(list.filter(r=>(!from||recDate(r)>=from)&&(!to||recDate(r)<=to)))}
+async function restoreArchived(m,r){
+  if(SERVER())await GAS.run('archiveRestore',m,[r.id],r.site,recDate(r).slice(0,4));
+  else if(SHARED){await DBX.collection('log-'+m).doc(r.id).set(clone(r));await DBX.collection('arch-'+m).doc(r.id).delete()}
+  else{LOCAL.arch[m]=(LOCAL.arch[m]||[]).filter(x=>x.id!==r.id);LOCAL.rec[m].unshift(clone(r));persistLocal()}
+  if(SHARED&&!CACHE[m].some(x=>x.id===r.id))CACHE[m].unshift(clone(r));scheduleRender()}
+
+/* ---------- live subscriptions ---------- */
+const subs={};
+function sub(key,ref,next){if(subs[key])subs[key]();
+  subs[key]=ref.onSnapshot(s=>{if(!s.metadata.fromCache){confirmed.add(key);updateSync()}next(s)},e=>{confirmed.add(key);if(e.code==='revoked'){SHARED_REVOKED=true}updateSync();scheduleRender()})}
+let SHARED_REVOKED=false;
+function subscribeAll(){
+  sub('cfg',DBX.doc('config/main'),s=>{CFG=s.exists?normalizeCfg(clone(s.data())):null;CFG_READY=true;applyLaunchSite();subscribeSiteRecords();subscribeSite();scheduleRender()});
+  for(const m of MODS)sub('log-'+m,DBX.collection('log-'+m).orderBy('createdAt','desc').limit(1000),s=>{CACHE[m]=s.docs.map(d=>d.data());scheduleRender()});
+  setTimeout(()=>{syncTimedOut=true;updateSync()},10000)}
+/* Staff and participant records for every site this account can use (rosters are small). */
+const recSubs=new Set();
+function subscribeSiteRecords(){if(!CFG||!SHARED)return;
+  for(const k of allowedSites()){if(recSubs.has(k))continue;recSubs.add(k);
+    sub('staff-'+k,DBX.collection(`sites/${k}/staff`),s=>{STAFF[k]=s.docs.map(d=>clone(d.data()));SUBREADY.add('staff-'+k);migrateLegacy(k);scheduleRender()});
+    sub('ppl-'+k,DBX.collection(`sites/${k}/participants`),s=>{PPL[k]=s.docs.map(d=>clone(d.data()));SUBREADY.add('ppl-'+k);migrateLegacy(k);scheduleRender()})}}
+/* A launch link (…?site=<id or name>) opens straight to that site's page. */
+function applyLaunchSite(){if(!LAUNCH_SITE||!CFG)return;const want=LAUNCH_SITE.trim().toLowerCase();
+  const k=allowedSites().find(x=>x.toLowerCase()===want||String(S().sites[x].name).trim().toLowerCase()===want);
+  if(k){PREF.site=k;savePref()}LAUNCH_SITE=''}
+let subscribedSite=null,subscribedDay=null;
+function subscribeSite(){
+  const k=curSite();if(!k||!SHARED)return;
+  if(subscribedSite===k&&subscribedDay===today())return;subscribedSite=k;subscribedDay=today();
+  sub('inv',DBX.collection('inv-'+k),s=>{INV[k]=s.docs.map(d=>clone(d.data()));invReady[k]=true;scheduleRender()});
+  sub('checks',DBX.doc('checks/'+checksDocId()),s=>{CHECKS=s.exists?clone(s.data()):{};scheduleRender()});
+  sub('audit',DBX.doc('checks/audit_'+k),s=>{AUDIT=s.exists?s.data():null;scheduleRender()})}
+function updateSync(){const el=$('#sync');if(!el)return;
+  if(!SHARED){el.className='syncpill warn';el.lastElementChild.textContent='This device only';return}
+  if(SHARED_REVOKED){el.className='syncpill warn';el.lastElementChild.textContent='Access changed';return}
+  if(MODE==='api'&&SIGNIN_NEEDED){el.className='syncpill warn';el.lastElementChild.textContent=PENDING?`Sign in to sync ${PENDING}`:'Sign in again';return}
+  if(SERVER()&&GAS_OFFLINE){el.className='syncpill warn';el.lastElementChild.textContent=PENDING?`Offline · ${PENDING} waiting to sync`:'Offline · working from this device';return}
+  if(MODE==='api'&&PENDING){el.className='syncpill';el.lastElementChild.textContent=`Syncing ${PENDING}…`;return}
+  const all=confirmed.size>=MODS.length+1;
+  el.className='syncpill '+(all?'live':syncTimedOut?'warn':'');el.lastElementChild.textContent=all?'Live · shared':syncTimedOut?'Can\'t reach shared data yet':'Connecting…'}
+
+/* ---------- render scheduling (don't steal focus while someone is typing) ---------- */
+let renderPending=false,rT;
+function scheduleRender(){clearTimeout(rT);rT=setTimeout(()=>{const a=document.activeElement;
+  if(a&&$('#view').contains(a)&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)&&!a.classList.contains('search')){renderPending=true;return}render()},60)}
+document.addEventListener('focusout',()=>{if(renderPending){renderPending=false;setTimeout(()=>{const a=document.activeElement;if(!(a&&$('#view').contains(a)&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)))render();else renderPending=true},0)}});
+
+/* =========================================================
+   OPTION LISTS & PILLS
+   ========================================================= */
+const INTERACTION=["Incident Report filed","One on One","Weekly Check-in","Wellness Check","Room Checks","Group Activity","12N Community","Celebration","Reminder","Policy Reminder","Support Request","Observation","Behaviour Escalation","Safety","Maintenance","Cleaners","Guest Visit","Intake Request","Inventory","Law Enforcement Visit","Missing Participant Check","Staff Change"];
+/* Entry types where the shift log only references an Incident Report (12N Note Taking and Report Writing Guideline). */
+const NOTE_IR_TYPES=['Incident Report filed','Behaviour Escalation','Safety','Law Enforcement Visit','Missing Participant Check'];
+const followDue=r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'&&r.followUpBy&&new Date(r.followUpBy)<new Date();
+const fmtWhen=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})};
+/* Words that usually signal a guess, label or diagnosis rather than an observation. */
+const SUBJECTIVE_RE=/\b(drunk|intoxicated|wasted|stoned|hostile|lazy|uncooperative|rude|crazy|psycho\w*|manic|paranoid|delusional|schizo\w*|bipolar|depressed|attention[- ]seeking|manipulat\w*|looking (for|to start) (trouble|a fight|a conflict)|seemed|appeared to be|probably|obviously|i think|i feel|i believe)\b/gi;
+const INCIDENT_TYPES=["Near Miss","Behavioural Escalation","Participant Injury","Staff Injury","Medical Emergency or Overdose","Harassment","Violence","Property Damage","Breach of Community Agreements / Code of Conduct","Police or EMS Involvement","Missing Participant","Needle Stick / Sharps Injury","Alarm Activation (Homestar Gate)","Other / General Incident"];
+const LOCATIONS=["Courtyard","Admin Building","Kitchen / Common area","Shared bathrooms / showers","Laundry","Guest space / Guest unit","Gate / Perimeter","Micro-home exterior","Inside a unit","Off-site activity","Other"];
+const PLACES=["Admin Building","Shared bathrooms / showers","Laundry","Courtyard / pathways","Homestar Gate","Perimeter fence","Exterior lighting","Guest unit","Other"];
+const ESC_STEPS=["—","1. Incident Report","2. Room Status Update","3. Written Warning","4. Community Accountability Review (CAR)","5. Urgent Warning (Final Written Notice)","6. Eviction Request Form","7. Program Review Committee decision","8. Debrief & Lessons Learned"];
+const PILL={HIGH:'bad',High:'bad',MEDIUM:'warn',Medium:'warn',LOW:'info',Low:'info',Yes:'warn',No:'',
+ 'All-Clear':'ok',Noteworthy:'warn','Disruptive Visitor':'bad','Security Hazard':'bad','Trespass Warning':'bad',
+ Pass:'ok',Fail:'bad','Day Off':'purple',Exempt:'ok',Due:'pink',Clean:'ok','Needs Support':'warn','Follow-Up Required':'bad',
+ Approved:'ok',Pending:'warn',Denied:'bad',Open:'warn',Resolved:'ok',Acknowledged:'ok',
+ Submitted:'info','Under Review':'warn','Follow-up Required':'bad','CAR Recommended':'purple',Closed:'ok',
+ 'Awaiting Review':'warn',Assigned:'info','In Progress':'acc',Completed:'ok',
+ '1 — Critical':'bad','2 — Urgent':'warn','3 — Routine':'info','4 — Low':'',
+ Stocked:'ok','Low Stock':'warn','Out of Stock':'bad','Not Stocked':'',Surplus:'info',
+ Requested:'warn',Ordered:'info',Received:'ok','New Inquiry':'warn','Contact Logged':'info','Card Active':'acc','Referred to Case Management':'purple',Admitted:'ok',
+ 'In HIFIS':'ok','Not in HIFIS':'bad',Unsure:'warn','On site':'warn','Signed out':'ok',
+ Occupied:'ok',Vacant:'','Pending Move-in':'warn','Out of service':'bad',Active:'ok',Inactive:'warn',Archived:''};
+const pill=(v,cls)=>v?`<span class="pill p-${cls??PILL[v]??''}">${esc(v)}</span>`:'';
+
+/* =========================================================
+   MODULE DEFINITIONS
+   ========================================================= */
+const D={me:()=>me(),today:()=>today(),now:()=>nowTime(),shift:()=>shiftFor(),other:()=>pair().find(n=>n!==me())||'',pairText:()=>pair().join(', ')};
+const M={
+notes:{title:'Shift Notes',nav:'Shift Notes',sheet:'Notes Data',sop:'Guide · Note-Taking · NH 3.3.5',
+ desc:'Log what staff need to know to support a participant, respond to a concern, or carry work into the next shift. Routine comings and goings, greetings and casual conversation stay out. Urgent concerns are escalated first, then logged.',
+ fields:[
+  {k:'guide',t:'info',full:1,show:()=>true,html:()=>`<b>Does this change what staff need to know or do?</b> If not, it doesn't need logging.<br>
+   <b>Log:</b> meaningful wellness changes · missed scheduled check-ins · requests or commitments that need follow-up · safety concerns · site issues (a leak, a supply shortage).<br>
+   <b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment with no safety concern or follow-up.<br>
+   <span class="meta" style="margin:0">12N Note Taking and Report Writing Guideline</span>`},
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',req:1,def:D.now},
+  {k:'shift',l:'Shift',t:'select',o:SHIFTS,def:D.shift},{k:'priority',l:'Priority',t:'seg',o:['LOW','MEDIUM','HIGH'],def:'LOW'},
+  {k:'participant',l:'Participant / Unit',t:'unit',extras:['Neighbourly Homes (general)','Shift Change'],req:1,hint:'Use the unit or approved identifier when staff need it to act.'},
+  {k:'location',l:'Location',t:'select',o:LOCATIONS},
+  {k:'type',l:'Entry type',t:'select',o:INTERACTION,req:1},
+  {k:'irInfo',t:'info',full:1,warn:1,show:r=>NOTE_IR_TYPES.includes(r.type),html:()=>'<b>Keep this entry brief.</b> The full account (sequence of events, observations, actions taken, who was notified) goes in the <b>Incident Report</b>. Here, reference the report and add any immediate instructions or open follow-up the incoming team needs. Escalate urgent concerns first.'},
+  {k:'irStatus',l:'Incident Report',t:'seg',o:['Filed','To be filed','Not required'],show:r=>NOTE_IR_TYPES.includes(r.type),req:r=>NOTE_IR_TYPES.includes(r.type)},
+  {k:'notes',l:'What happened, what staff did, and the outcome',t:'textarea',full:1,req:1,ph:'e.g. At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order.',
+   hint:'Describe what you observed. If someone told you, name the source by role or unit. Quote exactly only when the wording matters. Leave out guesses about motives, diagnoses and unrelated personal details.'},
+  {k:'reporter',l:'Reporter',t:'staff',def:D.me,req:1},
+  {k:'followUp',l:'Open follow-up?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'followUpWho',l:'Who will act',t:'text',list:()=>['Incoming shift','Day shift','Evening shift','Night shift','Site Supervisor','Manager','Maintenance (C&M)','Case Management',...staffNames()],show:r=>r.followUp==='Yes',req:r=>r.followUp==='Yes'},
+  {k:'followUpBy',l:'By when',t:'datetime-local',show:r=>r.followUp==='Yes',req:r=>r.followUp==='Yes'},
+  {k:'followUpDetails',l:'What they need to do',t:'textarea',full:1,show:r=>r.followUp==='Yes',req:r=>r.followUp==='Yes',ph:'e.g. Check the repair status and update the participant.'},
+  {k:'followUpStatus',l:'Follow-up status',t:'seg',o:['Open','Resolved'],def:'Open',show:r=>r.followUp==='Yes'},
+  {k:'escalation',l:'Escalated?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'escalationNotes',l:'Escalation notes',t:'textarea',full:1,show:r=>r.escalation==='Yes',hint:'Who was told, when and how. If this is an incident, also file an Incident Report within 12 hours.'}],
+ cols:['date','time','priority','participant','type','notes','reporter',{l:'Follow-up',f:r=>r.followUp!=='Yes'?'':r.followUpStatus==='Resolved'?pill('Resolved'):followDue(r)?pill('Overdue','bad'):pill(r.followUpWho?`Open · ${r.followUpWho}`:'Open','warn')}],
+ chips:[{l:'Today',f:r=>r.date===today()},{l:'Open follow-ups',f:r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'},{l:'High priority',f:r=>r.priority==='HIGH'},{l:'Escalated',f:r=>r.escalation==='Yes'}]},
+handoff:{title:'Shift Handoff',nav:'Shift Handoff',sheet:'Shift Handoff Log',sop:'NH 3.3.5',
+ desc:'Done in the final 15 minutes of each shift, with a 10-minute in-person overlap when possible. If critical safety or tenant matters remain open, do not leave until the incoming lead accepts the handoff.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'shift',l:'Shift ending',t:'select',o:SHIFTS,def:D.shift,req:1},
+  {k:'outgoing',l:'Outgoing staff 1',t:'staff',def:D.me,req:1},{k:'outgoing2',l:'Outgoing staff 2',t:'staff',def:D.other},
+  {k:'incoming',l:'Incoming staff 1',t:'staff'},{k:'incoming2',l:'Incoming staff 2',t:'staff'},
+  {k:'auto',t:'info',full:1,html:()=>autoSummaryHTML()},
+  {k:'participantUpdates',l:'Participant updates',t:'textarea',full:1,hint:'Wellness concerns, conflict or notable behaviour, missed check-ins, follow-up requests.'},
+  {k:'siteUpdates',l:'Site updates',t:'textarea',full:1,hint:'Maintenance issues, hazards from walkthroughs, supplies needing restock, programming notes.'},
+  {k:'incidents',l:'Incidents (reported or potential)',t:'textarea',full:1,hint:'Include low-level ones. Note if an Incident Report is still to be filed.'},
+  {k:'toFollowUp',l:'To follow up (for incoming staff)',t:'textarea',full:1,req:1,def:()=>autoSummaryText(),hint:'Review each pending item with incoming staff and confirm who is taking it. For incidents, reference the Incident Report and say what the incoming shift must do.'},
+  {k:'verbal',l:'Verbal handoff done?',t:'seg',o:['Yes','No'],def:'Yes'},
+  {k:'status',l:'Handoff status',t:'seg',o:['Pending','Acknowledged'],def:'Pending'},
+  {k:'ackBy',l:'Acknowledged by',t:'staff',show:r=>r.status==='Acknowledged',req:r=>r.status==='Acknowledged'}],
+ cols:['date','shift',{l:'Outgoing',f:r=>esc([r.outgoing,r.outgoing2].filter(Boolean).join(' & '))},{l:'Incoming',f:r=>esc([r.incoming,r.incoming2].filter(Boolean).join(' & '))},'toFollowUp','status'],
+ chips:[{l:'Pending',f:r=>r.status!=='Acknowledged'},{l:'Today',f:r=>r.date===today()}]},
+patrols:{title:'Perimeter Checks & Walkthroughs',nav:'Perimeter & Walkthroughs',sheet:'Perimeter Check Data',sop:'NH 3.1.5 · 3.1.8 · Guide',
+ desc:'Hourly patrols (every 60–90 min), the Morning Walkthrough (8–10 AM), the Midday Spot Check (12–2 PM) and the Evening Site Check (9:30–10 PM). Log within 15 minutes of the patrol.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',req:1,def:D.now},
+  {k:'checkType',l:'Check type',t:'select',full:1,o:['Hourly Patrol','Morning Safety Walkthrough (8–10 AM)','Midday Spot Check (12–2 PM)','Evening Site Check (9:30–10 PM)'],def:()=>{const h=new Date().getHours();return h>=8&&h<10?'Morning Safety Walkthrough (8–10 AM)':h>=12&&h<14?'Midday Spot Check (12–2 PM)':h>=21&&h<23?'Evening Site Check (9:30–10 PM)':'Hourly Patrol'},req:1},
+  {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},{k:'staff2',l:'Second staff',t:'staff',def:D.other},
+  {k:'areas',l:'Areas checked',t:'multi',full:1,o:['Courtyard & pathways','Outdoor gathering areas','Shared bathrooms / showers / laundry','Admin Building interior','Micro-home exteriors','Emergency exits latched & locked','Homestar Gate & brace','Perimeter fence','Exterior lighting','Waste disposal','Emergency access paths']},
+  {k:'observed',l:'Observed',t:'multi',full:1,o:['Trash / broken glass','Tampered cords / unauthorized appliances','Damage, leaks or pests','Fire hazard','Participant wellness concern','Maintenance needed','Conflict / graffiti / vandalism','Snow / ice / weather impact','Unlocked or tampered exit','Unknown person on site','Restock needed (Admin)'],hint:'Leave blank if nothing to note.'},
+  {k:'internal',l:'Internal notes',t:'textarea',hint:'Hallways, exits, common spaces, Admin Building.'},
+  {k:'external',l:'External notes',t:'textarea',hint:'Yard, fence, lighting, walkways, waste area.'},
+  {k:'classification',l:'Classification',t:'seg',full:1,o:['All-Clear','Noteworthy','Disruptive Visitor','Security Hazard','Trespass Warning'],def:'All-Clear',req:1},
+  {k:'escalation',l:'Escalation',t:'select',o:['None','De-escalated','Asked to Leave','Notice of Trespass Issued','Police Non-Emergency Dispatched','911 Emergency Dispatched'],def:'None'},
+  {k:'actions',l:'Actions taken / maintenance flagged',t:'textarea',full:1,show:r=>r.classification!=='All-Clear'||(r.observed||[]).length||r.escalation!=='None'},
+  {k:'tip',t:'info',full:1,warn:1,show:r=>['Disruptive Visitor','Security Hazard','Trespass Warning'].includes(r.classification)||['Notice of Trespass Issued','Police Non-Emergency Dispatched','911 Emergency Dispatched'].includes(r.escalation),html:()=>'Tell the Shift Lead now. Security threats, trespass or police contact also need an <b>Incident Report</b> (within 12 hours). A Notice of Trespass needs Executive Director approval. Never attempt physical removal.'}],
+ cols:['date','time','checkType','staff','classification','escalation',{l:'Observed',f:r=>esc((r.observed||[]).join(', '))}],
+ chips:[{l:'Today',f:r=>r.date===today()},{l:'Not all-clear',f:r=>r.classification!=='All-Clear'},{l:'Evening checks',f:r=>/Evening/.test(r.checkType)}]},
+incidents:{title:'Incident Reports',nav:'Incident Reports',sheet:'Incident Reports',sop:'NH 3.1.4 · 3.1.12 · 3.1.16 · Red Manual',copy:1,
+ desc:'Submit within 12 hours for any injury, illness, property damage, near miss, behavioural escalation, police/EMS involvement or Code of Conduct breach. Use initials or ID codes only, never full names.',
+ fields:[
+  {t:'sect',l:'When & where'},
+  {k:'date',l:'Date of incident',t:'date',req:1,def:D.today},{k:'time',l:'Time of incident',t:'time',req:1,def:D.now},
+  {k:'location',l:'Location',t:'select',o:LOCATIONS,req:1},{k:'locationDetail',l:'Location detail',t:'text',hint:'e.g. kitchen, by the back door'},
+  {k:'reportType',l:'Reason for report',t:'select',full:1,o:INCIDENT_TYPES,req:1},
+  {t:'sect',l:'People involved'},
+  {k:'involved',l:'Individuals involved',t:'textarea',full:1,req:1,hint:'Initials or ID codes only, and say whether each is staff or participant. Example: "PA (participant), PB (participant)".'},
+  {k:'staffOnSite',l:'Staff on site',t:'text',def:D.pairText},{k:'otherServices',l:'Other services involved',t:'text',hint:'N/A if none'},
+  {t:'sect',l:'What happened'},
+  {k:'description',l:'Objective description',t:'textarea',full:1,req:1,hint:'The sequence of events and relevant observations: what was said or done, and how it developed. Only what you saw or heard yourself. For anything second-hand, name the source by role or identifier. Quote exactly only when the wording matters.'},
+  {k:'actions',l:'Actions taken by staff',t:'textarea',full:1,req:1},
+  {t:'sect',l:'Notifications'},
+  {k:'supContacted',l:'Site Supervisor / On-Call contacted?',t:'seg',o:['Yes','No'],req:1},
+  {k:'supWho',l:'Who & how (Signal, phone, in person)',t:'text',show:r=>r.supContacted==='Yes'},
+  {k:'services',l:'Emergency services attended',t:'multi',o:['Police','EMS','Fire']},
+  {k:'occurrence',l:'Police file / occurrence #',t:'text',show:r=>(r.services||[]).includes('Police')||r.reportType==='Missing Participant'},
+  {k:'officer',l:'Officer name / badge',t:'text',show:r=>(r.services||[]).includes('Police')},
+  {k:'warrant',l:'Warrant # (if presented)',t:'text',show:r=>(r.services||[]).includes('Police')},
+  {k:'naloxone',l:'Naloxone administered?',t:'seg',o:['No','Yes'],show:r=>r.reportType==='Medical Emergency or Overdose'},
+  {t:'sect',l:'Missing participant details',show:r=>r.reportType==='Missing Participant'},
+  {k:'mpInfo',t:'info',full:1,warn:1,show:r=>r.reportType==='Missing Participant',html:()=>'<b>Thresholds:</b> High Risk: 24 hours without confirmed contact. Non-High Risk: 10 days. Reassess risk at any time and move to the High Risk timeline if needed. After filing this, phone the Site Manager right away.'},
+  {k:'risk',l:'Risk level at time of absence',t:'seg',o:['High Risk','Non-High Risk'],show:r=>r.reportType==='Missing Participant',req:r=>r.reportType==='Missing Participant'},
+  {k:'unit',l:'Unit',t:'unit',show:r=>r.reportType==='Missing Participant'},
+  {k:'lastSeen',l:'Last confirmed on-site presence',t:'datetime-local',show:r=>r.reportType==='Missing Participant'},
+  {k:'identified',l:'Absence first identified',t:'datetime-local',show:r=>r.reportType==='Missing Participant'},
+  {k:'attempts',l:'Wellness check attempts & outcomes',t:'textarea',full:1,show:r=>r.reportType==='Missing Participant',hint:'Site logs checked, calls/texts (times), who was asked.'},
+  {k:'appearance',l:'Last known description / context',t:'textarea',full:1,show:r=>r.reportType==='Missing Participant'},
+  {t:'sect',l:'Reporter'},
+  {k:'reporter',l:'Staff completing report',t:'staff',def:D.me,req:1},
+  {t:'sect',l:'Supervisor review (Site Supervisor / Manager)'},
+  {k:'review',l:'Review status',t:'select',o:['Submitted','Under Review','Follow-up Required','CAR Recommended','Closed'],def:'Submitted'},
+  {k:'escStep',l:'Escalation framework step',t:'select',o:ESC_STEPS,def:'—'},
+  {k:'agencies',l:'Partner agencies informed?',t:'seg',o:['N/A','Yes','No'],def:'N/A'},
+  {k:'reviewNotes',l:'Review / follow-up notes',t:'textarea',full:1}],
+ cols:['date','time','reportType','location','reporter',{l:'Filed',f:r=>lateness(r)},'review'],
+ chips:[{l:'Open',f:r=>r.review!=='Closed'},{l:'Filed late (>12h)',f:r=>incLateHrs(r)>12},{l:'Police / EMS',f:r=>(r.services||[]).length},{l:'Missing participant',f:r=>r.reportType==='Missing Participant'}]},
+visitors:{title:'Visitor & Contractor Log',nav:'Visitor Log',sheet:'Visitor Log',sop:'NH 3.3.1 · 3.3.2',
+ desc:'Every external worker, contractor, agency partner and 12N visitor signs in at the Admin Building. External workers meet participants in the Admin Building or courtyard seating, never inside units. No participant guests in the courtyard interior.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'timeIn',l:'Time in',t:'time',req:1,def:D.now},
+  {k:'name',l:'Visitor name',t:'text',req:1},{k:'agency',l:'Agency / organization',t:'text',req:1},
+  {k:'vtype',l:'Visitor type',t:'select',o:['Agency worker / case manager','Contractor / maintenance','12N staff / leadership','Funder / researcher (supervised)','Other']},
+  {k:'visiting',l:'Participant visiting',t:'text',hint:'First name only if confidentiality is a concern'},
+  {k:'purpose',l:'Purpose',t:'text',full:1},
+  {k:'consent',l:'Participant agreed to the visit?',t:'seg',o:['Yes','No','N/A'],def:'Yes'},
+  {k:'staff',l:'Checked in by',t:'staff',def:D.me},{k:'timeOut',l:'Time out',t:'time'},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','timeIn','timeOut','name','agency','visiting',{l:'Status',f:r=>pill(r.timeOut?'Signed out':'On site')}],
+ rowAction:{l:'Sign out',show:r=>!r.timeOut,run:r=>{r.timeOut=nowTime()}},
+ chips:[{l:'On site now',f:r=>!r.timeOut},{l:'Today',f:r=>r.date===today()}]},
+roomchecks:{title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations Data',sop:'Guide · Room Checks',custom:'roomGrid',
+ desc:'Weekday checks (Mon–Fri, 10 AM–2 PM): knock, announce, do a wellness and room check, then record it here. Every unit must be accounted for (checked or exempt) before the shift ends.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Unit',t:'unit',req:1},
+  {k:'status',l:'Result',t:'seg',full:1,o:['Pass','Fail','Day Off','Exempt','Due'],req:1},
+  {k:'exemptReason',l:'Exemption reason',t:'select',o:['Holiday','Staff Meeting','Pre-approved Exemption','Medical / Hospital','Participant Away'],show:r=>['Exempt','Day Off'].includes(r.status)},
+  {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},{k:'trainee',l:'Second staff / shadowing',t:'staff',def:D.other},
+  {k:'checkStatus',l:'Check status',t:'select',o:['Completed','Staff Missed Check','Pending Follow-up','Excused'],def:'Completed'},
+  {k:'missedReason',l:'Missed check reason',t:'text',show:r=>r.checkStatus==='Staff Missed Check'},
+  {k:'priority',l:'Priority',t:'seg',o:['Low','Medium','High'],def:'Low'},
+  {k:'followUp',l:'Follow-up?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'comments',l:'Comments',t:'textarea',full:1,req:r=>r.status==='Fail',hint:'Required for a Fail. Note any unapproved appliances (heating elements, hot plates): report these to the Site Supervisor right away.'}],
+ cols:['date','unit','status','staff','checkStatus','followUp','comments'],
+ chips:[{l:'Today',f:r=>r.date===today()},{l:'Fails',f:r=>r.status==='Fail'},{l:'Follow-ups',f:r=>r.followUp==='Yes'}]},
+wellness:{title:'Room Wellness Checks',nav:'Wellness Checks',sheet:'Room Wellness Checks',sop:'NH 3.1.6 · Appendix 3',copy:1,
+ desc:'Every second Thursday, 2–4 PM, with a notice posted 48 hours ahead. The check is supportive, not disciplinary. Do not open bins, drawers or bags unless safety is at immediate risk and a supervisor approves.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time of check',t:'time',def:D.now},
+  {k:'unit',l:'Room / unit',t:'unit',req:1},{k:'staff',l:'Staff member',t:'staff',def:D.me,req:1},{k:'staff2',l:'Second staff',t:'staff',def:D.other},
+  {k:'items',l:'Room wellness check',t:'yntable',full:1,o:['Participant in unit','Room is clean / tidy','Bed made / sleeping area neat','Garbage removed / no buildup','Signs of pests / infestations','Odour free / air fresh','Items in good repair (no damage)','Smoke detector is working','Participant open to conversation','Participant has health & wellness concerns']},
+  {k:'roomStatus',l:'Room status',t:'seg',full:1,o:['Clean','Needs Support','Follow-Up Required'],req:1},
+  {k:'support',l:'Support needed',t:'multi',full:1,o:['Hygiene supplies','Mental health','Physical health','Emotional support / check-in','Laundry support','Room cleaning support','Clothing / weather gear','Maintenance / repairs','Income support / Social Development','Budgeting support','Legal support','Other']},
+  {k:'notes',l:'Additional notes',t:'textarea'},{k:'action',l:'Immediate action taken',t:'textarea'},
+  {k:'checkInDue',l:'Private check-in due (within 48 h)',t:'date',show:r=>r.roomStatus&&r.roomStatus!=='Clean',def:()=>addDays(today(),2)},
+  {k:'checkInDone',l:'Check-in completed?',t:'seg',o:['No','Yes'],def:'No',show:r=>r.roomStatus&&r.roomStatus!=='Clean'}],
+ cols:['date','unit','staff','roomStatus',{l:'Support',f:r=>esc((r.support||[]).join(', '))},{l:'Check-in',f:r=>r.roomStatus&&r.roomStatus!=='Clean'?(r.checkInDone==='Yes'?pill('Completed'):pill('Due '+fmtDate(r.checkInDue),r.checkInDue<today()?'bad':'warn')):''}],
+ chips:[{l:'Needs follow-up',f:r=>r.roomStatus&&r.roomStatus!=='Clean'&&r.checkInDone!=='Yes'},{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)}]},
+requests:{title:'Participant Requests & Appliance Approvals',nav:'Participant Requests',sheet:'Participant Requests',sop:'Guide · Room Checks · NH 3.3.4',
+ desc:'Supply requests, appliance permissions and item needs. All appliance approvals need management sign-off. Only permitted items (e.g. kettle, fridge) are approved.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Participant / unit',t:'unit',req:1},
+  {k:'category',l:'Request category',t:'select',o:['Appliance Approval','Cleaning Supplies','Hygiene Supplies','Clothing / Weather Gear','Bedding / Linens','Maintenance','Food / Meal','Other'],req:1},
+  {k:'item',l:'Requested item',t:'text',req:1},{k:'reason',l:'Request reason',t:'textarea',full:1},
+  {k:'approval',l:'Approval status',t:'seg',o:['Pending','Approved','Denied'],def:'Pending'},
+  {k:'approvedBy',l:'Approved / denied by',t:'staff',show:r=>r.approval!=='Pending'},
+  {k:'approvalNotes',l:'Approval notes',t:'textarea',full:1,show:r=>r.approval!=='Pending'},
+  {k:'staff',l:'Logged by',t:'staff',def:D.me}],
+ cols:['date','unit','category','item','approval','staff'],
+ chips:[{l:'Pending',f:r=>r.approval==='Pending'},{l:'Appliances',f:r=>r.category==='Appliance Approval'}]},
+intakes:{title:'Intakes',nav:'Intakes',sheet:'Intake Data',sop:'Guide · Intakes · NH 3.2.1',
+ desc:'Review new inquiries daily so none waits more than 24 hours. Check HIFIS for each applicant. Escalate any referral with no contact for 48+ hours to the Senior Intake Coordinator. Flag urgent shelter needs to Case Management.',
+ fields:[
+  {k:'date',l:'Date received',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
+  {k:'name',l:'Applicant name',t:'text',req:1},{k:'contact',l:'Contact info',t:'text',hint:'Verify before the intake interview'},
+  {k:'dob',l:'Date of birth',t:'date'},{k:'hifis',l:'HIFIS',t:'seg',o:['Yes','No','Unsure'],req:1},
+  {k:'referral',l:'Referring agency / worker',t:'text'},
+  {k:'status',l:'Status',t:'select',o:['New Inquiry','Contact Logged','Card Active','Referred to Case Management','Admitted','Closed'],def:'New Inquiry'},
+  {k:'urgent',l:'Urgent shelter need?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'lastContact',l:'Last contact date',t:'date'},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','name','contact',{l:'HIFIS',f:r=>pill(r.hifis==='Yes'?'In HIFIS':r.hifis==='No'?'Not in HIFIS':r.hifis)},'status',{l:'Age',f:r=>intakeAge(r)}],
+ chips:[{l:'New',f:r=>r.status==='New Inquiry'},{l:'Not in HIFIS',f:r=>r.hifis!=='Yes'},{l:'Urgent',f:r=>r.urgent==='Yes'},{l:'Active',f:r=>!['Admitted','Closed'].includes(r.status)}]},
+engagement:{title:'Participant Engagement',nav:'Engagement',sheet:'Participant Engagement Data',sop:'Guide · Participant Engagement · NH 2.1',custom:'engStats',
+ desc:'Post the daily quote or reflection question by 8:30 AM. Use trauma-informed language and do not repeat a quote within 60 days. Log engagement by 4 PM, and tell the Shift Lead if a prompt causes distress.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},
+  {k:'category',l:'Category',t:'select',o:['Daily Whiteboard','Community Games','Wellness & Health','Life Skills Workshop','Support Assistance','Creative Arts','Social Connection'],req:1},
+  {k:'activity',l:'Activity name',t:'text',req:1},
+  {k:'boardType',l:'Whiteboard post type',t:'seg',o:['Quote','Question','Support','Exercise'],show:r=>r.category==='Daily Whiteboard'},
+  {k:'quote',l:'Quote / question text',t:'textarea',full:1,show:r=>r.category==='Daily Whiteboard',req:r=>r.category==='Daily Whiteboard'},
+  {k:'focus',l:'Target focus',t:'select',o:['Reflection & Morale','Positive Mindset','Community Building','Social Inclusion','Social Recreation','Mental Health','Coping Strategies','Stress Reduction','Physical Wellness','Creative Expression','Cognitive Engagement','Life Skills','Financial Literacy','Employment Readiness','Housing Stability','Individual Support']},
+  {k:'facilitator',l:'Staff facilitator',t:'staff',def:D.me},
+  {k:'attendance',l:'Attendance',t:'number'},
+  {k:'rating',l:'Engagement rating',t:'seg',o:['High','Medium','Low']},
+  {k:'location',l:'Location',t:'select',o:['Admin Building','Courtyard','Guest space','Off-site']},
+  {k:'notes',l:'Feedback / follow-up notes',t:'textarea',full:1}],
+ cols:['date','category','activity','facilitator','attendance','rating'],
+ chips:[{l:'Whiteboard',f:r=>r.category==='Daily Whiteboard'},{l:'This week',f:r=>r.date>=addDays(today(),-6)}]},
+workorders:{title:'Maintenance Work Orders',nav:'Work Orders',sheet:'Work Orders',sop:'NH 3.3.10 · Safety 2.8.1',copy:1,
+ desc:'Every maintenance issue gets a work order; verbal reports do not count. Only C&M does repairs. Critical issues (gas, flooding, no heat in winter, fire safety): phone or Signal the Warehouse Manager right away. Routine work is batched for the Wednesday site visit.',
+ fields:[
+  {k:'date',l:'Date submitted',t:'date',req:1,def:D.today},
+  {k:'where',l:'Unit or building',t:'place',req:1},
+  {k:'description',l:'Description of the issue',t:'textarea',full:1,req:1},
+  {k:'source',l:'Identified through',t:'select',o:['Participant report','Staff observation','Daily Safety Walkthrough','Room Wellness Check','Evening Site Check','Inspection finding','Emergency call follow-up','Maintenance follow-up']},
+  {k:'severity',l:'Severity / priority',t:'seg',full:1,o:['1 — Critical','2 — Urgent','3 — Routine','4 — Low'],def:'3 — Routine',req:1},
+  {k:'sevInfo',t:'info',full:1,warn:1,show:r=>/^1|^2/.test(r.severity||''),html:r=>/^1/.test(r.severity)?'<b>Critical:</b> escalate now by phone or Signal to the Warehouse Manager. Do not wait for the next site visit.':'<b>Urgent:</b> submit today and flag Urgent in DOS. The Warehouse Manager assigns it within 24 hours.'},
+  {k:'stage',l:'Stage',t:'seg',full:1,o:['Awaiting Review','Assigned','In Progress','Completed'],def:'Awaiting Review'},
+  {k:'assigned',l:'Assigned to (C&M)',t:'text',show:r=>r.stage!=='Awaiting Review'},{k:'scheduled',l:'Scheduled date',t:'date',show:r=>r.stage!=='Awaiting Review'},
+  {k:'submittedBy',l:'Submitted by',t:'staff',def:D.me,req:1},
+  {k:'escalated',l:'Escalated since submission?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'escNotes',l:'What changed / who was contacted',t:'textarea',full:1,show:r=>r.escalated==='Yes'},
+  {k:'completion',l:'Completion note',t:'textarea',full:1,show:r=>r.stage==='Completed',req:r=>r.stage==='Completed',hint:'Required to close. This is the permanent record of the work done.'},
+  {k:'closedBy',l:'Closed by',t:'staff',show:r=>r.stage==='Completed'}],
+ cols:['date','where','description','severity','stage',{l:'Age',f:r=>r.stage==='Awaiting Review'&&hoursSince(r.createdAt)>24?pill('Review overdue','bad'):''}],
+ chips:[{l:'Open',f:r=>r.stage!=='Completed'},{l:'Awaiting review',f:r=>r.stage==='Awaiting Review'},{l:'Critical / urgent',f:r=>/^1|^2/.test(r.severity)&&r.stage!=='Completed'}]},
+requisitions:{title:'Supply Requisitions',nav:'Requisitions',sheet:'Requisitions',sop:'Guide · Inventory & Needs · NH 3.3.4 · 3.3.8',custom:'quickReq',
+ desc:'Quick requests for tools, seasonal gear and restock. No critical requisition should sit in the queue for more than 24 hours. Items over the restock cost threshold need Operations Lead approval before purchase (ApprovalMax).',
+ fields:[
+  {k:'date',l:'Request date',t:'date',req:1,def:D.today},{k:'by',l:'Requested by',t:'staff',def:D.me,req:1},
+  {k:'item',l:'Item',t:'text',req:1,list:()=>(INV[curSite()]||[]).map(i=>i.item)},{k:'qty',l:'Quantity',t:'number',def:1},
+  {k:'reason',l:'Reason',t:'textarea',full:1},
+  {k:'priority',l:'Priority',t:'seg',o:['High','Medium','Low'],def:'Medium'},
+  {k:'status',l:'Status',t:'select',o:['Requested','Approved','Ordered','Received','Denied'],def:'Requested'},
+  {k:'notes',l:'Approval / order notes',t:'textarea',full:1}],
+ cols:['date','item','qty','priority','status','by'],
+ chips:[{l:'Open',f:r=>!['Received','Denied'].includes(r.status)},{l:'High priority',f:r=>r.priority==='High'}]},
+};
+const fieldsOf=m=>M[m].fields.filter(f=>f.k&&f.t!=='info');
+function incLateHrs(r){if(!r.date||!r.createdAt)return 0;const ev=new Date(`${r.date}T${r.time||'00:00'}`);return (new Date(r.createdAt)-ev)/36e5}
+function lateness(r){const h=incLateHrs(r);return h>12?pill(`Late · ${Math.round(h)}h`,'bad'):pill('On time','ok')}
+function intakeAge(r){if(['Admitted','Closed'].includes(r.status))return'';const h=hoursSince(r.createdAt||r.date);if(r.status==='New Inquiry'&&h>24)return pill('>24h unreviewed','bad');if(h>48&&!r.lastContact)return pill('>48h no contact','warn');return pill(Math.max(0,Math.round(h))+'h','')}
+
+/* =========================================================
+   IN-PAGE DIALOG (the viewer blocks alert/confirm/prompt)
+   ========================================================= */
+function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
+  return new Promise(res=>{
+    const d=document.createElement('div');d.className='dlg';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');
+    d.innerHTML=`<div class="box"><h3>${esc(title)}</h3>${body?`<p>${body}</p>`:''}${fields.map((f,i)=>`<div class="fld"><label for="dq${i}">${esc(f.l)}</label>${f.o?`<select id="dq${i}">${f.o.map(o=>`<option ${o===f.v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:`<input id="dq${i}" type="${f.t||'text'}" value="${esc(f.v??'')}">`}</div>`).join('')}
+      <div class="acts">${cancel?`<button class="btn" data-a="no" type="button">${esc(cancel)}</button>`:''}<button class="btn ${danger?'dangerfill':'pri'}" data-a="ok" type="button">${esc(ok)}</button></div></div>`;
+    const done=v=>{d.remove();res(v)};
+    d.onclick=e=>{const a=e.target.dataset.a;if(a==='no'||e.target===d)done(null);if(a==='ok'){const vals=fields.map((f,i)=>$('#dq'+i,d).value);if(fields.some((f,i)=>f.req&&!vals[i].trim())){toast('Please fill in '+fields.find((f,i)=>f.req&&!vals[i].trim()).l,'err');return}done(fields.length?vals:true)}};
+    d.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();done(null)}if(e.key==='Enter'&&e.target.tagName==='INPUT')$('[data-a=ok]',d).click()};
+    document.body.appendChild(d);($('input,select',d)||$('[data-a=ok]',d)).focus()})}
+
+/* =========================================================
+   NAV & HEADER
+   ========================================================= */
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff']]],['Safety & Security',[['patrols'],['incidents'],['visitors']]],
+ ['Residents',[['roomchecks'],['wellness'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
+ ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
+ ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
+let cur=(location.hash||'').slice(1)||'dash';const chipState={},searchState={};
+function badgeFor(id){
+  if(id==='notes')return siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved').length;
+  if(id==='incidents')return siteRecs('incidents').filter(r=>r.review==='Submitted').length;
+  if(id==='workorders')return siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1|^2/.test(r.severity)).length;
+  if(id==='visitors')return siteRecs('visitors').filter(r=>!r.timeOut).length;
+  if(id==='intakes')return siteRecs('intakes').filter(r=>r.status==='New Inquiry').length;
+  if(id==='handoff')return siteRecs('handoff').filter(r=>r.status!=='Acknowledged').length;
+  return 0}
+function renderNav(){let h=`<div class="logo"><div class="mk">12N</div><div><b>Neighbourly Homes</b><small>Site Documentation</small></div></div>`;
+  for(const [g,items] of NAV){h+=`<div class="ngrp">${g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
+    h+=`<button class="nitem ${cur===id?'on':''}" type="button" data-go="${id}"><span>${esc(lab||M[id].nav)}</span>${b?`<span class="cnt">${b}</span>`:''}</button>`}}
+  const portal=CFG&&CFG.portalUrl;
+  if(portal&&/^https:\/\//.test(portal))h+=`<div class="ngrp">12 Neighbours</div><a class="nitem" href="${esc(portal)}" target="_blank" rel="noopener" style="text-decoration:none"><span>12N Staff Portal ↗</span></a>`;
+  $('#side').innerHTML=h}
+$('#side').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
+$('#menuBtn').onclick=()=>$('#side').classList.toggle('open');
+function go(id){closeForm();cur=id;try{location.hash=id}catch(e){}$('#side').classList.remove('open');render();window.scrollTo(0,0)}
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1)||'dash';if(h!==cur){closeForm();cur=h;render()}});
+function renderHeader(){
+  const vis=visibleSites();const list=vis.includes(curSite())?vis:[curSite(),...vis];
+  $('#siteSel').innerHTML=list.filter(k=>S().sites[k]).map(k=>{const s=S().sites[k];return `<option value="${esc(k)}" ${k===curSite()?'selected':''}>${esc(s.name)}${s.status==='Archived'?' (closed)':''}</option>`}).join('');
+  $('#siteSel').disabled=list.length<=1;$('#siteSel').title=ALLOWED_RAW&&list.length<=1?'This account is set to this site':'';
+  const st=staffNames();const [p1,p2]=pair2();
+  const opts=(sel,list)=>list.map(n=>`<option ${n===sel?'selected':''}>${esc(n)}</option>`).join('')+(sel&&!list.includes(sel)?`<option selected>${esc(sel)}</option>`:'');
+  $('#on1').innerHTML=`<option value="">${st.length?'— staff 1 —':'— add staff —'}</option>`+opts(p1,st);
+  $('#on2').innerHTML=`<option value="">— staff 2 —</option>`+opts(p2,st);
+  $('#on1').disabled=$('#on2').disabled=!CAN_WRITE;
+  const who=pair().length?pair():st;$('#meSel').innerHTML=`<option value="">— who is logging? —</option>`+opts(me(),who);
+  $('#shiftPill').textContent=shiftFor();updateSync()}
+$('#siteSel').onchange=e=>{PREF.site=e.target.value;SHOW_CLOSED=false;savePref();subscribeSite();render()};
+async function setPair(i,v){const p=pair2();p[i]=v;if(p[0]&&p[0]===p[1]){toast('Pick two different people for the shift.','err');renderHeader();return}
+  CHECKS=Object.assign({},CHECKS,{['staff_'+shiftIdx()]:p,date:today(),site:curSite()});
+  if(v&&!me()){PREF.meBy=PREF.meBy||{};PREF.meBy[curSite()]=v;savePref()}
+  try{await putChecks();toast(`On shift: ${pair().join(' & ')||'nobody'}`)}catch(e){writeErr(e)}}
+$('#on1').onchange=e=>setPair(0,e.target.value);$('#on2').onchange=e=>setPair(1,e.target.value);
+$('#meSel').onchange=e=>{PREF.meBy=PREF.meBy||{};PREF.meBy[curSite()]=e.target.value;savePref();toast(e.target.value?`Signed in as ${e.target.value}`:'Signed out')};
+function renderBanner(){let h='';
+  if(!SHARED)h=`<div class="banner">Shared storage isn't available here, so entries are saved in <b>this browser only</b>. Use the site's NH Site Docs web address (or the claude.ai page) to work from the shared log.</div>`;
+  else if(MODE==='api'&&SIGNIN_NEEDED)h=`<div class="banner">Your Google sign-in has expired. Entries are being kept on this device${PENDING?` (${PENDING} waiting)`:''} and will sync after you sign in again. <span id="gisBanner" style="display:inline-block;vertical-align:middle"></span></div>`;
+  else if(MODE==='api'&&GAS_OFFLINE)h=`<div class="banner">No connection right now. You can keep working: entries are saved on this device${PENDING?` (${PENDING} waiting)`:''} and sync automatically when the connection is back. Archive searches need a connection.</div>`;
+  else if(MODE==='gas'&&GAS_OFFLINE)h=`<div class="banner">Can't reach the shared log right now. New entries won't save until the connection is back. Note anything urgent on paper and enter it later.</div>`;
+  else if(SHARED_REVOKED)h=`<div class="banner">Your access to this page changed. Reload the page to continue.</div>`;
+  else if(!CAN_WRITE)h=`<div class="banner">You have <b>view-only</b> access, so you can read the logs but not add entries. ${SERVER()?'Ask a manager to change your role on the Access tab of the data sheet.':'Ask the page owner to share it with you as a <b>Contributor</b>.'}</div>`;
+  else if(CFG_READY&&!CFG)h=`<div class="banner">NH Site Docs hasn't been set up yet. ${CAN_ADMIN?`<button class="btn sm" type="button" id="initCfg">Set up the first site</button>`:'Ask a manager to finish setup.'}</div>`;
+  else if(CFG&&ALLOWED_RAW&&!allowedSites().length)h=`<div class="banner">This account is set to a site that doesn't exist (${esc(ALLOWED_RAW.join(', '))}). Ask a manager to check the Sites column on the Access tab.</div>`;
+  else if(site().status==='Archived')h=`<div class="banner">${esc(site().name)} is <b>closed</b>${site().closed?` (since ${esc(fmtDate(site().closed))})`:''}. Its records are kept for reference. ${CAN_ADMIN?'Reopen it under Sites &amp; Export.':''}</div>`;
+  $('#banner').innerHTML=h;const gb=$('#gisBanner');if(gb)renderSignInButton(gb);const b=$('#initCfg');if(b)b.onclick=async()=>{const a=await ask({title:'Set up the first site',ok:'Create site',fields:[{l:'Site name',req:1,v:''},{l:'Number of units',t:'number',v:0}]});if(!a)return;
+    CFG=DEFAULT_CFG();CFG.sites={c1:mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[1]||0)))};try{await putCfg();toast('Site created. Follow the setup checklist on the dashboard.');go('dash')}catch(e){CFG=null;writeErr(e)}}}
+
+function render(){renderHeader();renderNav();renderBanner();const v=$('#view');
+  if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
+  if(cur==='info')return renderInfo(v);if(cur==='archive')return renderArchive(v);
+  if(cur==='sop')return renderSOP(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
+
+/* =========================================================
+   LIST VIEW
+   ========================================================= */
+function cellVal(m,r,c){if(typeof c==='object')return c.f(r);const f=M[m].fields.find(x=>x.k===c);const v=r[c];if(!f)return esc(v);
+  if(f.t==='date')return esc(fmtDate(v));if(f.t==='unit')return esc(r[c+'Label']||unitLabel(v));if(f.t==='multi')return esc((v||[]).join(', '));
+  if(f.t==='seg'||(f.t==='select'&&PILL[v]!==undefined))return pill(v);return esc(v)}
+const colLabel=(m,c)=>typeof c==='object'?c.l:(M[m].fields.find(x=>x.k===c)||{}).l||c;
+const sorted=list=>list.slice().sort((a,b)=>((b.date||'')+(b.time||b.timeIn||'')).localeCompare((a.date||'')+(a.time||a.timeIn||''))||(b.createdAt||'').localeCompare(a.createdAt||''));
+function renderList(v,m){
+  const mod=M[m];const chips=chipState[m]||(chipState[m]=new Set());const q=(searchState[m]||'').toLowerCase();
+  let list=siteRecs(m);for(const i of chips){const c=mod.chips[i];if(c)list=list.filter(c.f)}
+  if(q)list=list.filter(r=>JSON.stringify(r).toLowerCase().includes(q));list=sorted(list);
+  const hadFocus=document.activeElement&&document.activeElement.classList.contains('search');
+  let h=`<h1>${esc(mod.title)}<span class="sopref">${esc(mod.sop)}</span></h1><p class="sub">${esc(mod.desc)}</p><div id="customTop"></div>
+   <div class="toolbar"><button class="btn pri" type="button" data-new>＋ New entry</button>
+   <input class="search" id="search-${m}" aria-label="Search ${esc(mod.title)}" placeholder="Search ${esc(mod.title.toLowerCase())}…" value="${esc(searchState[m]||'')}">
+   ${(mod.chips||[]).map((c,i)=>`<button class="chip ${chips.has(i)?'on':''}" type="button" data-chip="${i}">${esc(c.l)}</button>`).join('')}
+   <button class="btn sm" type="button" data-csv>⇩ CSV</button></div>`;
+  if(!list.length)h+=`<div class="card empty">${siteRecs(m).length?'No entries match these filters.':'No entries yet for this site. Tap <b>＋ New entry</b> to add the first one.'}</div>`;
+  else{h+=`<div class="tblwrap"><table><thead><tr>${mod.cols.map(c=>`<th>${esc(colLabel(m,c))}</th>`).join('')}${mod.rowAction?'<th></th>':''}</tr></thead><tbody>`;
+    for(const r of list.slice(0,500)){h+=`<tr class="click" data-open="${esc(r.id)}" tabindex="0">${mod.cols.map(c=>{const f=typeof c==='string'&&mod.fields.find(x=>x.k===c);return `<td class="${f&&f.t==='textarea'?'clip':''}">${cellVal(m,r,c)}</td>`}).join('')}
+      ${mod.rowAction?`<td>${mod.rowAction.show(r)?`<button class="btn sm" type="button" data-act="${esc(r.id)}">${esc(mod.rowAction.l)}</button>`:''}</td>`:''}</tr>`}
+    h+=`</tbody></table></div><p class="meta">${list.length} entr${list.length===1?'y':'ies'}${list.length>500?' (showing newest 500)':''}</p>`}
+  v.innerHTML=h;
+  v.querySelector('[data-new]').onclick=()=>openForm(m);v.querySelector('[data-csv]').onclick=()=>exportCSV(m);
+  v.querySelectorAll('[data-chip]').forEach(b=>b.onclick=()=>{const i=+b.dataset.chip;chips.has(i)?chips.delete(i):chips.add(i);render()});
+  const s=v.querySelector('.search');s.oninput=()=>{searchState[m]=s.value;clearTimeout(window._st);window._st=setTimeout(render,250)};
+  if(hadFocus){s.focus();s.setSelectionRange(s.value.length,s.value.length)}
+  v.querySelectorAll('tr[data-open]').forEach(tr=>{tr.onclick=e=>{if(e.target.closest('[data-act]'))return;openForm(m,tr.dataset.open)};tr.onkeydown=e=>{if(e.key==='Enter')openForm(m,tr.dataset.open)}});
+  v.querySelectorAll('[data-act]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const r=clone(recs(m).find(x=>x.id===b.dataset.act));mod.rowAction.run(r);r.updatedAt=new Date().toISOString();r.updatedBy=me();try{await putRec(m,r);toast('Updated')}catch(err){writeErr(err)}});
+  if(mod.custom)CUSTOM[mod.custom]($('#customTop'))}
+
+/* =========================================================
+   FORM DRAWER
+   ========================================================= */
+let draft=null,draftMod=null,draftIsNew=false,saving=false;
+function openForm(m,id,preset){
+  if(!me()){toast('Set who is on shift and who is logging (top of the page) so entries are signed.','err');(pair().length?$('#meSel'):$('#on1')).focus();return}
+  if(!CAN_WRITE&&!id){toast('You have view-only access to this page.','err');return}
+  closeForm();draftMod=m;const mod=M[m];
+  if(id){const r=recs(m).find(x=>x.id===id);if(!r)return;draft=clone(r);draftIsNew=false}
+  else{draft={};for(const f of mod.fields)if(f.k&&f.def!==undefined)draft[f.k]=typeof f.def==='function'?f.def(draft):f.def;Object.assign(draft,preset||{});draftIsNew=true}
+  const sc=document.createElement('div');sc.className='scrim';sc.id='scrim';sc.onclick=e=>{if(e.target===sc)closeForm()};
+  sc.innerHTML=`<div class="drawer" role="dialog" aria-modal="true" aria-label="${esc(mod.title)}"><div class="dhead"><h2>${draftIsNew?'New':'Edit'} · ${esc(mod.title)}</h2><button class="btn ghost" type="button" data-x aria-label="Close">✕</button></div>
+   <div class="dbody"><div class="fgrid" id="fgrid"></div>${!draftIsNew?`<div class="meta">Created ${esc(new Date(draft.createdAt).toLocaleString())} by ${esc(draft.createdBy||'?')}${(draft.shiftStaff||[]).length?` (on shift: ${esc(draft.shiftStaff.join(' & '))})`:''}${draft.updatedAt?` · Last edited ${esc(new Date(draft.updatedAt).toLocaleString())} by ${esc(draft.updatedBy||'?')}`:''}</div>`:''}</div>
+   <div class="dfoot">${CAN_WRITE?`<button class="btn pri" type="button" data-save>Save</button>`:''}<button class="btn" type="button" data-x>${CAN_WRITE?'Cancel':'Close'}</button><span class="sp"></span>
+   ${mod.copy&&!draftIsNew?`<button class="btn" type="button" data-copy>⇩ Printable copy</button>`:''}
+   ${!draftIsNew&&CAN_ADMIN&&CAN_WRITE?`<button class="btn danger" type="button" data-del>Delete</button>`:''}</div></div>`;
+  document.body.appendChild(sc);
+  sc.querySelectorAll('[data-x]').forEach(b=>b.onclick=closeForm);
+  const sv=sc.querySelector('[data-save]');if(sv)sv.onclick=saveForm;
+  const cp=sc.querySelector('[data-copy]');if(cp)cp.onclick=copyRec;
+  const dl=sc.querySelector('[data-del]');if(dl)dl.onclick=delRec;
+  buildFields();const f=sc.querySelector('.fgrid input,.fgrid select,.fgrid textarea,.fgrid button');if(f)f.focus({preventScroll:true})}
+function closeForm(){const s=$('#scrim');if(s)s.remove();draft=null}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#scrim')&&!$('.dlg'))closeForm()});
+const staffOpts=sel=>{const st=staffNames();return `<option value=""></option>`+st.map(n=>`<option ${n===sel?'selected':''}>${esc(n)}</option>`).join('')+(sel&&!st.includes(sel)?`<option selected>${esc(sel)}</option>`:'')};
+const unitOpts=(sel,extras)=>`<option value=""></option>`+(extras||[]).map(x=>`<option value="${esc(x)}" ${x===sel?'selected':''}>${esc(x)}</option>`).join('')+units().map(u=>`<option value="${u.no}" ${String(u.no)===String(sel)?'selected':''}>${esc(unitLabel(u.no))}${u.status!=='Occupied'?' ('+esc(u.status)+')':''}</option>`).join('');
+function buildFields(){
+  const g=$('#fgrid');const mod=M[draftMod];let h='';
+  mod.fields.forEach((f,i)=>{const id='f'+i;const val=f.k?draft[f.k]:undefined;const isReq=typeof f.req==='function'?'dyn':f.req;
+    const lab=f.l?`<label for="${id}">${esc(f.l)}${isReq?` <span class="req" ${isReq==='dyn'?`data-dynreq="1"`:''}>*</span>`:''}</label>`:'';
+    const hint=f.hint?`<span class="hint">${esc(f.hint)}</span>`:'';let inp='';
+    switch(f.t){
+      case 'sect':h+=`<div class="secth" data-i="${i}">${esc(f.l)}</div>`;return;
+      case 'info':h+=`<div class="infob ${f.warn?'warn':''}" data-i="${i}" data-info="1"></div>`;return;
+      case 'text':inp=`<input id="${id}" type="text" value="${esc(val)}" placeholder="${esc(f.ph||'')}" ${f.list?`list="${id}l"`:''}>${f.list?`<datalist id="${id}l">${f.list().map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`:''}`;break;
+      case 'number':inp=`<input id="${id}" type="number" min="0" inputmode="numeric" value="${esc(val)}">`;break;
+      case 'date':case 'time':case 'datetime-local':inp=`<input id="${id}" type="${f.t}" value="${esc(val)}">`;break;
+      case 'textarea':inp=`<textarea id="${id}" placeholder="${esc(f.ph||'')}">${esc(val)}</textarea>`;break;
+      case 'select':inp=`<select id="${id}"><option value=""></option>${f.o.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}${val&&!f.o.includes(val)?`<option selected>${esc(val)}</option>`:''}</select>`;break;
+      case 'staff':inp=`<select id="${id}">${staffOpts(val)}</select>`;break;
+      case 'unit':inp=`<select id="${id}">${unitOpts(val,f.extras)}</select>`;break;
+      case 'place':inp=`<select id="${id}"><option value=""></option><optgroup label="Buildings & shared areas">${PLACES.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</optgroup><optgroup label="Units">${units().map(u=>{const o='Unit '+u.no;return `<option ${o===val?'selected':''}>${o}</option>`}).join('')}</optgroup></select>`;break;
+      case 'seg':inp=`<div class="seg" id="${id}" role="group">${f.o.map(o=>`<button type="button" class="${o===val?'on':''}" aria-pressed="${o===val}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;break;
+      case 'multi':inp=`<div class="chips" id="${id}">${f.o.map(o=>{const on=(val||[]).includes(o);return `<label class="${on?'on':''}"><input type="checkbox" value="${esc(o)}" ${on?'checked':''}>${esc(o)}</label>`}).join('')}</div>`;break;
+      case 'yntable':{const vv=val||{};inp=`<div style="overflow-x:auto"><table class="ynt" id="${id}">${f.o.map((o,j)=>`<tr><td style="width:44%">${esc(o)}</td><td><div class="seg" data-row="${j}">${['Yes','No'].map(x=>`<button type="button" class="${(vv[o]||{}).v===x?'on':''}" data-v="${x}">${x}</button>`).join('')}</div></td><td><input aria-label="Notes: ${esc(o)}" placeholder="Notes" data-note="${j}" value="${esc((vv[o]||{}).n)}"></td></tr>`).join('')}</table></div>`;break}}
+    h+=`<div class="fld ${f.full||f.t==='textarea'?'full':''}" data-i="${i}">${lab}${inp}${hint}</div>`});
+  g.innerHTML=h;
+  mod.fields.forEach((f,i)=>{const el=g.querySelector('#f'+i);if(!el||!f.k)return;
+    if(f.t==='seg')el.onclick=e=>{const b=e.target.closest('button');if(!b)return;draft[f.k]=draft[f.k]===b.dataset.v&&!f.req?'':b.dataset.v;el.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.v===draft[f.k]);x.setAttribute('aria-pressed',x.dataset.v===draft[f.k])});onChange(f)};
+    else if(f.t==='multi')el.onchange=()=>{draft[f.k]=[...el.querySelectorAll('input:checked')].map(x=>x.value);el.querySelectorAll('label').forEach(l=>l.classList.toggle('on',l.querySelector('input').checked));onChange(f)};
+    else if(f.t==='yntable'){el.onclick=e=>{const b=e.target.closest('button');if(!b)return;const o=f.o[+b.parentElement.dataset.row];draft[f.k]=draft[f.k]||{};const c=draft[f.k][o]||{};c.v=c.v===b.dataset.v?'':b.dataset.v;draft[f.k][o]=c;b.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===c.v))};
+      el.oninput=e=>{const j=e.target.dataset.note;if(j==null)return;const o=f.o[j];draft[f.k]=draft[f.k]||{};(draft[f.k][o]=draft[f.k][o]||{}).n=e.target.value}}
+    else{const evt=/^(text|textarea|number)$/.test(f.t)?'input':'change';el.addEventListener(evt,()=>{draft[f.k]=f.t==='number'?(el.value===''?'':+el.value):el.value;onChange(f)})}});
+  refreshVis()}
+function onChange(f){
+  if(draftMod==='notes'&&f.k==='time'){draft.shift=shiftFor(draft.time);const i=M.notes.fields.findIndex(x=>x.k==='shift');const s=$('#f'+i);if(s)s.value=draft.shift}
+  if(draftMod==='roomchecks'&&f.k==='status'&&draft.status==='Fail'&&draft.followUp!=='Yes'){draft.followUp='Yes';const i=M.roomchecks.fields.findIndex(x=>x.k==='followUp');$('#f'+i).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='Yes'))}
+  refreshVis()}
+function refreshVis(){M[draftMod].fields.forEach((f,i)=>{const w=$(`#fgrid [data-i="${i}"]`);if(!w)return;const vis=!f.show||!!f.show(draft);w.hidden=!vis;
+  if(w.dataset.info&&vis)w.innerHTML=f.html(draft);const r=w.querySelector('[data-dynreq]');if(r)r.style.visibility=f.req(draft)?'visible':'hidden'})}
+const isEmpty=v=>v==null||v===''||(Array.isArray(v)&&!v.length);
+async function saveForm(){
+  if(saving||!draft)return;const mod=M[draftMod];const bad=[];
+  $('#fgrid').querySelectorAll('.fld.err').forEach(x=>x.classList.remove('err'));
+  mod.fields.forEach((f,i)=>{if(!f.k)return;const vis=!f.show||f.show(draft);const req=typeof f.req==='function'?f.req(draft):f.req;
+    if(vis&&req&&isEmpty(draft[f.k])){bad.push(f.l);$(`#fgrid [data-i="${i}"]`).classList.add('err')}});
+  if(bad.length){toast('Please complete: '+bad.join(', '),'err');$('#fgrid .fld.err')?.scrollIntoView({block:'center'});return}
+  const m=draftMod,d=draft,isNew=draftIsNew;
+  // Writing check from the 12N Note Taking and Report Writing Guideline: observations, not guesses or labels.
+  const txt=m==='notes'?d.notes:m==='incidents'?d.description:'';
+  if(txt){const hits=[...new Set((String(txt).match(SUBJECTIVE_RE)||[]).map(w=>w.toLowerCase()))];
+    const tooLong=m==='notes'&&NOTE_IR_TYPES.includes(d.type)&&String(txt).length>400;
+    if(hits.length||tooLong){const parts=[];
+      if(hits.length)parts.push(`These words often read as a guess, label or diagnosis: “${hits.slice(0,6).join('”, “')}”. Describe what you saw or heard instead (e.g. “speaking loudly and pacing” rather than “hostile”).`);
+      if(tooLong)parts.push('This looks like a full incident account. Keep the shift log to a brief reference and put the details in the Incident Report.');
+      if(!await ask({title:'Check the wording',body:parts.join('\n\n'),ok:'Save anyway',cancel:'Edit entry'}))return}}
+  if(m==='engagement'&&d.category==='Daily Whiteboard'&&d.quote){const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const rep=recs('engagement').find(r=>r.id!==d.id&&r.category==='Daily Whiteboard'&&norm(r.quote)===norm(d.quote)&&Math.abs((new Date(d.date)-new Date(r.date))/864e5)<60);
+    if(rep&&!await ask({title:'Quote used recently',body:`This quote was posted on ${fmtDate(rep.date)}, less than 60 days ago.`,ok:'Save anyway'}))return}
+  if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
+    if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
+  mod.fields.forEach(f=>{if(f.t==='unit'&&f.k){d[f.k+'Label']=d[f.k]?unitLabel(d[f.k]):'';d[f.k+'Pid']=d[f.k]?unitPid(d[f.k]):''}});
+  const now=new Date().toISOString();
+  if(isNew){d.id=uid();d.site=curSite();d.createdAt=now;d.createdBy=me();d.shiftStaff=pair();if(MY_UID)d.createdUid=MY_UID}else{d.updatedAt=now;d.updatedBy=me();if(MY_UID)d.updatedUid=MY_UID}
+  saving=true;const sb=$('[data-save]');if(sb){sb.disabled=true;sb.textContent='Saving…'}
+  try{await putRec(m,d)}catch(e){saving=false;if(sb){sb.disabled=false;sb.textContent='Save'}writeErr(e);return}
+  saving=false;closeForm();toast(isNew?'Entry saved':'Changes saved');
+  if(m==='incidents'&&isNew&&d.reportType==='Missing Participant')await ask({title:'Next step: phone the Site Manager',body:'SOP 3.1.16: call now with the participant\'s name, risk level, last confirmed contact and the wellness checks you tried.',ok:'Got it',cancel:''});
+  if(m==='incidents'&&isNew&&await ask({title:'Add a shift log reference?',body:'The guideline asks for a brief note in the shift log that points to this Incident Report, plus any instructions the incoming team needs.',ok:'Add reference',cancel:'Not now'}))
+    openForm('notes',null,{type:'Incident Report filed',irStatus:'Filed',location:d.location,priority:/Violence|Medical|Missing|Police/.test(d.reportType)?'HIGH':'MEDIUM',participant:'Neighbourly Homes (general)',
+      notes:`Incident Report filed: ${d.reportType} at ${d.location}${d.locationDetail?' ('+d.locationDetail+')':''}, ${fmtDate(d.date)} ${d.time}.`});
+  if(m==='patrols'&&isNew&&((d.observed||[]).includes('Maintenance needed')||(d.observed||[]).includes('Damage, leaks or pests')))offerWO(d,'Daily Safety Walkthrough');
+  if(m==='wellness'&&isNew&&(d.support||[]).includes('Maintenance / repairs'))offerWO(d,'Room Wellness Check')}
+async function offerWO(rec,src){if(await ask({title:'Create a work order?',body:'Maintenance was flagged. SOP 3.3.10: every maintenance issue needs a work order.',ok:'Create work order',cancel:'Not now'}))
+  openForm('workorders',null,{source:src,where:rec.unit?'Unit '+rec.unit:'',description:[rec.internal,rec.external,rec.notes,rec.action].filter(Boolean).join('\n')})}
+async function delRec(){const m=draftMod,id=draft.id;if(!await ask({title:'Delete this entry?',body:'It will be removed for everyone. This cannot be undone.',ok:'Delete',danger:true}))return;
+  try{await removeRec(m,id);closeForm();toast('Entry deleted')}catch(e){writeErr(e)}}
+function copyRec(){const mod=M[draftMod];let rows='';
+  for(const f of mod.fields){if(!f.k||f.t==='info'||(f.show&&!f.show(draft)))continue;let v=draft[f.k];
+    if(f.t==='unit')v=draft[f.k+'Label']||unitLabel(v);else if(f.t==='multi')v=(v||[]).join(', ');
+    else if(f.t==='yntable')v=f.o.map(o=>`${o}: ${(v||{})[o]?.v||'—'}${(v||{})[o]?.n?' ('+v[o].n+')':''}`).join('\n');
+    rows+=`<tr><td>${esc(f.l)}</td><td style="white-space:pre-wrap">${esc(v)}</td></tr>`}
+  const html=`<!doctype html><meta charset="utf-8"><title>${esc(mod.title)} ${esc(draft.date||'')}</title><style>body{font:12pt Arial,sans-serif;margin:24px}table{width:100%;border-collapse:collapse}td{border:1px solid #999;padding:5px 7px;vertical-align:top}td:first-child{width:32%;font-weight:600;background:#f2f2f2}</style>
+<h2>12 Neighbours · Neighbourly Homes: ${esc(mod.title)}</h2><p>${esc(site().name)} · Exported ${esc(new Date().toLocaleString())} by ${esc(me())}</p><table>${rows}</table>
+<p>Submitted ${esc(new Date(draft.createdAt).toLocaleString())} by ${esc(draft.createdBy)}</p><p style="margin-top:30px">Signature: ______________________ &nbsp; Reviewed by: ______________________</p>`;
+  download(`12N-${mod.sheet.replace(/\W+/g,'-')}-${draft.date||today()}.html`,html)}
+
+/* =========================================================
+   HANDOFF AUTO-SUMMARY
+   ========================================================= */
+function openItems(){const t=today();const out=[];
+  siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved').forEach(r=>out.push([followDue(r)?'Follow-up OVERDUE':'Follow-up',`${r.participantLabel||unitLabel(r.participant)}: ${r.followUpDetails||r.notes}${r.followUpWho?` · Who: ${r.followUpWho}`:''}${r.followUpBy?` · By: ${fmtWhen(r.followUpBy)}`:''}`]));
+  siteRecs('incidents').filter(r=>r.review!=='Closed'&&r.date>=addDays(t,-2)).forEach(r=>out.push(['Incident',`${r.reportType} at ${r.location} (${fmtDate(r.date)} ${r.time}), ${r.review}`]));
+  siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1|^2/.test(r.severity)).forEach(r=>out.push(['Work order',`${r.severity}: ${r.where}: ${r.description}`]));
+  siteRecs('visitors').filter(r=>!r.timeOut).forEach(r=>out.push(['Visitor on site',`${r.name} (${r.agency}) since ${r.timeIn}`]));
+  siteRecs('roomchecks').filter(r=>r.date===t&&r.status==='Fail').forEach(r=>out.push(['Room check fail',`${r.unitLabel}: ${r.comments}`]));
+  siteRecs('patrols').filter(r=>r.date===t&&r.classification!=='All-Clear').forEach(r=>out.push(['Patrol',`${r.time} ${r.classification}: ${[r.internal,r.external].filter(Boolean).join(' / ')}`]));
+  siteRecs('wellness').filter(r=>r.roomStatus&&r.roomStatus!=='Clean'&&r.checkInDone!=='Yes').forEach(r=>out.push(['Wellness check-in',`${r.unitLabel} due ${fmtDate(r.checkInDue)}`]));
+  siteRecs('requisitions').filter(r=>r.priority==='High'&&!['Received','Denied'].includes(r.status)).forEach(r=>out.push(['Supply',`${r.item} ×${r.qty} (${r.status})`]));
+  return out}
+function autoSummaryText(){return openItems().map(([a,b])=>`• [${a}] ${b}`).join('\n')}
+function autoSummaryHTML(){const o=openItems();return o.length?`<b>${o.length} open item${o.length>1?'s':''}</b> from the shared logs were copied into “To follow up” below. Edit as needed.`:'No open follow-ups, incidents, urgent work orders or visitors on site right now.'}
+
+/* =========================================================
+   CUSTOM PANELS
+   ========================================================= */
+let gridDate=today();
+const CUSTOM={
+ roomGrid(el){const by={};siteRecs('roomchecks').filter(r=>r.date===gridDate).forEach(r=>{by[r.unit]=r});
+  const occ=units().filter(u=>u.status==='Occupied');const done=occ.filter(u=>by[u.no]&&by[u.no].status!=='Due').length;const wk=dow(gridDate)===0||dow(gridDate)===6;
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="toolbar" style="margin-bottom:10px">
+    <label for="gridDate"><b style="font-size:15px">Units for</b></label><input id="gridDate" type="date" value="${gridDate}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel)">
+    <span class="pill ${done===occ.length?'p-ok':'p-warn'}">${done}/${occ.length} accounted for</span>${wk?'<span class="pill p-purple">Weekend: most units exempt</span>':''}
+    <span style="flex:1"></span><button class="btn sm" type="button" id="bulkEx">Mark the rest Exempt…</button></div>
+    <div class="rgrid">${units().map(u=>{const r=by[u.no];const st=r?r.status:(u.status==='Occupied'?'Not checked':'');
+      return `<button class="rtile ${r?r.status.replace(' ','-'):''}" type="button" data-unit="${u.no}" data-rid="${r?esc(r.id):''}"><b>Unit ${u.no}</b><small>${esc(unitName(u)||'—')}${u.status!=='Occupied'?' · '+esc(u.status):''}</small>${st?pill(st,r?undefined:''):''}</button>`}).join('')}</div>
+    <p class="meta">Tap a unit to record or edit its check. Weekends: see the Exemption Policy (usually 13 exempt, 1 required). Fails need follow-up notes.</p></div>`;
+  $('#gridDate').onchange=e=>{gridDate=e.target.value||today();render()};$('#bulkEx').onclick=bulkExempt;
+  el.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>b.dataset.rid?openForm('roomchecks',b.dataset.rid):openForm('roomchecks',null,{unit:b.dataset.unit,date:gridDate}))},
+ engStats(el){const l=siteRecs('engagement');const att=l.reduce((a,r)=>a+(+r.attendance||0),0);const rated=l.filter(r=>r.rating);const hi=rated.filter(r=>r.rating==='High').length;
+  const wb=l.find(r=>r.category==='Daily Whiteboard'&&r.date===today());const wk=l.filter(r=>r.date>=addDays(today(),-6)&&r.category!=='Daily Whiteboard').length;
+  el.innerHTML=`<div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Total sessions</div><div class="v">${l.length}</div></div>
+   <div class="card kpi"><div class="l">Cumulative attendance</div><div class="v">${att}</div></div><div class="card kpi"><div class="l">Engagement rate (High)</div><div class="v">${rated.length?Math.round(hi/rated.length*100):0}%</div></div>
+   <div class="card kpi"><div class="l">Logs this week (goal 5)</div><div class="v" style="color:${wk>=5?'var(--ok)':'var(--warn)'}">${wk}</div></div></div>
+   <div class="card" style="margin-bottom:14px">${wb?`<b>Today's whiteboard:</b> “${esc(wb.quote)}” <span class="meta">by ${esc(wb.facilitator)}</span>`:`<b>Today's whiteboard hasn't been logged yet.</b> <button class="btn sm acc" type="button" id="logWb">Log today's quote</button>`}</div>`;
+  const b=$('#logWb');if(b)b.onclick=()=>openForm('engagement',null,WB_PRESET)},
+ quickReq(el){const Q=['WD-40','Snow Shovel','Ice Melt','Radio Batteries','Garbage Bags','Toilet Paper','Naloxone Kits','Nitrile Gloves','Light Bulbs','Winter Gloves / Hats'];
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><b>Quick requisition</b><div class="qa" style="margin-top:8px">${Q.map(q=>`<button class="btn sm" type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div></div>`;
+  el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>openForm('requisitions',null,{item:b.dataset.q}))}};
+const WB_PRESET={category:'Daily Whiteboard',activity:'Daily Whiteboard',boardType:'Quote',focus:'Reflection & Morale',location:'Admin Building'};
+async function bulkExempt(){
+  const has=new Set(siteRecs('roomchecks').filter(r=>r.date===gridDate).map(r=>String(r.unit)));const rest=units().filter(u=>u.status==='Occupied'&&!has.has(String(u.no)));
+  if(!rest.length)return toast('Every unit already has an entry for this date.');if(!me())return toast('Choose your name in “Staff on shift” first.','err');
+  const a=await ask({title:`Mark ${rest.length} unit(s) Exempt?`,body:`Units without an entry for ${fmtDate(gridDate)}: ${rest.map(u=>u.no).join(', ')}`,ok:'Mark Exempt',fields:[{l:'Reason',o:['Pre-approved Exemption','Holiday','Staff Meeting','Medical / Hospital','Participant Away'],v:'Pre-approved Exemption'}]});
+  if(!a)return;const now=new Date().toISOString();
+  try{for(const u of rest)await putRec('roomchecks',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:gridDate,unit:String(u.no),unitLabel:unitLabel(u.no),status:'Exempt',exemptReason:a[0],staff:me(),checkStatus:'Excused',priority:'Low',followUp:'No'});toast(`${rest.length} unit(s) marked Exempt`)}catch(e){writeErr(e)}}
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+const chkKey=k=>`${SHIFTS.indexOf(shiftFor())}_${k}`;
+async function setChk(k,v){CHECKS=Object.assign({},CHECKS,{[chkKey(k)]:v,date:today(),site:curSite()});try{await putChecks()}catch(e){writeErr(e)}}
+/* New-site checklist: shown to managers until every step is done or they hide it. */
+function setupChecklistHTML(){const k=curSite(),s=site();if(!CFG||!CAN_ADMIN||s.setupDone||s.status==='Archived')return'';
+  const steps=[['Site details: address and site phone',!!(s.address&&s.sitePhone),'info'],['Units added',s.units.length>0,'setup'],
+    ['Staff roster (at least 2 active staff)',staffNames().length>=2,'staff'],['Contacts filled in',(s.contacts||[]).some(c=>c.name&&c.reach),'info'],
+    ['Participants moved in',pplOf(k).some(p=>p.status==='Active'),'site'],['Inventory list loaded',(INV[k]||[]).length>0,'inventory']];
+  const done=steps.filter(x=>x[1]).length;
+  return `<div class="card" style="margin-bottom:14px"><div class="toolbar" style="margin:0 0 6px"><b style="font-size:16px">Set up ${esc(s.name)}</b><span class="pill ${done===steps.length?'p-ok':'p-warn'}">${done} / ${steps.length}</span><span style="flex:1"></span><button class="btn sm" type="button" id="setupDone">${done===steps.length?'Done, hide this':'Hide checklist'}</button></div>
+   ${steps.map(([l,ok,pg])=>`<div class="task"><div class="st">${ok?pill('Done','ok'):pill('To do','warn')}</div><button class="tt" type="button" data-setup="${pg}"><b>${esc(l)}</b></button></div>`).join('')}</div>`}
+function renderDash(v){
+  const t=today(),sh=shiftFor(),hr=new Date().getHours();const pt=siteRecs('patrols').filter(r=>r.date===t);const has=re=>pt.some(r=>re.test(r.checkType));
+  const lastP=sorted(siteRecs('patrols'))[0];const mins=lastP?Math.round((Date.now()-new Date(`${lastP.date}T${lastP.time}`))/6e4):null;
+  const occ=units().filter(u=>u.status==='Occupied').length;const rcDone=new Set(siteRecs('roomchecks').filter(r=>r.date===t&&r.status!=='Due').map(r=>String(r.unit))).size;
+  const wb=siteRecs('engagement').some(r=>r.date===t&&r.category==='Daily Whiteboard');const engLog=siteRecs('engagement').some(r=>r.date===t&&r.category!=='Daily Whiteboard');
+  const low=(INV[curSite()]||[]).map(invCalc).filter(i=>i.status==='Low Stock'||i.status==='Out of Stock').length;
+  const newInt=siteRecs('intakes').filter(r=>r.status==='New Inquiry');const ho=siteRecs('handoff').some(r=>r.date===t&&r.shift===sh);const weekday=dow(t)>=1&&dow(t)<=5;
+  const St=(ok,txt,cls)=>ok===true?pill('Done','ok'):ok===false?pill(txt||'To do',cls||'warn'):pill(txt,cls||'');
+  const Tick=k=>`<input type="checkbox" class="tick" data-chk="${k}" ${CHECKS[chkKey(k)]?'checked':''} aria-label="Mark census review done">`;
+  const np=pair().length;
+  const tasks=[
+   ['Shift start','Confirm 2 staff on shift',np?`On shift: ${esc(pair().join(' & '))}`:'Choose both staff at the top of the page.',np>=2?pill('2 / 2','ok'):pill(`${np} / 2`,'bad'),'staff'],
+   ['Shift start','Review occupancy census','Check the unit roster, pending move-ins/outs and emergency contacts.',Tick('census'),'site'],
+   ['8:00–10:00','Morning Safety Walkthrough','Courtyard, shared bathrooms/laundry, Admin Building, micro-home exteriors.',St(has(/Morning/)),'patrols',{checkType:'Morning Safety Walkthrough (8–10 AM)'}],
+   ['by 8:30','Post the daily whiteboard','Check it hasn\'t run in the last 60 days. Use trauma-informed language.',St(wb),'engagement',WB_PRESET],
+   ['10:00–2:00','Daily room checks',weekday?'Knock, announce, check; record Pass / Fail / Exempt.':'Weekend: apply the exemption policy.',St(occ&&rcDone>=occ?true:rcDone?null:false,`${rcDone}/${occ}`,'warn'),'roomchecks'],
+   ['12:00–2:00','Midday Spot Check','Second walkthrough of the day.',St(has(/Midday/)),'patrols',{checkType:'Midday Spot Check (12–2 PM)'}],
+   ['Every 60–90 min','Perimeter patrol',lastP?`Last patrol ${esc(lastP.time)} (${fmtDate(lastP.date)}) by ${esc(lastP.staff)}`:'No patrols logged yet.',mins==null?pill('None yet','warn'):mins>90?pill(`${mins} min ago`,'bad'):pill(`${mins} min ago`,'ok'),'patrols',{checkType:'Hourly Patrol'}],
+   ['1:00–2:00','Intake triage','Cross-check HIFIS and update contact records.',newInt.length?pill(`${newInt.length} new`,'warn'):pill('Clear','ok'),'intakes'],
+   ['3:00–4:00','Supply check','Look at the restock queue and submit requisitions for low stock.'+(dow(t)===1?' <b>Monday:</b> cleaning supplies inventory check.':''),low?pill(`${low} low/out`,'warn'):pill('OK','ok'),'inventory'],
+   ['by 4:00','Log participant engagement','Engagement around today\'s prompt (High / Medium / Low) and any feedback.',St(engLog),'engagement'],
+   ['9:30–10:00 PM','Evening Site Check','Emergency exits latched and locked, courtyard clear, bathrooms and Admin Building checked.',St(has(/Evening/)),'patrols',{checkType:'Evening Site Check (9:30–10 PM)',areas:['Emergency exits latched & locked','Courtyard & pathways','Shared bathrooms / showers / laundry','Admin Building interior']}],
+   ['Last 30 min','Shift notes review & handoff','Resolve or assign follow-ups, then complete the handoff with the incoming lead.',St(ho),'handoff']];
+  const A=[];
+  if(CAN_ADMIN&&CAN_WRITE){const c=archiveCandidates(12);const n=MODS.reduce((a,m)=>a+c[m].length,0);if(n)A.push(['info',`${n} closed entr${n===1?'y is':'ies are'} over a year old. Archive them to keep the app quick.`,'archive',''])}
+  if(np<2)A.push(['bad',np?`Only ${pair()[0]} is recorded on this shift. Shifts are staffed by two.`:'No staff recorded on this shift yet. Choose both staff at the top.','dash','']);
+  siteRecs('incidents').filter(r=>r.review==='Submitted').forEach(r=>A.push(['warn',`Incident awaiting supervisor review: ${r.reportType} (${fmtDate(r.date)})`,'incidents',r.id]));
+  siteRecs('incidents').filter(r=>r.reportType==='Missing Participant'&&r.review!=='Closed').forEach(r=>A.push(['bad',`Missing participant file open (${r.risk||'risk not set'}): daily leadership update required`,'incidents',r.id]));
+  siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1/.test(r.severity)).forEach(r=>A.push(['bad',`Critical work order open: ${r.where}: ${String(r.description).slice(0,70)}`,'workorders',r.id]));
+  siteRecs('workorders').filter(r=>r.stage==='Awaiting Review'&&hoursSince(r.createdAt)>24).forEach(r=>A.push(['warn',`Work order awaiting review >24h: ${r.where}`,'workorders',r.id]));
+  siteRecs('notes').filter(followDue).forEach(r=>A.push(['bad',`Follow-up overdue (${r.followUpWho||'unassigned'}, due ${fmtWhen(r.followUpBy)}): ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
+  siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'&&r.priority==='HIGH'&&!followDue(r)).forEach(r=>A.push(['bad',`High-priority follow-up: ${r.participantLabel||''}: ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
+  siteRecs('wellness').filter(r=>r.roomStatus&&r.roomStatus!=='Clean'&&r.checkInDone!=='Yes'&&r.checkInDue<=t).forEach(r=>A.push([r.checkInDue<t?'bad':'warn',`Private check-in ${r.checkInDue<t?'overdue':'due today'}: ${r.unitLabel}`,'wellness',r.id]));
+  newInt.filter(r=>hoursSince(r.createdAt)>24).forEach(r=>A.push(['warn',`Intake unreviewed >24h: ${r.name}`,'intakes',r.id]));
+  siteRecs('intakes').filter(r=>r.urgent==='Yes'&&!['Admitted','Closed','Referred to Case Management'].includes(r.status)).forEach(r=>A.push(['bad',`Urgent shelter need: ${r.name}. Flag to Case Management`,'intakes',r.id]));
+  siteRecs('visitors').filter(r=>!r.timeOut).forEach(r=>A.push(['info',`On site: ${r.name} (${r.agency}) since ${r.timeIn}`,'visitors',r.id]));
+  siteRecs('requests').filter(r=>r.approval==='Pending'&&r.category==='Appliance Approval').forEach(r=>A.push(['info',`Appliance approval pending management: ${r.item} (${r.unitLabel})`,'requests',r.id]));
+  siteRecs('handoff').filter(r=>r.status!=='Acknowledged').forEach(r=>A.push(['warn',`Handoff not yet acknowledged: ${r.shift} (${fmtDate(r.date)})`,'handoff',r.id]));
+  const recent=[];for(const m of MODS)siteRecs(m).forEach(r=>recent.push([m,r]));
+  recent.sort((a,b)=>(b[1].updatedAt||b[1].createdAt||'').localeCompare(a[1].updatedAt||a[1].createdAt||''));
+  v.innerHTML=`<h1>${hr<12?'Good morning':hr<17?'Good afternoon':'Good evening'}${me()?', '+esc(me()):''}</h1><p class="sub">${new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'})} · ${esc(site().name)} · ${esc(sh)}</p>
+  ${setupChecklistHTML()}
+  ${!me()?`<div class="card" style="margin-bottom:14px;background:var(--warnSoft);border-color:var(--line);color:var(--warnInk)"><b>Start each shift by choosing both staff</b> under “On shift” at the top, then who is logging. Every entry is signed with it.</div>`:''}
+  <div class="card" style="margin-bottom:14px"><b>Quick log</b><div class="qa" style="margin-top:8px">
+   <button class="btn pri" type="button" data-q="notes">＋ Shift note</button><button class="btn" type="button" data-q="patrols">＋ Patrol / walkthrough</button>
+   <button class="btn" type="button" data-q="incidents">＋ Incident report</button><button class="btn" type="button" data-q="workorders">＋ Work order</button>
+   <button class="btn" type="button" data-q="visitors">＋ Visitor sign-in</button><button class="btn" type="button" data-q="handoff">＋ Shift handoff</button></div></div>
+  <div class="grid g2" style="align-items:start">
+   <div class="card"><b style="font-size:16px">Daily shift routine</b><p class="meta" style="margin:2px 0 6px">From the 12N Site Operations cadence and NH SOPs 3.1.5, 3.1.8 and 3.3.5. Status updates from everyone's entries. Tap a task to log it.</p>
+    ${tasks.map(([tm,ti,de,st,mod,pre],i)=>`<div class="task"><div class="tm">${tm}</div><button class="tt" type="button" data-task="${i}"><b>${ti}</b><span>${de}</span></button><div class="st">${st}</div></div>`).join('')}</div>
+   <div class="grid">
+    <div class="card"><b style="font-size:16px">Needs attention</b><div style="margin-top:8px">${A.length?A.map(([c,txt,m,id])=>`<button class="alert ${c}" type="button" data-m="${m}" data-id="${esc(id)}"><span class="dot"></span>${esc(txt)}</button>`).join(''):'<p class="meta">Nothing outstanding.</p>'}</div></div>
+    <div class="card"><b style="font-size:16px">Recent activity</b>${recent.length?`<div class="tblwrap" style="margin-top:6px;border:0"><table>${recent.slice(0,8).map(([m,r])=>`<tr class="click" data-m="${m}" data-id="${esc(r.id)}"><td style="width:42%"><span class="pill">${esc(M[m].nav)}</span></td><td>${esc(r.updatedBy||r.createdBy)}<div class="meta" style="margin:0">${esc(new Date(r.updatedAt||r.createdAt).toLocaleString([],{dateStyle:'short',timeStyle:'short'}))}</div></td></tr>`).join('')}</table></div>`:'<p class="meta">No entries yet. They will appear here as staff log them.</p>'}</div>
+    <div class="card"><b style="font-size:16px">Emergency</b><p style="margin:6px 0 0">Emergency: <b>911</b> · Police non-emergency: <b>${esc(site().nonEmergency||'—')}</b> · Site phone: <b>${esc(site().sitePhone||'—')}</b></p><p class="meta" style="margin-top:4px">Call 911 for imminent danger, a medical need or a crime. Never respond alone if it feels unsafe. File an Incident Report within 12 hours.</p></div>
+   </div></div>`;
+  v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>openForm(b.dataset.q));
+  v.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{const t=tasks[+b.dataset.task];t[5]&&M[t[4]]?openForm(t[4],null,t[5]):go(t[4])});
+  v.querySelectorAll('[data-m][data-id]').forEach(b=>b.onclick=()=>{const m=b.dataset.m,id=b.dataset.id;if(!id){if(m==='dash')$('#on1').focus();else{if(m==='archive')ARCH.tab='run';go(m)}return}go(m);openForm(m,id)});
+  v.querySelectorAll('[data-setup]').forEach(b=>b.onclick=()=>go(b.dataset.setup));const sd=$('#setupDone');if(sd)sd.onclick=()=>cfgSave(()=>{CFG.sites[curSite()].setupDone=true},'Setup checklist hidden');
+  v.querySelectorAll('[data-chk]').forEach(c=>c.onchange=()=>setChk(c.dataset.chk,c.checked))}
+
+/* =========================================================
+   INVENTORY
+   ========================================================= */
+function invCalc(i){const total=(+i.office||0)+(+i.bath||0)+(+i.guest||0);const par=+i.par||0;
+  const status=total===0&&par===0?'Not Stocked':total===0?'Out of Stock':total<=par?'Low Stock':par===0?'Surplus':'Stocked';return {...i,total,status,order:par>total?par-total:0}}
+let invFilter='all';
+function renderInventory(v){
+  const k=curSite();const items=INV[k]||[];const calc=items.map(invCalc);
+  let h=`<h1>Inventory &amp; Par Levels<span class="sopref">Guide · Inventory · NH 3.3.4 · 3.3.8</span></h1>
+  <p class="sub">Weekly audit: count the office, bathroom and guest-unit closets and compare against par. An item goes into the restock queue when total stock ≤ par. Counts should match within 5%. Asset write-offs need Operations Manager sign-off.</p>`;
+  if(!invReady[k]){v.innerHTML=h+`<div class="card empty">Loading inventory…</div>`;return}
+  if(!items.length){v.innerHTML=h+`<div class="card empty">No inventory items for ${esc(site().name)} yet.<br><br>${CAN_WRITE?`<button class="btn pri" type="button" id="loadStd">Load the standard 44-item list</button>`:''}</div>`;
+    const b=$('#loadStd');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Loading…';try{for(const s of SEED_INV)await putInv(k,seedInvItem(s));toast('Standard list loaded')}catch(e){writeErr(e);b.disabled=false}};return}
+  const low=calc.filter(i=>i.status==='Low Stock').length,out=calc.filter(i=>i.status==='Out of Stock').length;
+  let show=calc;if(invFilter==='restock')show=show.filter(i=>i.status==='Low Stock'||i.status==='Out of Stock');else if(invFilter!=='all')show=show.filter(i=>i.cat===invFilter);
+  h+=`<div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Items tracked</div><div class="v">${calc.length}</div></div>
+   <div class="card kpi"><div class="l">Low stock</div><div class="v" style="color:var(--warn)">${low}</div></div><div class="card kpi"><div class="l">Out of stock</div><div class="v" style="color:var(--bad)">${out}</div></div>
+   <div class="card kpi"><div class="l">Last audit</div><div class="v" style="font-size:16px">${AUDIT?esc(fmtDate(AUDIT.date))+'<div class="meta" style="margin:0">by '+esc(AUDIT.by)+'</div>':'Not yet'}</div></div></div>
+  <div class="toolbar"><button class="btn pri" type="button" id="audit">✓ Mark weekly audit complete</button><button class="btn" type="button" id="addInv">＋ Add item</button>
+   <button class="btn" type="button" id="toReq">Send restock queue to Requisitions</button>
+   <select class="chip" id="invFilt" aria-label="Filter inventory"><option value="all">All categories</option><option value="restock" ${invFilter==='restock'?'selected':''}>Restock queue only</option>${INV_CATS.map(c=>`<option ${invFilter===c?'selected':''}>${c}</option>`).join('')}</select>
+   <button class="btn sm" type="button" id="invCsv">⇩ CSV</button></div>
+  <div class="tblwrap inv"><table><thead><tr><th>ID</th><th>Item</th><th>Type</th><th>Freq.</th><th>Office</th><th>Bathroom</th><th>Guest</th><th>Total</th><th>Par</th><th>Status</th><th>To order</th><th>Condition</th><th></th></tr></thead><tbody>`;
+  let lastCat='';
+  for(const i of show.sort((a,b)=>INV_CATS.indexOf(a.cat)-INV_CATS.indexOf(b.cat)||a.id.localeCompare(b.id))){
+    if(i.cat!==lastCat){h+=`<tr class="catrow"><td colspan="13">${esc(i.cat)}</td></tr>`;lastCat=i.cat}
+    const n=f=>`<input type="number" min="0" inputmode="numeric" value="${esc(i[f])}" data-inv="${esc(i.id)}" data-f="${f}" aria-label="${f} for ${esc(i.item)}">`;
+    h+=`<tr><td class="meta" style="margin:0;white-space:nowrap">${esc(i.id)}</td><td>${esc(i.item)}</td><td>${esc(i.type)}</td><td>${esc(i.freq)}</td><td>${n('office')}</td><td>${n('bath')}</td><td>${n('guest')}</td><td><b>${i.total}</b></td><td>${n('par')}</td><td>${pill(i.status)}</td><td>${i.order||''}</td>
+     <td><select data-inv="${esc(i.id)}" data-f="cond" aria-label="Condition of ${esc(i.item)}">${['Good','Fair','Maintenance'].map(o=>`<option ${o===i.cond?'selected':''}>${o}</option>`).join('')}</select></td>
+     <td>${CAN_ADMIN?`<button class="btn sm ghost danger" type="button" data-rm="${esc(i.id)}" aria-label="Remove ${esc(i.item)}">✕</button>`:''}</td></tr>`}
+  v.innerHTML=h+`</tbody></table></div>`;
+  $('#invFilt').onchange=e=>{invFilter=e.target.value;render()};$('#invCsv').onclick=exportInvCSV;$('#audit').onclick=markAudit;$('#addInv').onclick=addInvItem;$('#toReq').onclick=restockToReq;
+  v.querySelectorAll('[data-inv]').forEach(el=>el.onchange=async()=>{const it=clone(items.find(x=>x.id===el.dataset.inv));const f=el.dataset.f;it[f]=f==='cond'?el.value:(el.value===''?0:Math.max(0,+el.value));it.updatedAt=new Date().toISOString();it.updatedBy=me();try{await putInv(k,it)}catch(e){writeErr(e)}});
+  v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{const it=items.find(x=>x.id===b.dataset.rm);if(await ask({title:`Remove “${it.item}”?`,body:'Asset write-offs need Operations Manager sign-off.',ok:'Remove',danger:true}))try{await delInvItem(k,it.id)}catch(e){writeErr(e)}})}
+async function addInvItem(){const a=await ask({title:'Add inventory item',ok:'Add item',fields:[{l:'Item name',req:1},{l:'Category',o:INV_CATS,v:'Office Supplies'},{l:'Type',o:['Consumable','Persistent'],v:'Consumable'},{l:'Replacement frequency',o:['Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually'],v:'Monthly'},{l:'Par level',t:'number',v:2}]});
+  if(!a)return;const k=curSite();const n=(INV[k]||[]).reduce((m,i)=>Math.max(m,+String(i.id).replace(/\D/g,'')||0),0)+1;
+  try{await putInv(k,{id:'INV-'+String(n).padStart(3,'0'),type:a[2],cat:a[1],item:a[0].trim(),freq:a[3],office:0,bath:0,guest:0,par:Math.max(0,+a[4]||0),cond:'Good'});toast('Item added')}catch(e){writeErr(e)}}
+async function markAudit(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');try{await putAudit({date:today(),by:me(),site:curSite()});toast('Weekly audit recorded')}catch(e){writeErr(e)}}
+async function restockToReq(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');
+  const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0);const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied'].includes(r.status)).map(r=>r.item));
+  const add=q.filter(i=>!open.has(i.item));if(!add.length)return toast('The restock queue is already in Requisitions.');
+  if(!await ask({title:`Create ${add.length} requisition(s)?`,body:'One for each item at or below par that does not already have an open requisition.',ok:'Create'}))return;
+  const now=new Date().toISOString();try{for(const i of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:i.item,qty:i.order,reason:`Restock to par (${i.total}/${i.par})`,priority:i.status==='Out of Stock'&&/Safety/.test(i.cat)?'High':'Medium',status:'Requested'});
+  toast(`${add.length} requisition(s) created`);go('requisitions')}catch(e){writeErr(e)}}
+
+/* =========================================================
+   PARTICIPANTS & UNITS (move in, transfer, move out, past participants)
+   ========================================================= */
+const siteEditable=()=>CAN_ADMIN&&CAN_WRITE&&!!CFG&&site().status!=='Archived';
+const vacantUnits=()=>units().filter(u=>u.status==='Vacant'||u.status==='Pending Move-in');
+function entriesFor(pid){const out=[];for(const m of MODS)for(const r of recs(m))if(Object.keys(r).some(x=>/Pid$/.test(x)&&r[x]===pid))out.push([m,r]);
+  return out.sort((a,b)=>(recDate(b[1])+(b[1].time||'')).localeCompare(recDate(a[1])+(a[1].time||'')))}
+async function setUnit(no,patch,msg){const k=curSite();await cfgSave(()=>{const u=CFG.sites[k].units.find(x=>String(x.no)===String(no));Object.assign(u,patch)},msg)}
+async function moveIn(no){const k=curSite();const free=vacantUnits();if(!free.length)return toast('There are no vacant units. Add units under Sites & Export, or move someone out first.','err');
+  const a=await ask({title:`Move a participant in · ${site().name}`,ok:'Move in',fields:[{l:'Unit',o:free.map(u=>'Unit '+u.no),v:'Unit '+(no||free[0].no)},{l:'Participant name or approved identifier',req:1},{l:'Move-in date',t:'date',v:today()},{l:'Approved appliances',v:''},{l:'Notes',v:''}]});
+  if(!a)return;const unit=+a[0].replace(/\D/g,'');
+  const p={id:uid(),name:a[1].trim(),unit,status:'Active',moveIn:a[2]||today(),moveOut:'',exitReason:'',appliances:a[3].trim(),notes:a[4].trim(),history:[{date:a[2]||today(),event:'Moved in',unit,by:me()||''}]};
+  try{await putSub(k,'participants',p);await setUnit(unit,{status:'Occupied',participantId:p.id},`${p.name} moved in to Unit ${unit}`)}catch(e){writeErr(e)}}
+async function moveOut(no){const k=curSite();const u=unitOf(no);const p=personById(u&&u.participantId);if(!p)return;
+  const a=await ask({title:`Move ${p.name} out of Unit ${no}`,body:'They move to Past participants. Their history and all log entries are kept.',ok:'Move out',danger:true,
+    fields:[{l:'Move-out date',t:'date',v:today()},{l:'Reason',o:EXIT_REASONS,v:EXIT_REASONS[0]},{l:'Unit after move-out',o:['Vacant','Out of service'],v:'Vacant'},{l:'Notes',v:''}]});
+  if(!a)return;const q=clone(p);Object.assign(q,{status:'Archived',moveOut:a[0]||today(),exitReason:a[1]});if(a[3].trim())q.notes=(q.notes?q.notes+'\n':'')+a[3].trim();
+  q.history=[...(q.history||[]),{date:a[0]||today(),event:`Moved out: ${a[1]}`,unit:+no,by:me()||''}];
+  try{await putSub(k,'participants',q);await setUnit(no,{status:a[2],participantId:''},`${p.name} moved out`)}catch(e){writeErr(e)}}
+async function transferUnit(no){const k=curSite();const p=personById(unitPid(no));if(!p)return;const free=vacantUnits();if(!free.length)return toast('There are no vacant units to transfer to.','err');
+  const a=await ask({title:`Transfer ${p.name} from Unit ${no}`,ok:'Transfer',fields:[{l:'New unit',o:free.map(u=>'Unit '+u.no)},{l:'Transfer date',t:'date',v:today()}]});if(!a)return;
+  const to=+a[0].replace(/\D/g,'');const q=clone(p);q.unit=to;q.history=[...(q.history||[]),{date:a[1]||today(),event:`Transferred from Unit ${no} to Unit ${to}`,unit:to,by:me()||''}];
+  try{await putSub(k,'participants',q);await cfgSave(()=>{const us=CFG.sites[k].units;Object.assign(us.find(x=>x.no==no),{status:'Vacant',participantId:''});Object.assign(us.find(x=>x.no==to),{status:'Occupied',participantId:p.id})},`${p.name} moved to Unit ${to}`)}catch(e){writeErr(e)}}
+async function readmit(p){const k=curSite();const free=vacantUnits();if(!free.length)return toast('There are no vacant units.','err');
+  const a=await ask({title:`Re-admit ${p.name}`,ok:'Re-admit',fields:[{l:'Unit',o:free.map(u=>'Unit '+u.no)},{l:'Move-in date',t:'date',v:today()}]});if(!a)return;
+  const unit=+a[0].replace(/\D/g,'');const q=clone(p);Object.assign(q,{status:'Active',unit,moveIn:a[1]||today(),moveOut:'',exitReason:''});
+  q.history=[...(q.history||[]),{date:a[1]||today(),event:'Re-admitted',unit,by:me()||''}];
+  try{await putSub(k,'participants',q);await setUnit(unit,{status:'Occupied',participantId:p.id},`${p.name} re-admitted to Unit ${unit}`)}catch(e){writeErr(e)}}
+async function viewPerson(p){const ent=entriesFor(p.id);
+  const body=`<b>${esc(p.status==='Active'?'Current participant':'Past participant')}</b> · Unit ${esc(p.unit)} · moved in ${esc(fmtDate(p.moveIn)||'—')}${p.moveOut?` · moved out ${esc(fmtDate(p.moveOut))} (${esc(p.exitReason)})`:''}
+   ${p.appliances?`<br>Approved appliances: ${esc(p.appliances)}`:''}${p.notes?`<br>Notes: ${esc(p.notes)}`:''}
+   <br><br><b>History</b><br>${(p.history||[]).map(h=>`${esc(fmtDate(h.date))}: ${esc(h.event)}${h.by?` (${esc(h.by)})`:''}`).join('<br>')||'—'}
+   <br><br><b>Log entries (live)</b>: ${ent.length}<br>${ent.slice(0,8).map(([m,r])=>`${esc(fmtDate(recDate(r)))} · ${esc(M[m].nav)}${r.type?` · ${esc(r.type)}`:r.reportType?` · ${esc(r.reportType)}`:r.status?` · ${esc(r.status)}`:''}`).join('<br>')}${ent.length>8?'<br>…':''}`;
+  const ed=siteEditable();
+  if(await ask({title:p.name,body,ok:ed?'Edit details':'Close',cancel:ed?'Close':''})&&ed){
+    const a=await ask({title:`Edit ${p.name}`,ok:'Save',fields:[{l:'Name or approved identifier',req:1,v:p.name},{l:'Approved appliances',v:p.appliances||''},{l:'Notes',v:p.notes||''}]});if(!a)return;
+    const q=clone(p);Object.assign(q,{name:a[0].trim(),appliances:a[1].trim(),notes:a[2].trim()});try{await putSub(curSite(),'participants',q);toast('Saved')}catch(e){writeErr(e)}}}
+function pastParticipantsHTML(q){const k=curSite();q=(q||'').toLowerCase();
+  const past=pplOf(k).filter(p=>p.status==='Archived'&&(!q||JSON.stringify(p).toLowerCase().includes(q))).sort((a,b)=>String(b.moveOut).localeCompare(String(a.moveOut)));
+  return past.length?`<div class="tblwrap"><table><thead><tr><th>Participant</th><th>Last unit</th><th>Moved in</th><th>Moved out</th><th>Reason</th><th></th></tr></thead><tbody>${past.map(p=>`<tr class="click" data-pv="${esc(p.id)}" tabindex="0"><td>${esc(p.name)}</td><td>${esc(p.unit)}</td><td>${esc(fmtDate(p.moveIn))}</td><td>${esc(fmtDate(p.moveOut))}</td><td>${esc(p.exitReason)}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-readmit="${esc(p.id)}">Re-admit</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
+   :`<div class="card empty">${q?'No past participants match.':'No past participants yet.'}</div>`}
+function wirePast(v){v.querySelectorAll('[data-pv]').forEach(tr=>{const go2=e=>{if(e.target.closest('[data-readmit]'))return;viewPerson(personById(tr.dataset.pv))};tr.onclick=go2;tr.onkeydown=e=>{if(e.key==='Enter')go2(e)}});
+  v.querySelectorAll('[data-readmit]').forEach(b=>b.onclick=e=>{e.stopPropagation();readmit(personById(b.dataset.readmit))})}
+let pastQ='';
+function renderParticipants(v){
+  const k=curSite(),u=units(),ed=siteEditable();const occ=u.filter(x=>x.status==='Occupied').length,vac=u.filter(x=>x.status==='Vacant').length;
+  const migratingNote=u.some(x=>x.name&&!x.participantId)?`<div class="infob warn" style="margin-bottom:12px">This site's roster is from an earlier version. It moves into participant records the next time a manager opens the app.</div>`:'';
+  v.innerHTML=`<h1>Participants &amp; Units<span class="sopref">NH 3.2.1 · 3.3.9</span></h1>
+  <p class="sub">Who lives at <b>${esc(site().name)}</b> now, and who has lived here. The roster must match HIFIS census data. Move-ins, transfers and move-outs need Case Management and Shift Lead confirmation.${ed?'':' Only managers can change the roster.'}</p>${migratingNote}
+  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Units</div><div class="v">${u.length}</div></div>
+   <div class="card kpi"><div class="l">Occupied</div><div class="v">${occ}</div></div><div class="card kpi"><div class="l">Vacant</div><div class="v">${vac}</div></div>
+   <div class="card kpi"><div class="l">Occupancy rate</div><div class="v">${u.length?Math.round(occ/u.length*100):0}%</div></div></div>
+  ${ed?`<div class="toolbar"><button class="btn pri" type="button" id="mvIn">＋ Move a participant in</button></div>`:''}
+  ${u.length?`<div class="tblwrap" style="margin-bottom:22px"><table><thead><tr><th>Unit</th><th>Participant</th><th>Status</th><th>Since</th><th>Approved appliances</th><th></th></tr></thead><tbody>
+   ${u.map(x=>{const p=x.participantId&&personById(x.participantId);return `<tr><td><b>${x.no}</b></td>
+    <td>${p?`<button class="btn sm ghost" type="button" data-view="${esc(p.id)}" style="padding:0;text-decoration:underline">${esc(p.name)}</button>`:esc(x.name||'—')}</td>
+    <td>${pill(x.status)}</td><td>${esc(fmtDate(p&&p.moveIn||x.moveIn||''))}</td><td>${esc(p?p.appliances:(x.appliances||''))}</td>
+    <td style="white-space:nowrap">${!ed?'':x.status==='Occupied'&&p?`<button class="btn sm" type="button" data-tr="${x.no}">Transfer</button> <button class="btn sm danger" type="button" data-out="${x.no}">Move out</button>`
+      :x.status==='Out of service'?`<button class="btn sm" type="button" data-svc="${x.no}" data-to="Vacant">Back in service</button>`
+      :x.status==='Occupied'?'':`<button class="btn sm pri" type="button" data-in="${x.no}">Move in</button> <button class="btn sm" type="button" data-svc="${x.no}" data-to="Out of service">Out of service</button>`}</td></tr>`}).join('')}
+  </tbody></table></div>`:`<div class="card empty" style="margin-bottom:22px">No units yet. ${CAN_ADMIN?'Add units under <a href="#setup">Sites &amp; Export</a>.':'Ask a manager to add units.'}</div>`}
+  <div class="infob warn" style="margin-bottom:18px">All appliance approvals go through management. Log requests under <a href="#requests">Participant Requests</a>.</div>
+  <div class="toolbar"><h2 style="font-size:18px;margin:0">Past participants</h2><span class="pill">${pplOf(k).filter(p=>p.status==='Archived').length}</span>
+   <input class="search" id="pastQ" placeholder="Search past participants…" aria-label="Search past participants" value="${esc(pastQ)}"></div><div id="pastList">${pastParticipantsHTML(pastQ)}</div>`;
+  const mi=$('#mvIn');if(mi)mi.onclick=()=>moveIn();
+  v.querySelectorAll('[data-in]').forEach(b=>b.onclick=()=>moveIn(b.dataset.in));
+  v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>moveOut(b.dataset.out));
+  v.querySelectorAll('[data-tr]').forEach(b=>b.onclick=()=>transferUnit(b.dataset.tr));
+  v.querySelectorAll('[data-svc]').forEach(b=>b.onclick=()=>setUnit(b.dataset.svc,{status:b.dataset.to},`Unit ${b.dataset.svc}: ${b.dataset.to}`));
+  v.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>viewPerson(personById(b.dataset.view)));
+  const pq=$('#pastQ');pq.oninput=()=>{pastQ=pq.value;$('#pastList').innerHTML=pastParticipantsHTML(pastQ);wirePast(v)};wirePast(v)}
+
+/* =========================================================
+   SITE INFO & CONTACTS
+   ========================================================= */
+function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
+  v.innerHTML=`<h1>Site Info &amp; Contacts<span class="sopref">${esc(s.name)}</span></h1>
+  <p class="sub">Details, emergency numbers and the contact directory for this site.${ro?' Only managers can change them.':''}</p>
+  <div class="grid g2" style="margin-bottom:18px;max-width:820px">
+   <div class="fld"><label for="si_name">Site name</label><input id="si_name" ${ro} value="${esc(s.name)}"></div>
+   <div class="fld"><label for="si_addr">Address</label><input id="si_addr" ${ro} value="${esc(s.address)}"></div>
+   <div class="fld"><label for="si_phone">Site phone</label><input id="si_phone" ${ro} type="tel" value="${esc(s.sitePhone)}"></div>
+   <div class="fld"><label for="si_police">Police non-emergency</label><input id="si_police" ${ro} type="tel" value="${esc(s.nonEmergency)}"></div>
+   <div class="fld"><label for="si_open">Opened</label><input id="si_open" ${ro} type="date" value="${esc(s.opened)}"></div></div>
+  <h2 style="font-size:18px">Contact &amp; escalation directory</h2>
+  <div class="tblwrap inv"><table><thead><tr><th>Role</th><th>Contact name</th><th>Phone / email</th><th>Escalate for</th><th></th></tr></thead><tbody>
+   ${(s.contacts||[]).map((c,i)=>`<tr>${['role','name','reach','when'].map(f=>`<td><input ${ro} style="width:100%;min-width:${f==='when'?220:150}px" value="${esc(c[f])}" data-c="${i}" data-f="${f}" aria-label="${f} for contact ${i+1}"></td>`).join('')}
+    <td>${ro?'':`<button class="btn sm ghost danger" type="button" data-crm="${i}" aria-label="Remove contact ${i+1}">✕</button>`}</td></tr>`).join('')||`<tr><td colspan="5" class="empty">No contacts yet.</td></tr>`}
+  </tbody></table></div>
+  <div class="toolbar" style="margin-top:10px">${ro?'':`<button class="btn" type="button" id="addContact">＋ Add contact</button>`}<span class="meta" style="margin:0">Check this directory at each monthly review.</span></div>`;
+  const k=curSite();const fld=(id,f,msg)=>{const el=$(id);el.onchange=()=>cfgSave(()=>{CFG.sites[k][f]=el.value.trim()},msg||'Saved')};
+  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');
+  v.querySelectorAll('[data-c]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[k].contacts[+el.dataset.c][el.dataset.f]=el.value},'Contact saved'));
+  v.querySelectorAll('[data-crm]').forEach(b=>b.onclick=async()=>{const c=s.contacts[+b.dataset.crm];if(await ask({title:'Remove this contact?',body:esc(`${c.role||''}${c.name?': '+c.name:''}`),ok:'Remove',danger:true}))cfgSave(()=>{CFG.sites[k].contacts.splice(+b.dataset.crm,1)},'Contact removed')});
+  const ac=$('#addContact');if(ac)ac.onclick=()=>cfgSave(()=>{CFG.sites[k].contacts.push({role:'',name:'',reach:'',when:''})})}
+
+/* =========================================================
+   STAFF ROSTER (Active / Inactive / Archived)
+   ========================================================= */
+let showArchivedStaff=false;
+function renderStaff(v){
+  const k=curSite();const all=staffOf(k);const legacy=all.some(s=>s.legacy);const ed=siteEditable()&&!legacy;const ro=ed?'':'disabled';
+  const list=all.filter(s=>showArchivedStaff||s.status!=='Archived').sort((a,b)=>STAFF_STATUSES.indexOf(a.status)-STAFF_STATUSES.indexOf(b.status)||String(a.name).localeCompare(String(b.name)));
+  const n=st=>all.filter(s=>s.status===st).length;
+  v.innerHTML=`<h1>Staff Roster<span class="sopref">${esc(site().name)}</span></h1>
+  <p class="sub">The staff who work at <b>${esc(site().name)}</b>. Active staff appear in “On shift” and in the reporter and facilitator fields. Set someone to <b>Inactive</b> for a leave, and <b>Archived</b> when they leave the site. Their past entries keep their name either way.${ed?'':legacy?' This roster is from an earlier version. It moves into staff records the next time a manager opens the app.':' Only managers can change the roster.'}</p>
+  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">Inactive</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Archived</div><div class="v">${n('Archived')}</div></div></div>
+  <div class="toolbar">${ed?`<button class="btn pri" type="button" id="addStaff">＋ Add staff member</button><button class="btn" type="button" id="copyStaff">Copy staff from another site…</button>`:''}
+   <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show archived</label></div>
+  <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody>
+   ${list.map(s=>`<tr><td><input ${ro} style="width:150px" value="${esc(s.name)}" data-s="${esc(s.id)}" data-f="name" aria-label="Name"></td>
+    <td><input ${ro} style="width:170px" list="roleList" value="${esc(s.role)}" data-s="${esc(s.id)}" data-f="role" aria-label="Role, ${esc(s.name)}"></td>
+    <td><input ${ro} type="tel" style="width:130px" value="${esc(s.phone)}" data-s="${esc(s.id)}" data-f="phone" aria-label="Phone, ${esc(s.name)}"></td>
+    <td><input ${ro} type="email" style="width:200px" value="${esc(s.email)}" data-s="${esc(s.id)}" data-f="email" aria-label="Email, ${esc(s.name)}"></td>
+    <td><input ${ro} type="date" style="width:140px" value="${esc(s.start||'')}" data-s="${esc(s.id)}" data-f="start" aria-label="Start date, ${esc(s.name)}"></td>
+    <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
+    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option ${o===s.status?'selected':''}>${o}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No staff on this site's roster yet.</td></tr>`}
+  </tbody></table></div>
+  <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
+  $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
+  v.querySelectorAll('[data-s]').forEach(el=>el.onchange=async()=>{const s=clone(all.find(x=>x.id===el.dataset.s));const f=el.dataset.f;s[f]=el.value.trim();
+    if(f==='status'&&s.status==='Archived'&&!s.end)s.end=today();if(f==='status'&&s.status==='Active')s.end='';
+    try{await putSub(k,'staff',s);toast(f==='status'?`${s.name}: ${s.status}`:'Roster saved')}catch(e){writeErr(e);render()}});
+  const a=$('#addStaff');if(a)a.onclick=async()=>{const r=await ask({title:`Add staff to ${site().name}`,ok:'Add',fields:[{l:'Name',req:1},{l:'Role',v:'Community Facilitator'},{l:'Phone',t:'tel'},{l:'Email',t:'email'},{l:'Start date',t:'date',v:today()}]});if(!r)return;
+    if(all.some(s=>s.name.toLowerCase()===r[0].trim().toLowerCase()&&s.status!=='Archived'))return toast(`${r[0].trim()} is already on this roster.`,'err');
+    try{await putSub(k,'staff',{id:uid(),name:r[0].trim(),role:r[1].trim(),phone:r[2].trim(),email:r[3].trim(),start:r[4]||'',end:'',status:'Active'});toast('Added to roster')}catch(e){writeErr(e)}};
+  const c=$('#copyStaff');if(c)c.onclick=async()=>{const others=allowedSites().filter(x=>x!==k);if(!others.length)return toast('There is only one site.');
+    const r=await ask({title:'Copy staff from another site',body:'Adds that site\'s active staff who aren\'t already on this roster, with their contact details.',ok:'Copy',fields:[{l:'From site',o:others.map(x=>S().sites[x].name),v:S().sites[others[0]].name}]});if(!r)return;
+    const src=others.find(x=>S().sites[x].name===r[0]);const have=new Set(all.map(s=>s.name.toLowerCase()));
+    const add=staffOf(src).filter(s=>s.status==='Active'&&s.name&&!have.has(s.name.toLowerCase()));if(!add.length)return toast('Everyone from that site is already on this roster.');
+    try{for(const s of add)await putSub(k,'staff',{id:uid(),name:s.name,role:s.role||'',phone:s.phone||'',email:s.email||'',start:today(),end:'',status:'Active'});toast(`Copied ${add.length} staff`)}catch(e){writeErr(e)}}}
+
+/* =========================================================
+   ARCHIVE (old log entries, past participants, archived staff)
+   ========================================================= */
+const ARCH={tab:'logs',m:'notes',from:'',to:'',list:null,q:'',months:12,busy:false};
+function archivedRecHTML(m,r){const mod=M[m];let rows='';
+  for(const f of mod.fields){if(!f.k||f.t==='info'||(f.show&&!f.show(r)))continue;let v=r[f.k];
+    if(f.t==='unit')v=r[f.k+'Label']||v;else if(f.t==='multi')v=(v||[]).join(', ');else if(f.t==='yntable')v=f.o.map(o=>`${o}: ${(v||{})[o]?.v||'—'}`).join('; ');
+    if(v===''||v==null)continue;rows+=`<tr><td style="font-weight:600;width:38%;vertical-align:top">${esc(f.l)}</td><td style="white-space:pre-wrap">${esc(v)}</td></tr>`}
+  return `<div style="max-height:52vh;overflow:auto"><table>${rows}</table><p class="meta">Created ${esc(new Date(r.createdAt).toLocaleString())} by ${esc(r.createdBy||'?')}</p></div>`}
+function renderArchive(v){
+  const tabs=[['logs','Log entries'],['people','Past participants'],['staff','Archived staff'],...(CAN_ADMIN&&CAN_WRITE?[['run','Archive old entries']]:[])];
+  if(!tabs.some(t=>t[0]===ARCH.tab))ARCH.tab='logs';
+  let h=`<h1>Archive<span class="sopref">${esc(site().name)}</span></h1>
+  <p class="sub">Records the site no longer works from day to day. Nothing here is deleted: archived log entries stay searchable and can be restored, and past participants and archived staff keep their history.</p>
+  <div class="seg" role="tablist" style="margin-bottom:14px">${tabs.map(([id,l])=>`<button type="button" class="${ARCH.tab===id?'on':''}" data-tab="${id}" role="tab" aria-selected="${ARCH.tab===id}">${l}</button>`).join('')}</div>`;
+  if(ARCH.tab==='logs'){
+    h+=`<div class="toolbar"><select id="arM" class="chip" aria-label="Log">${MODS.map(m=>`<option value="${m}" ${m===ARCH.m?'selected':''}>${esc(M[m].nav)}</option>`).join('')}</select>
+     <label class="meta" style="margin:0" for="arFrom">From</label><input id="arFrom" type="date" value="${esc(ARCH.from)}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel)">
+     <label class="meta" style="margin:0" for="arTo">To</label><input id="arTo" type="date" value="${esc(ARCH.to)}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel)">
+     <button class="btn pri" type="button" id="arLoad">${ARCH.busy?'Loading…':'Search archive'}</button>
+     ${ARCH.list&&ARCH.list.length?`<input class="search" id="arQ" placeholder="Filter results…" aria-label="Filter results" value="${esc(ARCH.q)}"><button class="btn sm" type="button" id="arCsv">⇩ CSV</button>`:''}</div>`;
+    if(ARCH.list){const q=ARCH.q.toLowerCase();const list=ARCH.list.filter(r=>!q||JSON.stringify(r).toLowerCase().includes(q));const mod=M[ARCH.m];
+      h+=list.length?`<div class="tblwrap"><table><thead><tr>${mod.cols.map(c=>`<th>${esc(colLabel(ARCH.m,c))}</th>`).join('')}</tr></thead><tbody>${list.slice(0,500).map((r,i)=>`<tr class="click" data-ar="${i}" tabindex="0">${mod.cols.map(c=>`<td class="clip">${cellVal(ARCH.m,r,c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="meta">${list.length} archived entr${list.length===1?'y':'ies'}${list.length>500?' (showing 500)':''}</p>`
+        :`<div class="card empty">No archived ${esc(mod.nav.toLowerCase())} for ${esc(site().name)} in that range.</div>`}
+    else h+=`<div class="card empty">Choose a log and a date range, then search. Leave the dates blank to see everything archived for this site.</div>`}
+  if(ARCH.tab==='people')h+=`<div class="toolbar"><input class="search" id="pastQ" placeholder="Search past participants…" aria-label="Search past participants" value="${esc(pastQ)}"></div><div id="pastList">${pastParticipantsHTML(pastQ)}</div>`;
+  if(ARCH.tab==='staff'){const arch=staffOf(curSite()).filter(s=>s.status==='Archived');
+    h+=arch.length?`<div class="tblwrap"><table><thead><tr><th>Name</th><th>Role</th><th>Start</th><th>End</th><th></th></tr></thead><tbody>${arch.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(fmtDate(s.start))}</td><td>${esc(fmtDate(s.end))}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-sr="${esc(s.id)}">Restore to roster</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<div class="card empty">No archived staff for this site.</div>`}
+  if(ARCH.tab==='run'){const cand=archiveCandidates(ARCH.months);const total=MODS.reduce((a,m)=>a+cand[m].length,0);
+    h+=`<div class="card" style="max-width:720px"><p style="margin-top:0">Moves <b>closed</b> entries older than the cutoff out of the live logs into the archive${SERVER()?' (a yearly archive spreadsheet in each site\'s Drive folder)':''}. This keeps the app quick as years of records build up. Open items are never archived: unresolved follow-ups, open incidents, unfinished work orders, active intakes, pending requests and requisitions, wellness check-ins not done, unacknowledged handoffs, and visitors still signed in.</p>
+     <div class="toolbar"><label for="arMonths"><b>Archive entries older than</b></label><select id="arMonths" class="chip">${[3,6,12,18,24,36].map(n=>`<option value="${n}" ${n===ARCH.months?'selected':''}>${n} months</option>`).join('')}</select></div>
+     <table style="margin:8px 0 14px">${MODS.map(m=>`<tr><td>${esc(M[m].nav)}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${cand[m].length}</td></tr>`).join('')}<tr><td><b>Total</b></td><td style="text-align:right"><b>${total}</b></td></tr></table>
+     <button class="btn pri" type="button" id="arRun" ${total?'':'disabled'}>Archive ${total} entr${total===1?'y':'ies'}</button>
+     <p class="meta">Covers every site you manage${ALLOWED_RAW?' (your account\'s sites)':''}. ${MODE==='claude'?'On the claude.ai page this covers the newest 1,000 entries per log.':''}</p></div>`}
+  v.innerHTML=h;
+  v.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ARCH.tab=b.dataset.tab;render()});
+  if(ARCH.tab==='logs'){$('#arM').onchange=e=>{ARCH.m=e.target.value;ARCH.list=null;render()};$('#arFrom').onchange=e=>ARCH.from=e.target.value;$('#arTo').onchange=e=>ARCH.to=e.target.value;
+    $('#arLoad').onclick=async()=>{ARCH.busy=true;render();try{ARCH.list=await loadArchive(ARCH.m,curSite(),ARCH.from,ARCH.to)}catch(e){toast('Could not load the archive: '+(e.message||'connection problem'),'err')}ARCH.busy=false;render()};
+    const aq=$('#arQ');if(aq)aq.oninput=()=>{ARCH.q=aq.value;clearTimeout(window._aq);window._aq=setTimeout(()=>{render();const x=$('#arQ');if(x){x.focus();x.setSelectionRange(x.value.length,x.value.length)}},250)};
+    const ac=$('#arCsv');if(ac)ac.onclick=()=>{const objs=ARCH.list.map(r=>recFlat(ARCH.m,r));const head=Object.keys(recFlat(ARCH.m,{}));download(`12N-Archive-${M[ARCH.m].sheet.replace(/\W+/g,'-')}-${today()}.csv`,toCsv([head,...objs.map(o=>head.map(x=>o[x]))]))};
+    v.querySelectorAll('[data-ar]').forEach(tr=>tr.onclick=async()=>{const q=ARCH.q.toLowerCase();const r=ARCH.list.filter(x=>!q||JSON.stringify(x).toLowerCase().includes(q))[+tr.dataset.ar];
+      const canR=CAN_ADMIN&&CAN_WRITE;if(await ask({title:`${M[ARCH.m].title} · ${fmtDate(recDate(r))}`,body:archivedRecHTML(ARCH.m,r),ok:canR?'Restore to live log':'Close',cancel:canR?'Close':''})&&canR){
+        try{await restoreArchived(ARCH.m,r);ARCH.list=ARCH.list.filter(x=>x.id!==r.id);toast('Restored to the live log');render()}catch(e){writeErr(e)}}})}
+  if(ARCH.tab==='people'){const pq=$('#pastQ');pq.oninput=()=>{pastQ=pq.value;$('#pastList').innerHTML=pastParticipantsHTML(pastQ);wirePast(v)};wirePast(v)}
+  if(ARCH.tab==='staff')v.querySelectorAll('[data-sr]').forEach(b=>b.onclick=async()=>{const s=clone(staffOf(curSite()).find(x=>x.id===b.dataset.sr));s.status='Active';s.end='';try{await putSub(curSite(),'staff',s);toast(`${s.name} is back on the roster`)}catch(e){writeErr(e)}});
+  if(ARCH.tab==='run'){$('#arMonths').onchange=e=>{ARCH.months=+e.target.value;render()};
+    $('#arRun').onclick=async()=>{const cand=archiveCandidates(ARCH.months);const total=MODS.reduce((a,m)=>a+cand[m].length,0);if(!total)return;
+      if(!await ask({title:`Archive ${total} entries?`,body:`Closed entries older than ${ARCH.months} months move to the archive. They stay searchable here and can be restored one at a time.`,ok:'Archive'}))return;
+      let done=0;try{for(const m of MODS){await archiveEntries(m,cand[m],n=>toast(`Archiving… ${done+n}/${total}`));done+=cand[m].length}
+        if(GAS&&GAS.poll)GAS.poll();toast(`Archived ${done} entries`)}catch(e){writeErr(e);toast(`Stopped after ${done} of ${total}`,'err')}render()}}}
+
+function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>${title}<span class="tag ${tagc}">${tag}</span></h3>${body}</div>`;
+  v.innerHTML=`<h1>SOP Quick Reference</h1><p class="sub">Summaries of the SOPs used most on shift. The binders are the official source: Brown (NH), Red (Safety), White (Handbook), Yellow (Community), Green (G&amp;A).</p>
+  <div class="grid g2">
+  ${C('Emergency procedures','NH 3.1.7','t-brown',`<ol><li>Stay calm. Call <b>911</b> for imminent danger, a medical need or a crime.</li><li>Notify another staff member right away. Never respond alone if it feels unsafe.</li><li>Clear the area if needed. Give CPR or Naloxone as needed.</li><li>Give emergency services a clear, calm summary.</li><li>Afterwards: Incident Report within 12 h, debrief with the Site Supervisor, offer staff support, notify agency partners if hospitalised.</li></ol><p><b>Fire:</b> pull the alarm, evacuate to the meeting point, and don't re-enter until cleared.</p>`)}
+  ${C('Shift notes: what to log','12N Note Taking Guideline','t-brown',`<p><b>Ask:</b> would this change what staff need to know or do?</p><p><b>Log:</b> meaningful wellness changes, missed scheduled check-ins, requests or commitments that need follow-up, safety concerns, and site issues such as a leak or a supply shortage.</p><p><b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment.</p><p><b>Each entry:</b> date and time, location, what happened, what staff did, and the outcome. Describe what you observed. Name a second-hand source by role or unit. Quote only when the wording matters. No guesses about motives, diagnoses or unrelated personal details.</p><p><b>Follow-up:</b> say who will act, what they need to do, and when.</p><p><b>Incidents:</b> escalate urgent concerns first, then file the Incident Report. In the shift log, briefly reference it and note what the incoming team needs to do.</p><p class="meta" style="margin:0"><i>Example:</i> At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order. Evening shift to check the repair status by 6 p.m. and update the participant.</p>`)}
+  ${C('Incident reporting','NH 3.1.4','t-brown',`<p><b>When:</b> injury, illness, property damage, near miss, behavioural escalation, harassment, violence, Code of Conduct breach, police/EMS on site, or any other event that needs follow-up.</p><p><b>Deadline:</b> within <b>12 hours</b>. Finish it before you leave, or hand it off.</p><p><b>Include:</b> initials or ID codes only, staff or participant for each person, date, time, location, an objective sequence of events, actions taken, and whether the Supervisor or On-Call was contacted.</p><p><b>Leave out:</b> opinions, assumptions, diagnoses, hearsay (or name who told you), blame.</p><p>Message the Site Supervisor or Manager on Signal for urgent incidents.</p>`)}
+  ${C('Behaviour Escalation Framework','NH 3.1.12','t-brown',`<ol><li>Incident Report</li><li>Room Status Update (cleanliness, runs alongside)</li><li>Written Warning (first / second / final)</li><li>Community Accountability Review (CAR) &amp; Agreement, with follow-up in 1–2 weeks</li><li>Urgent Warning (Final Written Notice)</li><li>Eviction Request Form</li><li>Program Review Committee decision</li><li>Debrief &amp; lessons learned</li></ol><p><b>Red-line items</b> (violence, weapons, sexual assault) may go straight to step 6. <b>3 CARs in 12 months</b> trigger a mandatory Placement Review.</p>`)}
+  ${C('Missing participant','NH 3.1.16','t-brown',`<p><b>Thresholds:</b> High Risk: <b>24 h</b> without confirmed contact. Non-High Risk: <b>10 days</b>. Reassess at any time.</p><p><b>Before the threshold:</b> check logs, call or text the participant, ask discreetly, and document every attempt.</p><ol><li>Facilitator: Incident Report (unit, risk level, last seen, attempts, description)</li><li>Facilitator: phone the Site Manager</li><li>Manager: partner agencies by phone, plus email within 2 h (cc Director and Safety &amp; Ops Lead)</li><li>Manager: police missing person report. Record the occurrence #</li><li>Manager: email the Safety &amp; Ops Lead and Director the same day</li></ol><p>Keep the unit secured and belongings preserved.</p>`)}
+  ${C('Law enforcement arrival','NH 3.1.11','t-brown',`<ol><li>Greet them, introduce yourself, and ask for a business card and the purpose of the visit.</li><li>Warrant: ask for a copy, check the name and DOB, check it is signed by a judge, and write the warrant # on the card.</li><li>Ask the officers to wait in the office.</li><li>Tell the participant privately and let them gather belongings.</li><li>Walk them to the office.</li><li>Log it in Shift Notes and file an Incident Report with photos of the warrant and card. Notify the Supervisor or Manager.</li></ol>`)}
+  ${C('Disruptive visitors & trespass','Guide 2.7.3','t-white',`<p>Assess, approach calmly, explain expectations, and offer a quiet space. Never confront aggressive visitors alone, and never make physical contact.</p><p><b>Level 1</b> verbal feedback → <b>Level 2</b> asked to leave → <b>Level 3</b> Notice of Trespass (needs Executive Director approval).</p><p>Violence or weapons: disengage, retreat and call <b>911</b>. Trespass refused: police non-emergency <b>${esc(site().nonEmergency||'—')}</b>.</p>`)}
+  ${C('Work order severity','NH 3.3.10','t-brown',`<table><tr><td>${pill('1 — Critical')}</td><td>Gas leak, flooding, structural failure, no heat in winter, fire safety down. <b>Escalate immediately</b> by phone or Signal.</td></tr><tr><td>${pill('2 — Urgent')}</td><td>Plumbing failure, no hot water, broken lock. Submit the same day. Assigned within 24 h.</td></tr><tr><td>${pill('3 — Routine')}</td><td>Appliance issue or minor repair. Next Wednesday site visit.</td></tr><tr><td>${pill('4 — Low')}</td><td>Cosmetic. Batched with scheduled work.</td></tr></table><p>Only C&amp;M staff do repairs. No work order closes without a completion note.</p>`)}
+  ${C('Participant privacy','Guide 2.7.2','t-white',`<p>Protect names, room numbers, contact info, DOB, health and history. Share only on a need-to-know basis.</p><p><b>Inquiry script:</b> <i>“I appreciate your concern, but I cannot disclose personal details due to confidentiality policies.”</i> Offer to connect them with the Community team. Never confirm or deny that someone lives here.</p><p><b>Exception:</b> imminent harm or a medical emergency. Share only the minimum with first responders, then brief the Shift Lead and log it.</p>`)}
+  ${C('Professional boundaries','Guide 2.5.3','t-white',`<p>These apply 24/7, on and off site. <b>Do not</b>: give rides, lend or borrow money, give or receive gifts, socialise outside work, use personal social media or phone numbers, or make home visits.</p><p>Financial exploitation or romantic relationships lead to immediate termination.</p>`)}
+  ${C('Room wellness checks','NH 3.1.6','t-brown',`<p>Every second Thursday, 2–4 PM, with notice posted 48 h ahead. Knock, wait, announce. Visual check only: trash, unsafe electrical items, odours or distress, cleanliness. No opening bins, drawers or bags without immediate risk <i>and</i> supervisor approval.</p><p>Status: Clean / Needs Support / Follow-Up Required. Offer a private check-in within 48 h.</p>`)}
+  ${C('Shift handoff','NH 3.3.5','t-brown',`<p>Final 15 minutes of the shift, with a 10-minute overlap when possible. Cover participant updates, site updates, incidents (even low-level) and the “to follow up” list.</p><p>Shifts: Day 08:00–16:00 · Evening 16:00–00:00 · Night 00:00–08:00.</p>`)}
+  ${C('Safety walkthroughs','NH 3.1.5 · 3.1.8','t-brown',`<p><b>Morning</b> 8–10 AM and <b>Midday</b> 12–2 PM: courtyard and paths, social areas, shared bathrooms/showers/laundry, Admin Building, micro-home exteriors.</p><p><b>Evening</b> 9:30–10 PM: emergency exits latched and locked, courtyard clear, shared spaces, Admin restock needs. Quiet hours reminder only. Participants don't have to leave.</p><p><b>Gate alarm:</b> arm, disarm and re-arm it exactly as set out in NH SOP 3.1.9 (in the binder). Report every activation as a near miss.</p>`)}
+  </div>`}
+
+/* =========================================================
+   SETUP, IMPORT & EXPORT
+   ========================================================= */
+function launchLink(k){const base=MODE==='api'?location.origin+location.pathname:WEBAPP_URL;return base?`${base}?site=${encodeURIComponent(k)}`:''}
+async function copyText(t,msg){try{await navigator.clipboard.writeText(t);toast(msg||'Copied')}
+  catch(e){await ask({title:'Copy this link',body:`<input readonly value="${esc(t)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px" onfocus="this.select()">`,ok:'Done',cancel:''})}}
+function renderSetup(v){const ad=CAN_ADMIN&&CAN_WRITE&&!!CFG;const dis=ad?'':'disabled';const keys=allowedSites();
+  v.innerHTML=`<h1>Sites &amp; Export</h1><p class="sub">${MODE==='api'?'Entries save on this device first, then sync to the NH Site Docs Google Sheet. Formal reports are also kept as Google Docs in each site\'s Drive folder.':MODE==='gas'?'Entries save to the NH Site Docs Google Sheet, and every device sees them within about 20 seconds.':SHARED?'Entries save to this page\'s shared log, and everyone it\'s shared with sees them live.':'Entries are saved in this browser only.'} Managers set up, open and close sites here.</p>
+  <div class="grid g2" style="align-items:start">
+   <div class="card" style="grid-column:1/-1"><b style="font-size:16px">Sites</b><p class="meta" style="margin-top:2px">Each site keeps its own staff, participants, contacts, logs and inventory. Closing a site keeps every record, hides it from the site picker and stops new entries being expected.${SERVER()?' A site\'s <b>launch link</b> opens the app straight to that site: open it on that site\'s computer, tablet or phone, then install the app.':''}</p>
+    <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
+    ${keys.map(k=>{const s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;return `<tr><td><b>${esc(s.name)}</b><div class="meta" style="margin:0">${esc(s.address||'')}</div></td>
+     <td>${s.status==='Archived'?pill(`Closed ${fmtDate(s.closed)}`,''):pill('Open','ok')}</td>
+     <td style="white-space:nowrap">${s.units.length} ${ad&&s.status!=='Archived'?`<button class="btn sm" type="button" data-addu="${esc(k)}" aria-label="Add a unit to ${esc(s.name)}">＋</button><button class="btn sm" type="button" data-rmu="${esc(k)}" aria-label="Remove the last unit from ${esc(s.name)}">−</button>`:''}</td>
+     <td>${act}</td><td>${staffOf(k).filter(x=>x.status==='Active').length}</td>
+     ${SERVER()?`<td><button class="btn sm" type="button" data-link="${esc(k)}">Copy link</button></td>`:''}
+     <td style="white-space:nowrap">${ad?(s.status==='Archived'?`<button class="btn sm" type="button" data-reopen="${esc(k)}">Reopen</button>`:`<button class="btn sm danger" type="button" data-close="${esc(k)}">Close site</button>`):''}
+      ${s.status==='Archived'&&k!==curSite()?`<button class="btn sm" type="button" data-view="${esc(k)}">View records</button>`:''}</td></tr>`}).join('')}</tbody></table></div>
+    ${ad?`<button class="btn pri" type="button" id="addSite" style="margin-top:10px">＋ Open a new site</button>`:''}</div>
+   <div class="card"><b style="font-size:16px">Export</b>
+    <div class="qa" style="margin-top:10px"><button class="btn acc" type="button" id="xlsx">⇩ Export all to Excel (.xlsx)</button><button class="btn" type="button" id="json">⇩ Backup (.json)</button></div>
+    ${SHEET_URL||ARCHIVE_URL?`<div class="qa" style="margin-top:8px">${SHEET_URL?`<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the data sheet ↗</a>`:''}${ARCHIVE_URL?`<a class="btn" href="${esc(ARCHIVE_URL)}" target="_blank" rel="noopener">Open the records folder in Drive ↗</a>`:''}</div>`:''}
+    <p class="meta">Excel has one tab per log (named like the 12N Site Operations template), plus Participants, Staff Roster and Contacts. Keep exports in an access-restricted folder.</p>
+    <table style="margin-top:8px">${MODS.map(m=>`<tr><td>${esc(M[m].nav)}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${recs(m).length}</td></tr>`).join('')}</table>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <b>Import a backup</b><p class="meta" style="margin-top:2px">Adds the entries, staff and participants from a backup (.json) file. Records already here are kept.${!CAN_WRITE?' Needs Staff or Admin access.':''}</p>
+    <label class="btn ${CAN_WRITE?'':'disabled'}" for="importFile">⇧ Choose backup file</label><input id="importFile" type="file" accept=".json,application/json" hidden ${CAN_WRITE?'':'disabled'}></div>
+   <div class="card"><b style="font-size:16px">Organization</b>
+    <div class="fld" style="margin-top:8px"><label for="portalUrl">12N Staff Portal link</label><input id="portalUrl" type="url" ${dis} value="${esc(CFG&&CFG.portalUrl||'')}" placeholder="https://sites.google.com/…"><span class="hint">Shown in the menu so staff can jump to the portal.</span></div>
+    ${MODE==='api'?`<hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><b>This device</b><p class="meta" style="margin-top:2px">Signed in as ${esc(MY_UID||'')}. ${PENDING?`<b>${PENDING} change${PENDING>1?'s are':' is'} waiting to sync.</b>`:'Everything is synced.'}</p><div class="qa">${INSTALL_PROMPT?'<button class="btn pri" type="button" id="installApp">Install this app</button>':''}<button class="btn" type="button" id="syncNow">Sync now</button><button class="btn danger" type="button" id="signOut">Sign out of this device</button></div>`:''}
+    ${SERVER()?`<hr style="border:0;border-top:1px solid var(--line);margin:14px 0"><b>Install on a device</b>
+    <p class="meta" style="margin-top:2px">Open the site's launch link on the device, then:<br>
+     <b>Computer (Chrome or Edge):</b> menu ⋮ → Cast, save and share → <i>Install page as app</i> (Edge: Apps → <i>Install this site as an app</i>).<br>
+     <b>Android:</b> Chrome menu ⋮ → <i>Add to Home screen</i>.<br>
+     <b>iPad / iPhone:</b> Safari Share button → <i>Add to Home Screen</i>.<br>
+     For a shared site device, sign it in with a site Google account and set that account's site on the Access tab.</p>`:''}</div>
+  </div>`;
+  $('#xlsx').onclick=exportExcel;$('#json').onclick=exportJSON;$('#importFile').onchange=e=>importJSON(e.target.files[0]);
+  const ia=$('#installApp');if(ia)ia.onclick=async()=>{try{INSTALL_PROMPT.prompt();await INSTALL_PROMPT.userChoice}catch(e){}INSTALL_PROMPT=null;render()};
+  const sn=$('#syncNow');if(sn)sn.onclick=()=>{if(API)API.poll();toast('Syncing…')};
+  const so=$('#signOut');if(so)so.onclick=signOut;
+  const pu=$('#portalUrl');pu.onchange=()=>{const val=pu.value.trim();if(val&&!/^https:\/\//.test(val)){toast('Use a full https:// link.','err');return}cfgSave(()=>{CFG.portalUrl=val},'Portal link saved')};
+  v.querySelectorAll('[data-link]').forEach(b=>b.onclick=()=>copyText(launchLink(b.dataset.link),`Launch link for ${S().sites[b.dataset.link].name} copied`));
+  v.querySelectorAll('[data-addu]').forEach(b=>b.onclick=()=>cfgSave(()=>{const u=CFG.sites[b.dataset.addu].units;const next=u.reduce((m,x)=>Math.max(m,+x.no||0),0)+1;u.push(...mkUnits(1,next))},'Unit added'));
+  v.querySelectorAll('[data-rmu]').forEach(b=>b.onclick=async()=>{const u=CFG.sites[b.dataset.rmu].units;if(!u.length)return;const last=u[u.length-1];
+    if(last.participantId||last.status==='Occupied')return toast(`Unit ${last.no} is occupied. Move the participant out first.`,'err');
+    if(!await ask({title:`Remove unit ${last.no}?`,body:'Past log entries for this unit keep their unit number.',ok:'Remove',danger:true}))return;cfgSave(()=>u.pop(),'Unit removed')});
+  v.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const k=b.dataset.close,s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;
+    const a=await ask({title:`Close ${s.name}?`,body:`${act?`<b>${act} participant${act>1?'s are':' is'} still active.</b> Move them out first if they have left.\n\n`:''}The site and all its records are kept. It disappears from the site picker, and you can reopen it at any time.`,ok:'Close site',danger:true,fields:[{l:'Closing date',t:'date',v:today()}]});
+    if(a)cfgSave(()=>{Object.assign(CFG.sites[k],{status:'Archived',closed:a[0]||today()})},`${s.name} closed`)});
+  v.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=()=>cfgSave(()=>{Object.assign(CFG.sites[b.dataset.reopen],{status:'Active',closed:''})},'Site reopened'));
+  v.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{SHOW_CLOSED=true;PREF.site=b.dataset.view;subscribeSite();go('dash')});
+  const as=$('#addSite');if(as)as.onclick=async()=>{const a=await ask({title:'Open a new site',ok:'Create site',fields:[{l:'Site name',req:1},{l:'Address',v:''},{l:'Number of units',t:'number',v:0},{l:'Opening date',t:'date',v:today()}]});if(!a)return;
+    const k='s'+uid();await cfgSave(()=>{const s=mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[2]||0)));s.address=a[1].trim();s.opened=a[3]||today();CFG.sites[k]=s},'Site created');
+    if(CFG.sites[k]){PREF.site=k;savePref();subscribeSite();go('dash')}}}
+
+async function download(name,data){
+  if(DL){try{await DL.save({filename:name,data});toast('Saved '+name)}catch(e){if(e&&e.code!=='declined')toast('Could not save the file'+(e&&e.message?': '+e.message:''),'err')}return}
+  if(MODE==='claude'){toast('Downloads aren\'t available in this view.','err');return}
+  const b=data instanceof Blob?data:new Blob([data]);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+/* One record as readable label → value pairs (Excel export and the Google Sheet's columns). */
+function recFlat(m,r){const o={Site:S().sites[r.site]?.name||r.site||''};
+  for(const f of fieldsOf(m)){const v=r[f.k];o[f.l]=f.t==='unit'?(r[f.k+'Label']||unitLabel(v)):f.t==='multi'?(v||[]).join('; '):f.t==='yntable'?f.o.map(o2=>`${o2}: ${(v||{})[o2]?.v||'-'}${(v||{})[o2]?.n?' ('+v[o2].n+')':''}`).join('; '):(v??'')}
+  Object.assign(o,{'On shift':(r.shiftStaff||[]).join(' & '),Created:r.createdAt||'','Created by':r.createdBy||'','Last edited':r.updatedAt||'','Edited by':r.updatedBy||''});return o}
+function flatRows(m,all){const objs=sorted(all?recs(m):siteRecs(m)).map(r=>recFlat(m,r));const head=Object.keys(recFlat(m,{}));return [head,...objs.map(o=>head.map(h=>o[h]))]}
+function flatFor(c,d){
+  if(c.startsWith('log-')&&M[c.slice(4)])return recFlat(c.slice(4),d);
+  const sm=c.match(/^sites\/([^/]+)\/(staff|participants)$/);
+  if(sm){const sn=S().sites[sm[1]]?.name||sm[1];return sm[2]==='staff'?{Site:sn,Name:d.name,Role:d.role,Phone:d.phone,Email:d.email,Start:d.start||'',End:d.end||'',Status:d.status}
+    :{Site:sn,Participant:d.name,Status:d.status==='Active'?'Current':'Past',Unit:d.unit,'Moved in':d.moveIn,'Moved out':d.moveOut,'Exit reason':d.exitReason,'Approved appliances':d.appliances,Notes:d.notes}}
+  if(c.startsWith('inv-')){const i=invCalc(d);return {Site:S().sites[c.slice(4)]?.name||c.slice(4),'Inventory ID':i.id,Category:i.cat,Item:i.item,Type:i.type,Frequency:i.freq,'Office Qty':i.office,'Bathroom Qty':i.bath,'Guest Unit Qty':i.guest,'Total Stock':i.total,'Par Level':i.par,'Stock Status':i.status,'Qty to Order':i.order,Condition:i.cond}}
+  return {}}
+const csvCell=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+const toCsv=rows=>'﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+function exportCSV(m){download(`12N-${M[m].sheet.replace(/\W+/g,'-')}-${today()}.csv`,toCsv(flatRows(m)))}
+const invRows=k=>[['Inventory ID','Inventory Type','Category','Item','Replacement Frequency','Office Qty','Bathroom Qty','Guest Unit Qty','Total Stock','Par Level','Stock Status','Qty to Order','Condition'],...(INV[k]||[]).map(invCalc).map(i=>[i.id,i.type,i.cat,i.item,i.freq,i.office,i.bath,i.guest,i.total,i.par,i.status,i.order,i.cond])];
+function exportInvCSV(){download(`12N-Inventory-${today()}.csv`,toCsv(invRows(curSite())))}
+function exportExcel(){
+  if(!window.XLSX){toast('The Excel exporter did not load. Use the CSV buttons on each log instead.','err');return}
+  const wb=XLSX.utils.book_new();const used=new Set();
+  const add=(name,rows)=>{let n=name.replace(/[\[\]:*?\/\\]/g,'').slice(0,31);while(used.has(n))n=n.slice(0,28)+'~'+used.size;used.add(n);const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map(()=>({wch:20}));XLSX.utils.book_append_sheet(wb,ws,n)};
+  for(const m of MODS)add(M[m].sheet,flatRows(m,true));
+  for(const k in S().sites)add('Inventory '+S().sites[k].name,invRows(k));
+  add('Site Details Data',[['Site','Site status','Address','Unit','Unit status','Current participant','Unit notes'],...Object.entries(S().sites).flatMap(([k,s])=>s.units.map(u=>[s.name,s.status==='Archived'?'Closed':'Open',s.address,u.no,u.status,(pplOf(k).find(p=>p.id===u.participantId)||{}).name||u.name||'',u.notes]))]);
+  add('Participants',[['Site','Participant','Status','Unit','Moved in','Moved out','Exit reason','Approved appliances','Notes','History'],...Object.entries(S().sites).flatMap(([k,s])=>pplOf(k).map(p=>[s.name,p.name,p.status==='Active'?'Current':'Past',p.unit,p.moveIn,p.moveOut,p.exitReason,p.appliances,p.notes,(p.history||[]).map(h=>`${h.date} ${h.event}`).join('; ')]))]);
+  add('Staff Roster',[['Site','Name','Role','Phone','Email','Start','End','Status'],...Object.entries(S().sites).flatMap(([k,s])=>staffOf(k).map(x=>[s.name,x.name,x.role,x.phone,x.email,x.start||'',x.end||'',x.status]))]);
+  add('Contacts',[['Site','Role','Contact name','Phone / email','Escalate for'],...Object.values(S().sites).flatMap(s=>[[s.name,'Police non-emergency','',s.nonEmergency,''],[s.name,'Site phone','',s.sitePhone,''],...(s.contacts||[]).map(c=>[s.name,c.role,c.name,c.reach,c.when])])]);
+  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});download(`12N-NH-Site-Operations-${today()}.xlsx`,new Blob([buf]))}
+function exportJSON(){download(`12N-NH-backup-${today()}.json`,JSON.stringify({v:2,settings:clone(S()),rec:Object.fromEntries(MODS.map(m=>[m,recs(m)])),inv:INV,staff:STAFF,participants:PPL},null,1))}
+function importJSON(file){if(!file)return;const rd=new FileReader();rd.onload=async()=>{let d;try{d=JSON.parse(rd.result);if(!d||!d.rec)throw 0}catch(e){toast('That file is not a valid backup.','err');return}
+  // Site setup (sites, staff and participant rosters, contacts): managers only, and only when asked.
+  if(d.settings&&d.settings.sites&&CAN_ADMIN){const names=Object.values(d.settings.sites).map(s=>s.name).join(', ');
+    if(await ask({title:'Also copy the site setup?',body:`The backup includes setup for: ${names}.\nThis replaces the sites, staff rosters, participant rosters and contacts here.`,ok:'Replace setup',cancel:'Keep current setup'})){
+      const before=CFG;CFG=normalizeCfg(clone(d.settings));try{await putCfg();toast('Site setup copied')}catch(e){CFG=before;writeErr(e);return}}}
+  const incoming=[];for(const m of MODS)for(const r of (d.rec[m]||[]))if(r&&r.id&&!recs(m).some(x=>x.id===r.id))incoming.push([m,r]);
+  // Staff and participant records (backups from this version)
+  if(CAN_ADMIN)for(const kind of ['staff','participants']){const src=d[kind]||{};let n=0;
+    for(const k in src)if(S().sites[k])for(const x of src[k]||[]){const have=kind==='staff'?STAFF[k]:PPL[k];if(x&&x.id&&!(have||[]).some(y=>y.id===x.id)){try{await putSub(k,kind,x);n++}catch(e){writeErr(e);break}}}
+    if(n)toast(`Imported ${n} ${kind==='staff'?'staff records':'participant records'}`)}
+  const invIn=[];for(const k in (d.inv||{}))if(S().sites[k])for(const it of d.inv[k]||[])if(it&&it.id&&!(INV[k]||[]).some(x=>x.id===it.id))invIn.push([k,it]);
+  if(!incoming.length&&!invIn.length){toast('Every entry in that backup is already here.');return}
+  if(!await ask({title:`Import ${incoming.length} entr${incoming.length===1?'y':'ies'}${invIn.length?` and ${invIn.length} inventory items`:''}?`,body:'They will be added to the shared log for everyone. Entries already here are kept.',ok:'Import'}))return;
+  let n=0;const total=incoming.length+invIn.length;
+  try{for(const [m,r] of incoming){if(!S().sites[r.site])r.site=curSite();await putRec(m,r);n++;if(n%20===0)toast(`Importing… ${n}/${total}`)}
+    for(const [k,it] of invIn){await putInv(k,it);n++;if(n%20===0)toast(`Importing… ${n}/${total}`)}toast(`Imported ${n} items`)}catch(e){writeErr(e);toast(`Stopped after ${n} of ${total}`,'err')}};rd.readAsText(file)}
+
+function toast(msg,kind){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast '+(kind||'');t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),kind==='err'?4500:2200)}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+setInterval(()=>{$('#shiftPill').textContent=shiftFor();if(SHARED)subscribeSite();if(cur==='dash'&&!$('#scrim')&&!$('.dlg'))scheduleRender()},60000);
+/* ---------- Standalone mode: Google Apps Script web app backed by a Google Sheet ----------
+   Same document API the page uses on claude.ai (doc/collection, set/delete, onSnapshot),
+   kept fresh by polling the server for rows changed since the last check. */
+function makeGasDb(){
+  const store=new Map(),listeners=new Set();let since=0,ready=false,timer=null,busy=false;
+  const col=c=>{if(!store.has(c))store.set(c,new Map());return store.get(c)};
+  const toErr=e=>{const m=String(e&&e.message||e||'');return /DENIED:/.test(m)?{code:'invalid_argument',message:m.replace(/^.*DENIED:\s*/,'')}:{code:'unavailable',message:m||'connection problem'}};
+  const run=(fn,...a)=>new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(toErr(e)))[fn](...a));
+  const md={fromCache:false,hasPendingWrites:false};
+  function notify(touched){for(const l of listeners)if(!touched||touched.has(l.c))l.fire()}
+  function apply(docs){const t=new Set();for(const x of docs){const m=col(x.c);if(x.del)m.delete(x.id);else m.set(x.id,x.d);t.add(x.c)}return t}
+  async function poll(){if(busy)return;busy=true;
+    try{const r=await run('changes',Math.max(0,since-5000));since=Math.max(since,+r.ts||0);const t=apply(r.docs||[]);
+      if(GAS_OFFLINE){GAS_OFFLINE=false;scheduleRender()}
+      if(!ready){ready=true;notify(null)}else if(t.size)notify(t)}
+    catch(e){if(!GAS_OFFLINE){GAS_OFFLINE=true;scheduleRender()}}
+    finally{busy=false;updateSync()}}
+  function start(){poll();clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)poll()},20000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});window.addEventListener('focus',poll)}
+  function listen(c,fire){const l={c,fire};listeners.add(l);if(ready)setTimeout(fire,0);return ()=>listeners.delete(l)}
+  function query(c,ord,lim){return{
+    orderBy:(f,d)=>query(c,[f,d||'asc'],lim),limit:n=>query(c,ord,n),
+    onSnapshot(next){return listen(c,()=>{let list=[...col(c).entries()].map(([id,d])=>({id,d}));
+      if(ord){const [f,dir]=ord;list.sort((a,b)=>String(a.d[f]??'').localeCompare(String(b.d[f]??''))*(dir==='desc'?-1:1))}
+      if(lim)list=list.slice(0,lim);
+      const docs=list.map(x=>({id:x.id,exists:true,data:()=>x.d,metadata:md}));next({docs,size:docs.length,empty:!docs.length,metadata:md,docChanges:()=>[]})})}}}
+  function docRef(c,id){return{id,path:c+'/'+id,
+    async set(data){const prev=col(c).get(id);const body=clone(data);col(c).set(id,body);notify(new Set([c]));
+      let flat={};try{flat=flatFor(c,body)}catch(e){}
+      try{const r=await run('put',c,id,JSON.stringify(body),JSON.stringify(flat));since=Math.max(since,0)}
+      catch(e){if(prev===undefined)col(c).delete(id);else col(c).set(id,prev);notify(new Set([c]));throw e}},
+    async delete(){const prev=col(c).get(id);col(c).delete(id);notify(new Set([c]));
+      try{await run('remove',c,id)}catch(e){if(prev!==undefined)col(c).set(id,prev);notify(new Set([c]));throw e}},
+    onSnapshot(next){return listen(c,()=>{const d=col(c).get(id);next({id,exists:d!==undefined,data:()=>d,metadata:md})})}}}
+  const db={doc(p){const s=p.split('/');return docRef(s.slice(0,-1).join('/'),s[s.length-1])},
+    collection(c){const q=query(c,null,null);q.doc=id=>docRef(c,id||uid());q.path=c;return q}};
+  return {db,start,run,poll}}
+
+/* ---------- Installed app mode: works offline, syncs with the Apps Script server ----------
+   Every change is saved on this device first (IndexedDB) and queued; the queue is sent in order
+   whenever there is a connection and a valid Google sign-in. The server's changes are pulled
+   every 20 seconds and when the app comes back to the foreground. */
+const idb=(()=>{let dbp=null;
+  const open=()=>dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open('nh-site-docs',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
+  const tx=(mode,fn)=>open().then(db=>new Promise((res,rej)=>{const t=db.transaction('kv',mode);const req=fn(t.objectStore('kv'));t.oncomplete=()=>res(req&&req.result);t.onerror=()=>rej(t.error)}));
+  return {get:k=>tx('readonly',s=>s.get(k)),set:(k,v)=>tx('readwrite',s=>s.put(v,k)),clear:()=>tx('readwrite',s=>s.clear())}})();
+
+function makeApiDb(){
+  const store=new Map(),listeners=new Set(),pendingKeys=new Set();let since=0,ready=false,busy=false,outbox=[],saveT=null,timer=null;
+  const col=c=>{if(!store.has(c))store.set(c,new Map());return store.get(c)};
+  const md={fromCache:false,hasPendingWrites:false};
+  const toErr=m=>{m=String(m||'');return /AUTH:/.test(m)?{code:'unauthenticated',message:m.replace(/^.*AUTH:\s*/,'')}:/DENIED:/.test(m)?{code:'invalid_argument',message:m.replace(/^.*DENIED:\s*/,'')}:{code:'unavailable',message:m||'connection problem'}};
+  async function run(fn,...args){
+    if(navigator.onLine===false)throw {code:'unavailable',message:'No internet connection'};
+    const token=await getToken();if(!token){needSignIn();throw {code:'unauthenticated',message:'Sign in again'}}
+    let r;try{const res=await fetch(NH_CONFIG.apiUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn,args,token}),redirect:'follow'});r=await res.json()}
+    catch(e){throw {code:'unavailable',message:'Can\'t reach the server'}}
+    if(!r||!r.ok){const e=toErr(r&&r.error);if(e.code==='unauthenticated'){forgetToken();needSignIn()}throw e}
+    return r.result}
+  function notify(t){for(const l of listeners)if(!t||t.has(l.c))l.fire()}
+  function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{idb.set('store',[...store].map(([c,m])=>[c,[...m]])).catch(()=>{});idb.set('since',since).catch(()=>{});idb.set('outbox',outbox).catch(()=>{})},300)}
+  function counts(){pendingKeys.clear();outbox.forEach(o=>pendingKeys.add(o.c+'|'+o.id));const before=PENDING;PENDING=outbox.length;if(before!==PENDING){updateSync();scheduleRender()}}
+  function apply(docs){const t=new Set();for(const x of docs){if(pendingKeys.has(x.c+'|'+x.id))continue;const m=col(x.c);if(x.del)m.delete(x.id);else m.set(x.id,x.d);t.add(x.c)}return t}
+  /* op.prev = the value before this device's unsynced changes, so a refused change can be undone here too. */
+  function queue(op){const earlier=outbox.find(o=>o.c===op.c&&o.id===op.id);if(earlier)op.prev=earlier.prev;outbox=outbox.filter(o=>o!==earlier);outbox.push(op);counts();persist();setTimeout(poll,30)}
+  function undo(o){const m=col(o.c);if(o.prev==null)m.delete(o.id);else m.set(o.id,o.prev);notify(new Set([o.c]))}
+  async function flush(){
+    while(outbox.length){const o=outbox[0];
+      try{if(o.op==='put')await run('put',o.c,o.id,o.json,o.flat);else await run('remove',o.c,o.id)}
+      catch(e){if(e.code==='invalid_argument'){toast('A change could not be saved: '+e.message,'err');outbox.shift();counts();undo(o);persist();continue}throw e}
+      outbox.shift();counts();persist()}}
+  async function poll(){if(busy)return;busy=true;const wasOff=GAS_OFFLINE;
+    try{await flush();const r=await run('changes',Math.max(0,since-5000));since=Math.max(since,+r.ts||0);const t=apply(r.docs||[]);persist();
+      GAS_OFFLINE=false;if(!ready){ready=true;notify(null)}else if(t.size)notify(t)}
+    catch(e){if(e.code==='unavailable')GAS_OFFLINE=true}
+    finally{busy=false;updateSync();if(wasOff!==GAS_OFFLINE)scheduleRender()}}
+  async function load(){try{const [s,sn,ob]=await Promise.all([idb.get('store'),idb.get('since'),idb.get('outbox')]);
+    if(s)for(const [c,arr] of s)store.set(c,new Map(arr));since=+sn||0;outbox=Array.isArray(ob)?ob:[];counts();if(s&&s.length){ready=true;notify(null)}}catch(e){}}
+  function start(){poll();clearInterval(timer);timer=setInterval(()=>{if(!document.hidden)poll()},20000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});window.addEventListener('online',poll);window.addEventListener('focus',poll)}
+  function listen(c,fire){const l={c,fire};listeners.add(l);if(ready)setTimeout(fire,0);return ()=>listeners.delete(l)}
+  function query(c,ord,lim){return{orderBy:(f,d)=>query(c,[f,d||'asc'],lim),limit:n=>query(c,ord,n),
+    onSnapshot(next){return listen(c,()=>{let list=[...col(c).entries()].map(([id,d])=>({id,d}));
+      if(ord){const [f,dir]=ord;list.sort((a,b)=>String(a.d[f]??'').localeCompare(String(b.d[f]??''))*(dir==='desc'?-1:1))}
+      if(lim)list=list.slice(0,lim);const docs=list.map(x=>({id:x.id,exists:true,data:()=>x.d,metadata:md}));next({docs,size:docs.length,empty:!docs.length,metadata:md,docChanges:()=>[]})})}}}
+  function docRef(c,id){return{id,path:c+'/'+id,
+    async set(data){const before=col(c).get(id);const body=clone(data);col(c).set(id,body);notify(new Set([c]));let flat={};try{flat=flatFor(c,body)}catch(e){}
+      queue({op:'put',c,id,json:JSON.stringify(body),flat:JSON.stringify(flat),prev:before===undefined?null:clone(before)})},
+    async delete(){const before=col(c).get(id);col(c).delete(id);notify(new Set([c]));queue({op:'remove',c,id,prev:before===undefined?null:clone(before)})},
+    onSnapshot(next){return listen(c,()=>{const d=col(c).get(id);next({id,exists:d!==undefined,data:()=>d,metadata:md})})}}}
+  const db={doc(p){const s=p.split('/');return docRef(s.slice(0,-1).join('/'),s[s.length-1])},collection(c){const q=query(c,null,null);q.doc=id=>docRef(c,id||uid());q.path=c;return q}};
+  async function clearAll(){store.clear();outbox=[];since=0;counts();try{await idb.clear()}catch(e){}}
+  return {db,start,run,poll,load,clearAll,pending:()=>outbox.length}}
+
+/* ---------- Google sign-in (Google Identity Services) ---------- */
+let TOKEN=null,TOKEN_EXP=0,gisReady=null,credWaiters=[],AFTER_SIGNIN=null;
+const jwtExp=t=>{try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).exp*1000}catch(e){return 0}};
+try{const s=JSON.parse(localStorage.getItem('nh-token')||'null');if(s&&s.exp>Date.now()+60000){TOKEN=s.t;TOKEN_EXP=s.exp}}catch(e){}
+function forgetToken(){TOKEN=null;TOKEN_EXP=0;try{localStorage.removeItem('nh-token')}catch(e){}}
+function loadGis(){return gisReady||(gisReady=new Promise((res,rej)=>{
+    if(window.google&&google.accounts&&google.accounts.id)return res();
+    const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.onload=()=>res();s.onerror=()=>{gisReady=null;rej(new Error('Google sign-in could not load. Check the connection.'))};document.head.appendChild(s)})
+  .then(()=>google.accounts.id.initialize({client_id:NH_CONFIG.clientId,callback:onCredential,auto_select:true,cancel_on_tap_outside:false,itp_support:true,use_fedcm_for_prompt:true,hd:NH_CONFIG.domain||undefined})))}
+function onCredential(resp){if(!resp||!resp.credential)return;TOKEN=resp.credential;TOKEN_EXP=jwtExp(TOKEN);
+  try{localStorage.setItem('nh-token',JSON.stringify({t:TOKEN,exp:TOKEN_EXP}))}catch(e){}
+  credWaiters.splice(0).forEach(f=>f(TOKEN));
+  if(SIGNIN_NEEDED){SIGNIN_NEEDED=false;updateSync();scheduleRender()}
+  if(AFTER_SIGNIN){const f=AFTER_SIGNIN;AFTER_SIGNIN=null;f()}else if(API)API.poll()}
+async function getToken(){
+  if(TOKEN&&TOKEN_EXP>Date.now()+60000)return TOKEN;
+  if(SIGNIN_NEEDED)return null;
+  try{await loadGis()}catch(e){return null}
+  return new Promise(res=>{const first=!credWaiters.length;credWaiters.push(res);
+    if(first)try{google.accounts.id.prompt()}catch(e){}
+    setTimeout(()=>{const i=credWaiters.indexOf(res);if(i>=0){credWaiters.splice(i,1);res(null)}},8000)})}
+function needSignIn(){if(!SIGNIN_NEEDED){SIGNIN_NEEDED=true;updateSync();scheduleRender()}}
+function renderSignInButton(el){loadGis().then(()=>{el.innerHTML='';google.accounts.id.renderButton(el,{theme:'outline',size:'large',text:'signin_with',shape:'pill'})}).catch(e=>{el.textContent=e.message})}
+async function signOut(){const n=API?API.pending():0;
+  if(!await ask({title:'Sign out of this device?',body:(n?`<b>${n} change${n>1?'s have':' has'} not synced yet and will be lost.</b> Connect to the internet and wait for them to sync first.\n\n`:'')+'This removes the records stored on this device. Everything already synced stays in Google Drive.',ok:'Sign out',danger:true}))return;
+  try{if(window.google&&google.accounts&&google.accounts.id)google.accounts.id.disableAutoSelect()}catch(e){}
+  forgetToken();try{localStorage.removeItem('nh-session')}catch(e){}if(API)await API.clearAll();location.reload()}
+function showSignIn(msg){$('#view').innerHTML=`<div class="card" style="max-width:520px;margin:40px auto;text-align:center">
+  <div class="logo" style="justify-content:center;border:0;margin:0 0 8px"><div class="mk">12N</div><div style="text-align:left"><b style="color:var(--ink)">NH Site Docs</b><small>Neighbourly Homes</small></div></div>
+  <h1 style="font-size:20px">Sign in</h1><p class="sub" style="margin:6px auto 16px">Use your ${esc(NH_CONFIG.domain||'12 Neighbours')} Google account. After the first sign-in, this device keeps working even without internet.</p>
+  ${msg?`<div class="infob warn" style="text-align:left;margin-bottom:14px">${esc(msg)}</div>`:''}<div id="gisMain" style="display:flex;justify-content:center;min-height:44px"></div></div>`;
+  renderSignInButton($('#gisMain'))}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();INSTALL_PROMPT=e;if(cur==='setup')scheduleRender()});
+
+async function bootApi(){
+  MODE='api';
+  if(!NH_CONFIG.apiUrl||!NH_CONFIG.clientId){$('#view').innerHTML=`<div class="card empty">This copy of NH Site Docs isn't connected yet. A manager needs to fill in <b>config.js</b> (see SETUP.md).</div>`;return}
+  try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}
+  API=makeApiDb();GAS=API;await API.load();
+  let sess=null;try{sess=JSON.parse(localStorage.getItem('nh-session')||'null')}catch(e){}
+  const applySess=u=>{MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_WRITE=u.role==='Admin'||u.role==='Staff';SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
+  let started=false;const startApp=()=>{if(started)return;started=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
+  const refresh=async()=>{try{const u=await API.run('whoami');if(sess&&sess.email&&u.email!==sess.email){await API.clearAll()}sess=u;localStorage.setItem('nh-session',JSON.stringify(u));applySess(u);startApp();render()}
+    catch(e){if(e.code==='invalid_argument'){forgetToken();try{localStorage.removeItem('nh-session')}catch(x){}await API.clearAll();showSignIn(e.message)}
+      else if(e.code==='unauthenticated'&&!started){AFTER_SIGNIN=refresh;showSignIn()}else if(!started){GAS_OFFLINE=true;showSignIn('No connection. Connect to the internet for the first sign-in on this device.')}}};
+  if(sess){applySess(sess);startApp();refresh()}
+  else{AFTER_SIGNIN=refresh;showSignIn();if(TOKEN)refresh()}
+  if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})}
+
+(async function boot(){
+  if(window.NH_CONFIG){await bootApi();return}
+  if(window.google&&google.script&&google.script.run){
+    MODE='gas';const g=makeGasDb();
+    try{const u=await g.run('whoami');MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_WRITE=u.role==='Admin'||u.role==='Staff';SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.archiveUrl||'';WEBAPP_URL=u.webAppUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null;
+      LAUNCH_SITE=await new Promise(res=>{try{google.script.url.getLocation(loc=>res((loc&&loc.parameter&&loc.parameter.site)||''))}catch(e){res('')}})}
+    catch(e){$('#view').innerHTML=`<div class="card empty"><b>You don't have access to NH Site Docs.</b><br>${esc(e.message||'')}<br>Ask a manager to add your email to the Access tab of the data sheet.</div>`;MODE='denied';return}
+    GAS=g;DBX=g.db;SHARED=true;CFG_READY=false;subscribeAll();g.start();render();return}
+  if(window.claude&&typeof window.claude.use==='function'){MODE='claude';
+    try{[DBX,USER,DL]=await Promise.all([claude.use('db'),claude.use('user'),claude.use('downloads')])}catch(e){}}
+  if(DBX){SHARED=true;CFG_READY=false;
+    if(USER){try{MY_UID=await USER.id()}catch(e){}try{CAN_ADMIN=await USER.canEdit()}catch(e){CAN_ADMIN=false}try{const w=await USER.can('data.write');if(w===false)CAN_WRITE=false}catch(e){}}
+    else CAN_ADMIN=false;
+    subscribeAll()}
+  else{MODE='local';try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}loadLocal();applyLaunchSite()}
+  render()})();
+if(!(window.google&&window.google.script)&&!window.NH_CONFIG)render();
+</script>
+
+</body>
+</html>
