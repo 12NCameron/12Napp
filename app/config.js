@@ -1,6 +1,6 @@
-/* NH Site Docs: connection settings. Fill these in during setup (see SETUP.md). */
+/* NH Site Docs: connection settings (see SETUP.md). */
 window.NH_CONFIG = {
-  apiUrl: '',     // Apps Script web app URL, ending in /exec
-  clientId: '',   // Google OAuth Web client ID, ending in .apps.googleusercontent.com
+  apiUrl: 'https://script.google.com/macros/s/AKfycbytAMBGtx5JSeMadPu3KX9bf2vajY09k3QLPU1vIuMzxx7ZLMxksyIlpZRLM8Y-uKUHVQ/exec',  // Apps Script web app (Deploy → Manage deployments)
+  clientId: '451384662035-bg8i5o78qphr0ufq8lan906khdeid4c9.apps.googleusercontent.com',  // Google Cloud OAuth Web client
   domain: '12neighbours.com'  // only accounts from this Google Workspace domain can sign in
 };
