@@ -26,7 +26,7 @@ var TAB_NAMES = {
   notes: 'Notes Data', handoff: 'Shift Handoff Log', patrols: 'Perimeter Check Data', incidents: 'Incident Reports',
   visitors: 'Visitor Log', roomchecks: 'Room Operations Data', wellness: 'Room Wellness Checks',
   requests: 'Participant Requests', intakes: 'Intake Data', engagement: 'Participant Engagement Data',
-  workorders: 'Work Orders', requisitions: 'Requisitions'
+  workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log'
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
 var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs' };
