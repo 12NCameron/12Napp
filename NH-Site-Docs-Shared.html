@@ -131,7 +131,7 @@ td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowra
 .rtile{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:9px 10px;cursor:pointer;text-align:left;min-height:74px;min-width:0}
 .rtile b{display:block;font-size:13px}.rtile small{display:block;color:var(--ink3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtile .pill{margin-top:5px}
-.rtile.Pass,.rtile.Exempt{border-color:var(--ok);background:var(--okSoft)}.rtile.Fail{border-color:var(--bad);background:var(--badSoft)}
+.rtile.Pass,.rtile.Exempt{border-color:var(--ok);background:var(--okSoft)}.rtile.Fail,.rtile.Follow-up{border-color:var(--warn);background:var(--warnSoft)}
 .rtile.Day-Off{border-color:var(--purple);background:var(--purpleSoft)}.rtile.Due{border-color:var(--pink);background:var(--pinkSoft)}
 .inv input,.inv select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--panel)}
 .inv input[type=number]{width:64px;text-align:right}
@@ -209,14 +209,14 @@ const INV_CATS=["Office Supplies","Cleaning & Sanitation","Safety & Aid","Progra
 const seedInvItem=([id,type,cat,item,freq,par])=>({id,type,cat,item,freq,office:0,bath:0,guest:0,par,cond:'Good'});
 const DIRECTORY=[
  /* Template roles only: each site fills in its own names and numbers under Participants & Contacts. */
- ["Site Supervisor","","","Shift emergencies, urgent resident crises, appliance approvals, supervisor handoff"],
+ ["Site Supervisor","","","Shift emergencies, a participant in crisis, appliance approvals, supervisor handoff"],
  ["Site Manager","","","Escalations, on-call decisions, unit transfers and move-outs"],
  ["Safety & Operations Lead","","","Equipment hazards, untrained task concerns, safety audit findings"],
  ["HR — Office & Personnel Files","","","VSC results, non-urgent HR concerns, office admin"],
  ["HR — Payroll, Benefits & Attendance","","","Payroll, time punches, benefits"],
  ["HR — Governance & Safe Spaces","","","Confidential boundary concerns, whistleblower matters"],
  ["Emergency Services","Police · Fire · EMS","911","Active violence, weapons, medical emergency, fire"],
- ["Police — Non-Emergency","","","Trespass refusal, non-urgent police matters"]];
+ ["Police — Non-Emergency","","","Someone won't leave after a trespass notice; non-urgent police matters"]];
 /* ---------- Site lifecycle data model ----------
    config/main            org settings + each site's details, units, contacts (managers edit)
    sites/<site>/staff         one record per staff member (Active / Inactive / Archived)
@@ -224,7 +224,8 @@ const DIRECTORY=[
    log-<log>              live log entries;  arch-<log>  archived log entries (kept, searchable) */
 const UNIT_STATUSES=['Occupied','Vacant','Pending Move-in','Out of service'];
 const STAFF_STATUSES=['Active','Inactive','Archived'];
-const EXIT_REASONS=['Moved to permanent housing','Moved to other housing / family','Program completion','Voluntary exit','Eviction / placement ended','Transfer to another site','Hospital / treatment (long term)','Incarceration','Deceased','Other'];
+const STAFF_LABEL={Active:'Active',Inactive:'On leave',Archived:'Former staff'};
+const EXIT_REASONS=['Moved to permanent housing','Moved to other housing / family','Program completion','Chose to move on','Program participation ended','Transfer to another site','Hospital / treatment (long term)','In custody','Passed away','Other'];
 const DEFAULT_PORTAL='https://sites.google.com/12neighbours.com/12n-staff-portal-v1-0/home';
 const mkUnits=(n,start=1)=>Array.from({length:n},(_,i)=>({no:start+i,status:'Vacant',participantId:'',notes:''}));
 const DEFAULT_CONTACTS=()=>DIRECTORY.map(([role,name,reach,when])=>({role,name,reach,when}));
@@ -349,7 +350,7 @@ const recDate=r=>r.date||String(r.createdAt||'').slice(0,10);
 const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
   incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!roomFollow(r)||r.checkInDone==='Yes',inout:()=>true,
   requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
-  requisitions:r=>['Received','Denied'].includes(r.status)};
+  requisitions:r=>['Received','Denied','Not approved'].includes(r.status)};
 function archiveCandidates(months){const cutoff=addDays(today(),-Math.round(months*30.44));const ok=new Set(allowedSites());
   return Object.fromEntries(MODS.map(m=>[m,recs(m).filter(r=>ok.has(r.site)&&recDate(r)&&recDate(r)<cutoff&&IS_CLOSED[m](r))]))}
 async function archiveEntries(m,list,progress){
@@ -413,21 +414,26 @@ document.addEventListener('focusout',()=>{if(renderPending){renderPending=false;
 /* =========================================================
    OPTION LISTS & PILLS
    ========================================================= */
-const INTERACTION=["Incident Report filed","One on One","Weekly Check-in","Wellness Check","Room Checks","Group Activity","12N Community","Celebration","Reminder","Policy Reminder","Support Request","Observation","Behaviour Escalation","Safety","Maintenance","Cleaners","Guest Visit","Intake Request","Inventory","Law Enforcement Visit","Missing Participant Check","Staff Change"];
+const INTERACTION=["Incident Report filed","One on One","Weekly Check-in","Wellness Check","Room Checks","Group Activity","12N Community","Celebration","Reminder","Community agreement reminder","Support Request","Observation","Escalating situation","Safety","Maintenance","Cleaners","Guest Visit","Intake Request","Inventory","Law Enforcement Visit","Missing Participant Check","Staff Change"];
 /* Entry types where the shift log only references an Incident Report (12N Note Taking and Report Writing Guideline). */
-const NOTE_IR_TYPES=['Incident Report filed','Behaviour Escalation','Safety','Law Enforcement Visit','Missing Participant Check'];
+const NOTE_IR_TYPES=['Incident Report filed','Escalating situation','Behaviour Escalation','Safety','Law Enforcement Visit','Missing Participant Check'];
 const followDue=r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'&&r.followUpBy&&new Date(r.followUpBy)<new Date();
 const fmtWhen=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})};
 /* Words that usually signal a guess, label or diagnosis rather than an observation. */
-const SUBJECTIVE_RE=/\b(drunk|intoxicated|wasted|stoned|hostile|lazy|uncooperative|rude|crazy|psycho\w*|manic|paranoid|delusional|schizo\w*|bipolar|depressed|attention[- ]seeking|manipulat\w*|looking (for|to start) (trouble|a fight|a conflict)|seemed|appeared to be|probably|obviously|i think|i feel|i believe)\b/gi;
+const SUBJECTIVE_RE=/\b(drunk|intoxicated|wasted|stoned|high as|hostile|aggressive|violent person|lazy|uncooperative|non-?compliant|difficult|demanding|rude|crazy|nuts|insane|psycho\w*|manic|paranoid|delusional|schizo\w*|bipolar|depressed|attention[- ]seek\w*|manipulat\w*|acting out|bad attitude|frequent flyer|addicts?|junkies?|druggies?|crackheads?|alcoholics?|homeless (person|people|man|woman|guy)|the homeless|dirty|filthy|disgusting|gross|hoarder|looking (for|to start) (trouble|a fight|a conflict)|seemed|appeared to be|probably|obviously|i think|i feel|i believe)\b/gi;
+/* Person-first alternatives shown by the wording check. */
+const PERSON_FIRST=[[/addicts?|junkies?|druggies?|crackheads?/i,'person who uses substances'],[/alcoholics?/i,'person who uses alcohol'],[/homeless|the homeless/i,'person experiencing homelessness'],
+  [/non-?compliant|uncooperative/i,'“declined …” or “chose not to …”'],[/dirty|filthy|disgusting|gross|hoarder/i,'describe the room, e.g. “floor not visible; 3 bags of garbage”'],
+  [/aggressive|hostile|violent person|acting out/i,'describe the behaviour, e.g. “raised voice, pacing, clenched fists”'],[/crazy|nuts|insane|psycho|manic|paranoid|delusional|schizo|bipolar|depressed/i,'describe what was said or done; leave out diagnoses']];
 const INCIDENT_TYPES=["Near Miss","Behavioural Escalation","Participant Injury","Staff Injury","Medical Emergency or Overdose","Harassment","Violence","Property Damage","Breach of Community Agreements / Code of Conduct","Police or EMS Involvement","Missing Participant","Needle Stick / Sharps Injury","Alarm Activation (Homestar Gate)","Other / General Incident"];
 const LOCATIONS=["Courtyard","Admin Building","Kitchen / Common area","Shared bathrooms / showers","Laundry","Guest space / Guest unit","Gate / Perimeter","Micro-home exterior","Inside a unit","Off-site activity","Other"];
 const PLACES=["Admin Building","Shared bathrooms / showers","Laundry","Courtyard / pathways","Homestar Gate","Perimeter fence","Exterior lighting","Guest unit","Other"];
 const ESC_STEPS=["—","1. Incident Report","2. Room Status Update","3. Written Warning","4. Community Accountability Review (CAR)","5. Urgent Warning (Final Written Notice)","6. Eviction Request Form","7. Program Review Committee decision","8. Debrief & Lessons Learned"];
 const PILL={HIGH:'bad',High:'bad',MEDIUM:'warn',Medium:'warn',LOW:'info',Low:'info',Yes:'warn',No:'',
- 'All-Clear':'ok',Noteworthy:'warn','Disruptive Visitor':'bad','Security Hazard':'bad','Trespass Warning':'bad',
- Pass:'ok',Fail:'bad','Day Off':'purple',Exempt:'ok',Due:'pink',Clean:'ok','Needs Support':'warn','Follow-Up Required':'bad',
- Approved:'ok',Pending:'warn',Denied:'bad',Open:'warn',Resolved:'ok',Acknowledged:'ok',
+ 'All-Clear':'ok',Noteworthy:'warn','Disruptive Visitor':'bad','Visitor disruption':'bad','Security Hazard':'bad','Trespass Warning':'bad',
+ Pass:'ok',Fail:'warn','Follow-up':'warn','Day Off':'purple',Exempt:'ok',Due:'pink',Clean:'ok','Needs Support':'warn','Follow-Up Required':'bad',
+ Approved:'ok',Pending:'warn',Denied:'',
+ 'Not approved':'',Open:'warn',Resolved:'ok',Acknowledged:'ok',
  Submitted:'info','Under Review':'warn','Follow-up Required':'bad','CAR Recommended':'purple',Closed:'ok',
  'Awaiting Review':'warn',Assigned:'info','In Progress':'acc',Completed:'ok',
  '1 — Critical':'bad','2 — Urgent':'warn','3 — Routine':'info','4 — Low':'',
@@ -436,7 +442,10 @@ const PILL={HIGH:'bad',High:'bad',MEDIUM:'warn',Medium:'warn',LOW:'info',Low:'in
  'In HIFIS':'ok','Not in HIFIS':'bad',Unsure:'warn','On site':'warn','Signed out':'ok',
  'Needs Follow-Up':'warn',Urgent:'bad',P:'ok',FU:'warn',U:'bad',In:'ok',Out:'warn',
  Occupied:'ok',Vacant:'','Pending Move-in':'warn','Out of service':'bad',Active:'ok',Inactive:'warn',Archived:''};
-const pill=(v,cls)=>v?`<span class="pill p-${cls??PILL[v]??''}">${esc(v)}</span>`:'';
+/* Earlier wording, shown in today's person-centred words (stored values are left as recorded). */
+const SAY={Fail:'Follow-up',Denied:'Not approved','Disruptive Visitor':'Visitor disruption','Behaviour Escalation':'Escalating situation','Policy Reminder':'Community agreement reminder','Voluntary exit':'Chose to move on','Eviction / placement ended':'Program participation ended',Incarceration:'In custody',Deceased:'Passed away'};
+const say=v=>SAY[v]||v;
+const pill=(v,cls)=>v?`<span class="pill p-${cls??PILL[v]??''}">${esc(say(v))}</span>`:'';
 
 /* =========================================================
    MODULE DEFINITIONS
@@ -448,6 +457,7 @@ notes:{title:'Shift Notes',nav:'Shift Notes',sheet:'Notes Data',sop:'Guide · No
  fields:[
   {k:'guide',t:'info',full:1,show:()=>true,html:()=>`<b>Does this change what staff need to know or do?</b> If not, it doesn't need logging.<br>
    <b>Log:</b> meaningful wellness changes · missed scheduled check-ins · requests or commitments that need follow-up · safety concerns · site issues (a leak, a supply shortage) · completed work that matters to the next shift.<br>
+   <b>Write with respect:</b> person-first, plain language; describe actions and needs, not character.<br>
    <b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment with no safety concern or follow-up.<br>
    <span class="meta" style="margin:0">12N Note Taking and Report Writing Guideline</span>`},
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',req:1,def:D.now},
@@ -495,10 +505,10 @@ patrols:{title:'Perimeter Checks & Walkthroughs',nav:'Perimeter & Walkthroughs',
   {k:'observed',l:'Observed',t:'multi',full:1,o:['Trash / broken glass','Tampered cords / unauthorized appliances','Damage, leaks or pests','Fire hazard','Participant wellness concern','Maintenance needed','Conflict / graffiti / vandalism','Snow / ice / weather impact','Unlocked or tampered exit','Unknown person on site','Restock needed (Admin)'],hint:'Leave blank if nothing to note.'},
   {k:'internal',l:'Internal notes',t:'textarea',hint:'Hallways, exits, common spaces, Admin Building.'},
   {k:'external',l:'External notes',t:'textarea',hint:'Yard, fence, lighting, walkways, waste area.'},
-  {k:'classification',l:'Classification',t:'seg',full:1,o:['All-Clear','Noteworthy','Disruptive Visitor','Security Hazard','Trespass Warning'],def:'All-Clear',req:1},
+  {k:'classification',l:'Classification',t:'seg',full:1,o:['All-Clear','Noteworthy','Visitor disruption','Security Hazard','Trespass Warning'],def:'All-Clear',req:1},
   {k:'escalation',l:'Escalation',t:'select',o:['None','De-escalated','Asked to Leave','Notice of Trespass Issued','Police Non-Emergency Dispatched','911 Emergency Dispatched'],def:'None'},
   {k:'actions',l:'Actions taken / maintenance flagged',t:'textarea',full:1,show:r=>r.classification!=='All-Clear'||(r.observed||[]).length||r.escalation!=='None'},
-  {k:'tip',t:'info',full:1,warn:1,show:r=>['Disruptive Visitor','Security Hazard','Trespass Warning'].includes(r.classification)||['Notice of Trespass Issued','Police Non-Emergency Dispatched','911 Emergency Dispatched'].includes(r.escalation),html:()=>'Tell the Shift Lead now. Security threats, trespass or police contact also need an <b>Incident Report</b> (within 12 hours). A Notice of Trespass needs Executive Director approval. Never attempt physical removal.'}],
+  {k:'tip',t:'info',full:1,warn:1,show:r=>['Disruptive Visitor','Visitor disruption','Security Hazard','Trespass Warning'].includes(r.classification)||['Notice of Trespass Issued','Police Non-Emergency Dispatched','911 Emergency Dispatched'].includes(r.escalation),html:()=>'Tell the Shift Lead now. Security threats, trespass or police contact also need an <b>Incident Report</b> (within 12 hours). A Notice of Trespass needs Executive Director approval. Never attempt physical removal.'}],
  cols:['date','time','checkType','staff','classification','escalation',{l:'Observed',f:r=>esc((r.observed||[]).join(', '))}],
  chips:[{l:'Today',f:r=>r.date===today()},{l:'Not all-clear',f:r=>r.classification!=='All-Clear'},{l:'Evening checks',f:r=>/Evening/.test(r.checkType)}]},
 incidents:{title:'Incident Reports',nav:'Incident Reports',sheet:'Incident Reports',sop:'NH 3.1.4 · 3.1.12 · 3.1.16 · Red Manual',copy:1,
@@ -558,16 +568,16 @@ roomchecks:{title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations D
  desc:'Weekday checks (Mon–Fri, 10 AM–2 PM): knock, announce, do a wellness and room check, then record it here. Every unit must be accounted for (checked or exempt) before the shift ends.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Unit',t:'unit',req:1},
-  {k:'status',l:'Result',t:'seg',full:1,o:['Pass','Fail','Day Off','Exempt','Due'],req:1},
+  {k:'status',l:'Result',t:'seg',full:1,o:['Pass','Follow-up','Day Off','Exempt','Due'],req:1},
   {k:'exemptReason',l:'Exemption reason',t:'select',o:['Holiday','Staff Meeting','Pre-approved Exemption','Medical / Hospital','Participant Away'],show:r=>['Exempt','Day Off'].includes(r.status)},
   {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},{k:'trainee',l:'Second staff / shadowing',t:'staff',def:D.other},
   {k:'checkStatus',l:'Check status',t:'select',o:['Completed','Staff Missed Check','Pending Follow-up','Excused'],def:'Completed'},
   {k:'missedReason',l:'Missed check reason',t:'text',show:r=>r.checkStatus==='Staff Missed Check'},
   {k:'priority',l:'Priority',t:'seg',o:['Low','Medium','High'],def:'Low'},
   {k:'followUp',l:'Follow-up?',t:'seg',o:['No','Yes'],def:'No'},
-  {k:'comments',l:'Comments',t:'textarea',full:1,req:r=>r.status==='Fail',hint:'Required for a Fail. Note any unapproved appliances (heating elements, hot plates): report these to the Site Supervisor right away.'}],
+  {k:'comments',l:'Comments',t:'textarea',full:1,req:r=>rcFollow(r.status),hint:'Required when follow-up is needed: describe what you saw and what support was offered. Report any unapproved appliances (heating elements, hot plates) to the Site Supervisor right away.'}],
  cols:['date','unit','status','staff','checkStatus','followUp','comments'],
- chips:[{l:'Today',f:r=>r.date===today()},{l:'Fails',f:r=>r.status==='Fail'},{l:'Follow-ups',f:r=>r.followUp==='Yes'}]},
+ chips:[{l:'Today',f:r=>r.date===today()},{l:'Needs follow-up',f:r=>rcFollow(r.status)},{l:'Follow-ups',f:r=>r.followUp==='Yes'}]},
 wellness:{title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Checks',sop:'Unit Room Check Form v1.0 (Phase 2) · NH 3.1.6',copy:1,
  desc:'The official Unit Room Check Form. Rate each item P = Pass, FU = Follow-Up, U = Urgent. Knock, wait and announce before entering. The check is supportive, not disciplinary: do not open bins, drawers or bags unless safety is at immediate risk and a supervisor approves.',
  fields:[
@@ -631,8 +641,8 @@ requests:{title:'Participant Requests & Appliance Approvals',nav:'Participant Re
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Participant / unit',t:'unit',req:1},
   {k:'category',l:'Request category',t:'select',o:['Appliance Approval','Cleaning Supplies','Hygiene Supplies','Clothing / Weather Gear','Bedding / Linens','Maintenance','Food / Meal','Other'],req:1},
   {k:'item',l:'Requested item',t:'text',req:1},{k:'reason',l:'Request reason',t:'textarea',full:1},
-  {k:'approval',l:'Approval status',t:'seg',o:['Pending','Approved','Denied'],def:'Pending'},
-  {k:'approvedBy',l:'Approved / denied by',t:'staff',show:r=>r.approval!=='Pending'},
+  {k:'approval',l:'Approval status',t:'seg',o:['Pending','Approved','Not approved'],def:'Pending'},
+  {k:'approvedBy',l:'Decision by',t:'staff',show:r=>r.approval!=='Pending'},
   {k:'approvalNotes',l:'Approval notes',t:'textarea',full:1,show:r=>r.approval!=='Pending'},
   {k:'staff',l:'Logged by',t:'staff',def:D.me}],
  cols:['date','unit','category','item','approval','staff'],
@@ -691,13 +701,14 @@ requisitions:{title:'Supply Requisitions',nav:'Requisitions',sheet:'Requisitions
   {k:'item',l:'Item',t:'text',req:1,list:()=>(INV[curSite()]||[]).map(i=>i.item)},{k:'qty',l:'Quantity',t:'number',def:1},
   {k:'reason',l:'Reason',t:'textarea',full:1},
   {k:'priority',l:'Priority',t:'seg',o:['High','Medium','Low'],def:'Medium'},
-  {k:'status',l:'Status',t:'select',o:['Requested','Approved','Ordered','Received','Denied'],def:'Requested'},
+  {k:'status',l:'Status',t:'select',o:['Requested','Approved','Ordered','Received','Not approved'],def:'Requested'},
   {k:'notes',l:'Approval / order notes',t:'textarea',full:1}],
  cols:['date','item','qty','priority','status','by'],
- chips:[{l:'Open',f:r=>!['Received','Denied'].includes(r.status)},{l:'High priority',f:r=>r.priority==='High'}]},
+ chips:[{l:'Open',f:r=>!['Received','Denied','Not approved'].includes(r.status)},{l:'High priority',f:r=>r.priority==='High'}]},
 };
 const fieldsOf=m=>M[m].fields.filter(f=>f.k&&f.t!=='info');
 const optLabel=o=>Array.isArray(o)?o[0]:o;
+const rcFollow=s=>s==='Follow-up'||s==='Fail'; /* 'Fail' = wording used before Nov 2026 */
 /* Unit Room Check: which items were rated FU or U, the status they imply, and whether it needs follow-up. */
 const ROOM_TABLES=['general','sleeping','appliances','plumbing','cords','exitPath'];
 function roomFlags(r){const out=[];for(const k of ROOM_TABLES)for(const [item,x] of Object.entries(r[k]||{}))if(x&&(x.v==='FU'||x.v==='U'))out.push({table:k,item,v:x.v,n:x.n||''});return out}
@@ -730,7 +741,7 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
    NAV & HEADER
    ========================================================= */
 const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff']]],['Safety & Security',[['patrols'],['incidents'],['visitors']]],
- ['Residents',[['roomchecks'],['wellness'],['inout'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
+ ['Participants',[['roomchecks'],['wellness'],['inout'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
 let cur=(location.hash||'').slice(1)||'dash';const chipState={},searchState={};
@@ -795,7 +806,7 @@ function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in scre
    ========================================================= */
 function cellVal(m,r,c){if(typeof c==='object')return c.f(r);const f=M[m].fields.find(x=>x.k===c);const v=r[c];if(!f)return esc(v);
   if(f.t==='date')return esc(fmtDate(v));if(f.t==='unit')return esc(r[c+'Label']||unitLabel(v));if(f.t==='multi')return esc((v||[]).join(', '));
-  if(f.t==='seg'||(f.t==='select'&&PILL[v]!==undefined))return pill(v);return esc(v)}
+  if(f.t==='seg'||(f.t==='select'&&PILL[v]!==undefined))return pill(v);return esc(say(v))}
 const colLabel=(m,c)=>typeof c==='object'?c.l:(M[m].fields.find(x=>x.k===c)||{}).l||c;
 const sorted=list=>list.slice().sort((a,b)=>((b.date||'')+(b.time||b.timeIn||'')).localeCompare((a.date||'')+(a.time||a.timeIn||''))||(b.createdAt||'').localeCompare(a.createdAt||''));
 function renderList(v,m){
@@ -880,7 +891,7 @@ function onChange(f){
   if(draftMod==='wellness'){if(f.k==='roomStatus')draft._statusSet=true;
     else if(!draft._statusSet&&(f.t==='yntable'||['unapproved','panelOk','smokeResult','bedding'].includes(f.k))){draft.roomStatus=roomAutoStatus(draft);const i=M.wellness.fields.findIndex(x=>x.k==='roomStatus');const el=$('#f'+i);if(el)el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===draft.roomStatus))}}
   if(draftMod==='notes'&&f.k==='time'){draft.shift=shiftFor(draft.time);const i=M.notes.fields.findIndex(x=>x.k==='shift');const s=$('#f'+i);if(s)s.value=draft.shift}
-  if(draftMod==='roomchecks'&&f.k==='status'&&draft.status==='Fail'&&draft.followUp!=='Yes'){draft.followUp='Yes';const i=M.roomchecks.fields.findIndex(x=>x.k==='followUp');$('#f'+i).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='Yes'))}
+  if(draftMod==='roomchecks'&&f.k==='status'&&rcFollow(draft.status)&&draft.followUp!=='Yes'){draft.followUp='Yes';const i=M.roomchecks.fields.findIndex(x=>x.k==='followUp');$('#f'+i).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='Yes'))}
   refreshVis()}
 function refreshVis(){M[draftMod].fields.forEach((f,i)=>{const w=$(`#fgrid [data-i="${i}"]`);if(!w)return;const vis=!f.show||!!f.show(draft);w.hidden=!vis;
   if(w.dataset.info&&vis)w.innerHTML=f.html(draft);const r=w.querySelector('[data-dynreq]');if(r)r.style.visibility=f.req(draft)?'visible':'hidden'})}
@@ -897,7 +908,8 @@ async function saveForm(){
   if(txt){const hits=[...new Set((String(txt).match(SUBJECTIVE_RE)||[]).map(w=>w.toLowerCase()))];
     const tooLong=m==='notes'&&NOTE_IR_TYPES.includes(d.type)&&String(txt).length>400;
     if(hits.length||tooLong){const parts=[];
-      if(hits.length)parts.push(`These words often read as a guess, label or diagnosis: “${hits.slice(0,6).join('”, “')}”. Describe what you saw or heard instead (e.g. “Participant declined room cleaning assistance” rather than “uncooperative”).`);
+      if(hits.length){const tips=[...new Set(hits.map(h=>(PERSON_FIRST.find(([re])=>re.test(h))||[])[1]).filter(Boolean))];
+        parts.push(`These words can read as a label, judgement or diagnosis: “${hits.slice(0,6).join('”, “')}”. Use respectful, person-first language and describe what you saw or heard (e.g. “Participant declined room cleaning assistance” rather than “uncooperative”).${tips.length?'\n\nTry: '+tips.join(' · '):''}`)}
       if(tooLong)parts.push('This looks like a full incident account. Keep the shift log to a brief reference and put the details in the Incident Report.');
       if(!await ask({title:'Check the wording',body:parts.join('\n\n'),ok:'Save anyway',cancel:'Edit entry'}))return}}
   if(m==='engagement'&&d.category==='Daily Whiteboard'&&d.quote){const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -943,10 +955,10 @@ function openItems(){const t=today();const out=[];
   siteRecs('incidents').filter(r=>r.review!=='Closed'&&r.date>=addDays(t,-2)).forEach(r=>out.push(['Incident',`${r.reportType} at ${r.location} (${fmtDate(r.date)} ${r.time}), ${r.review}`]));
   siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1|^2/.test(r.severity)).forEach(r=>out.push(['Work order',`${r.severity}: ${r.where}: ${r.description}`]));
   siteRecs('visitors').filter(r=>!r.timeOut).forEach(r=>out.push(['Visitor on site',`${r.name} (${r.agency}) since ${r.timeIn}`]));
-  siteRecs('roomchecks').filter(r=>r.date===t&&r.status==='Fail').forEach(r=>out.push(['Room check fail',`${r.unitLabel}: ${r.comments}`]));
+  siteRecs('roomchecks').filter(r=>r.date===t&&rcFollow(r.status)).forEach(r=>out.push(['Room check follow-up',`${r.unitLabel}: ${r.comments}`]));
   siteRecs('patrols').filter(r=>r.date===t&&r.classification!=='All-Clear').forEach(r=>out.push(['Patrol',`${r.time} ${r.classification}: ${[r.internal,r.external].filter(Boolean).join(' / ')}`]));
   siteRecs('wellness').filter(r=>roomFollow(r)&&r.checkInDone!=='Yes').forEach(r=>out.push(['Wellness check-in',`${r.unitLabel} due ${fmtDate(r.checkInDue)}`]));
-  siteRecs('requisitions').filter(r=>r.priority==='High'&&!['Received','Denied'].includes(r.status)).forEach(r=>out.push(['Supply',`${r.item} ×${r.qty} (${r.status})`]));
+  siteRecs('requisitions').filter(r=>r.priority==='High'&&!['Received','Denied','Not approved'].includes(r.status)).forEach(r=>out.push(['Supply',`${r.item} ×${r.qty} (${r.status})`]));
   return out}
 function autoSummaryText(){return openItems().map(([a,b])=>`• [${a}] ${b}`).join('\n')}
 function autoSummaryHTML(){const o=openItems();return o.length?`<b>${o.length} open item${o.length>1?'s':''}</b> from the shared logs were copied into “To follow up” below. Edit as needed.`:'No open follow-ups, incidents, urgent work orders or visitors on site right now.'}
@@ -964,7 +976,7 @@ const CUSTOM={
     <span style="flex:1"></span><button class="btn sm" type="button" id="bulkEx">Mark the rest Exempt…</button></div>
     <div class="rgrid">${units().map(u=>{const r=by[u.no];const st=r?r.status:(u.status==='Occupied'?'Not checked':'');
       return `<button class="rtile ${r?r.status.replace(' ','-'):''}" type="button" data-unit="${u.no}" data-rid="${r?esc(r.id):''}"><b>Unit ${u.no}</b><small>${esc(unitName(u)||'—')}${u.status!=='Occupied'?' · '+esc(u.status):''}</small>${st?pill(st,r?undefined:''):''}</button>`}).join('')}</div>
-    <p class="meta">Tap a unit to record or edit its check. Weekends: see the Exemption Policy (usually 13 exempt, 1 required). Fails need follow-up notes.</p></div>`;
+    <p class="meta">Tap a unit to record or edit its check. Weekends: see the Exemption Policy (usually 13 exempt, 1 required). When follow-up is needed, note what you saw and the support offered.</p></div>`;
   $('#gridDate').onchange=e=>{gridDate=e.target.value||today();render()};$('#bulkEx').onclick=bulkExempt;
   el.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>b.dataset.rid?openForm('roomchecks',b.dataset.rid):openForm('roomchecks',null,{unit:b.dataset.unit,date:gridDate}))},
  engStats(el){const l=siteRecs('engagement');const att=l.reduce((a,r)=>a+(+r.attendance||0),0);const rated=l.filter(r=>r.rating);const hi=rated.filter(r=>r.rating==='High').length;
@@ -1037,7 +1049,7 @@ function renderDash(v){
    ['Shift start','Review occupancy census','Check the unit roster, pending move-ins/outs and emergency contacts.',Tick('census'),'site'],
    ['8:00–10:00','Morning Safety Walkthrough','Courtyard, shared bathrooms/laundry, Admin Building, micro-home exteriors.',St(has(/Morning/)),'patrols',{checkType:'Morning Safety Walkthrough (8–10 AM)'}],
    ['by 8:30','Post the daily whiteboard','Check it hasn\'t run in the last 60 days. Use trauma-informed language.',St(wb),'engagement',WB_PRESET],
-   ['10:00–2:00','Daily room checks',weekday?'Knock, announce, check; record Pass / Fail / Exempt.':'Weekend: apply the exemption policy.',St(occ&&rcDone>=occ?true:rcDone?null:false,`${rcDone}/${occ}`,'warn'),'roomchecks'],
+   ['10:00–2:00','Daily room checks',weekday?'Knock, announce, check in; record Pass / Follow-up / Exempt.':'Weekend: apply the exemption policy.',St(occ&&rcDone>=occ?true:rcDone?null:false,`${rcDone}/${occ}`,'warn'),'roomchecks'],
    ['12:00–2:00','Midday Spot Check','Second walkthrough of the day.',St(has(/Midday/)),'patrols',{checkType:'Midday Spot Check (12–2 PM)'}],
    ['Every 60–90 min','Perimeter patrol',lastP?`Last patrol ${esc(lastP.time)} (${fmtDate(lastP.date)}) by ${esc(lastP.staff)}`:'No patrols logged yet.',mins==null?pill('None yet','warn'):mins>90?pill(`${mins} min ago`,'bad'):pill(`${mins} min ago`,'ok'),'patrols',{checkType:'Hourly Patrol'}],
    ['1:00–2:00','Intake triage','Cross-check HIFIS and update contact records.',newInt.length?pill(`${newInt.length} new`,'warn'):pill('Clear','ok'),'intakes'],
@@ -1123,7 +1135,7 @@ async function addInvItem(){const a=await ask({title:'Add inventory item',ok:'Ad
   try{await putInv(k,{id:'INV-'+String(n).padStart(3,'0'),type:a[2],cat:a[1],item:a[0].trim(),freq:a[3],office:0,bath:0,guest:0,par:Math.max(0,+a[4]||0),cond:'Good'});toast('Item added')}catch(e){writeErr(e)}}
 async function markAudit(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');try{await putAudit({date:today(),by:me(),site:curSite()});toast('Weekly audit recorded')}catch(e){writeErr(e)}}
 async function restockToReq(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');
-  const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0);const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied'].includes(r.status)).map(r=>r.item));
+  const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0);const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied','Not approved'].includes(r.status)).map(r=>r.item));
   const add=q.filter(i=>!open.has(i.item));if(!add.length)return toast('The restock queue is already in Requisitions.');
   if(!await ask({title:`Create ${add.length} requisition(s)?`,body:'One for each item at or below par that does not already have an open requisition.',ok:'Create'}))return;
   const now=new Date().toISOString();try{for(const i of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:i.item,qty:i.order,reason:`Restock to par (${i.total}/${i.par})`,priority:i.status==='Out of Stock'&&/Safety/.test(i.cat)?'High':'Medium',status:'Requested'});
@@ -1153,10 +1165,10 @@ async function transferUnit(no){const k=curSite();const p=personById(unitPid(no)
   const to=+a[0].replace(/\D/g,'');const q=clone(p);q.unit=to;q.history=[...(q.history||[]),{date:a[1]||today(),event:`Transferred from Unit ${no} to Unit ${to}`,unit:to,by:me()||''}];
   try{await putSub(k,'participants',q);await cfgSave(()=>{const us=CFG.sites[k].units;Object.assign(us.find(x=>x.no==no),{status:'Vacant',participantId:''});Object.assign(us.find(x=>x.no==to),{status:'Occupied',participantId:p.id})},`${p.name} moved to Unit ${to}`)}catch(e){writeErr(e)}}
 async function readmit(p){const k=curSite();const free=vacantUnits();if(!free.length)return toast('There are no vacant units.','err');
-  const a=await ask({title:`Re-admit ${p.name}`,ok:'Re-admit',fields:[{l:'Unit',o:free.map(u=>'Unit '+u.no)},{l:'Move-in date',t:'date',v:today()}]});if(!a)return;
+  const a=await ask({title:`Move ${p.name} back in`,ok:'Welcome back',fields:[{l:'Unit',o:free.map(u=>'Unit '+u.no)},{l:'Move-in date',t:'date',v:today()}]});if(!a)return;
   const unit=+a[0].replace(/\D/g,'');const q=clone(p);Object.assign(q,{status:'Active',unit,moveIn:a[1]||today(),moveOut:'',exitReason:''});
-  q.history=[...(q.history||[]),{date:a[1]||today(),event:'Re-admitted',unit,by:me()||''}];
-  try{await putSub(k,'participants',q);await setUnit(unit,{status:'Occupied',participantId:p.id},`${p.name} re-admitted to Unit ${unit}`)}catch(e){writeErr(e)}}
+  q.history=[...(q.history||[]),{date:a[1]||today(),event:'Moved back in',unit,by:me()||''}];
+  try{await putSub(k,'participants',q);await setUnit(unit,{status:'Occupied',participantId:p.id},`Welcome back, ${p.name}: Unit ${unit}`)}catch(e){writeErr(e)}}
 async function viewPerson(p){const ent=entriesFor(p.id);
   const body=`<b>${esc(p.status==='Active'?'Current participant':'Past participant')}</b> · Unit ${esc(p.unit)} · moved in ${esc(fmtDate(p.moveIn)||'—')}${p.moveOut?` · moved out ${esc(fmtDate(p.moveOut))} (${esc(p.exitReason)})`:''}
    ${p.appliances?`<br>Approved appliances: ${esc(p.appliances)}`:''}${p.notes?`<br>Notes: ${esc(p.notes)}`:''}
@@ -1168,7 +1180,7 @@ async function viewPerson(p){const ent=entriesFor(p.id);
     const q=clone(p);Object.assign(q,{name:a[0].trim(),appliances:a[1].trim(),notes:a[2].trim()});try{await putSub(curSite(),'participants',q);toast('Saved')}catch(e){writeErr(e)}}}
 function pastParticipantsHTML(q){const k=curSite();q=(q||'').toLowerCase();
   const past=pplOf(k).filter(p=>p.status==='Archived'&&(!q||JSON.stringify(p).toLowerCase().includes(q))).sort((a,b)=>String(b.moveOut).localeCompare(String(a.moveOut)));
-  return past.length?`<div class="tblwrap"><table><thead><tr><th>Participant</th><th>Last unit</th><th>Moved in</th><th>Moved out</th><th>Reason</th><th></th></tr></thead><tbody>${past.map(p=>`<tr class="click" data-pv="${esc(p.id)}" tabindex="0"><td>${esc(p.name)}</td><td>${esc(p.unit)}</td><td>${esc(fmtDate(p.moveIn))}</td><td>${esc(fmtDate(p.moveOut))}</td><td>${esc(p.exitReason)}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-readmit="${esc(p.id)}">Re-admit</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
+  return past.length?`<div class="tblwrap"><table><thead><tr><th>Participant</th><th>Last unit</th><th>Moved in</th><th>Moved out</th><th>Reason</th><th></th></tr></thead><tbody>${past.map(p=>`<tr class="click" data-pv="${esc(p.id)}" tabindex="0"><td>${esc(p.name)}</td><td>${esc(p.unit)}</td><td>${esc(fmtDate(p.moveIn))}</td><td>${esc(fmtDate(p.moveOut))}</td><td>${esc(p.exitReason)}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-readmit="${esc(p.id)}">Welcome back</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
    :`<div class="card empty">${q?'No past participants match.':'No past participants yet.'}</div>`}
 function wirePast(v){v.querySelectorAll('[data-pv]').forEach(tr=>{const go2=e=>{if(e.target.closest('[data-readmit]'))return;viewPerson(personById(tr.dataset.pv))};tr.onclick=go2;tr.onkeydown=e=>{if(e.key==='Enter')go2(e)}});
   v.querySelectorAll('[data-readmit]').forEach(b=>b.onclick=e=>{e.stopPropagation();readmit(personById(b.dataset.readmit))})}
@@ -1234,10 +1246,10 @@ function renderStaff(v){
   const list=all.filter(s=>showArchivedStaff||s.status!=='Archived').sort((a,b)=>STAFF_STATUSES.indexOf(a.status)-STAFF_STATUSES.indexOf(b.status)||String(a.name).localeCompare(String(b.name)));
   const n=st=>all.filter(s=>s.status===st).length;
   v.innerHTML=`<h1>Staff Roster<span class="sopref">${esc(site().name)}</span></h1>
-  <p class="sub">The staff who work at <b>${esc(site().name)}</b>. Active staff appear in “On shift” and in the reporter and facilitator fields. Set someone to <b>Inactive</b> for a leave, and <b>Archived</b> when they leave the site. Their past entries keep their name either way.${ed?'':legacy?' This roster is from an earlier version. It moves into staff records the next time a manager opens the app.':' Only managers can change the roster.'}</p>
-  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">Inactive</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Archived</div><div class="v">${n('Archived')}</div></div></div>
+  <p class="sub">The staff who work at <b>${esc(site().name)}</b>. Active staff appear in “On shift” and in the reporter and facilitator fields. Set someone to <b>On leave</b> while they're away, and <b>Former staff</b> when they leave the site. Their past entries keep their name either way.${ed?'':legacy?' This roster is from an earlier version. It moves into staff records the next time a manager opens the app.':' Only managers can change the roster.'}</p>
+  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">On leave</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Former staff</div><div class="v">${n('Archived')}</div></div></div>
   <div class="toolbar">${ed?`<button class="btn pri" type="button" id="addStaff">＋ Add staff member</button><button class="btn" type="button" id="copyStaff">Copy staff from another site…</button>`:''}
-   <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show archived</label></div>
+   <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show former staff</label></div>
   <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody>
    ${list.map(s=>`<tr><td><input ${ro} style="width:150px" value="${esc(s.name)}" data-s="${esc(s.id)}" data-f="name" aria-label="Name"></td>
     <td><input ${ro} style="width:170px" list="roleList" value="${esc(s.role)}" data-s="${esc(s.id)}" data-f="role" aria-label="Role, ${esc(s.name)}"></td>
@@ -1245,13 +1257,13 @@ function renderStaff(v){
     <td><input ${ro} type="email" style="width:200px" value="${esc(s.email)}" data-s="${esc(s.id)}" data-f="email" aria-label="Email, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.start||'')}" data-s="${esc(s.id)}" data-f="start" aria-label="Start date, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
-    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option ${o===s.status?'selected':''}>${o}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No staff on this site's roster yet.</td></tr>`}
+    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No staff on this site's roster yet.</td></tr>`}
   </tbody></table></div>
   <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
   v.querySelectorAll('[data-s]').forEach(el=>el.onchange=async()=>{const s=clone(all.find(x=>x.id===el.dataset.s));const f=el.dataset.f;s[f]=el.value.trim();
     if(f==='status'&&s.status==='Archived'&&!s.end)s.end=today();if(f==='status'&&s.status==='Active')s.end='';
-    try{await putSub(k,'staff',s);toast(f==='status'?`${s.name}: ${s.status}`:'Roster saved')}catch(e){writeErr(e);render()}});
+    try{await putSub(k,'staff',s);toast(f==='status'?`${s.name}: ${STAFF_LABEL[s.status]||s.status}`:'Roster saved')}catch(e){writeErr(e);render()}});
   const a=$('#addStaff');if(a)a.onclick=async()=>{const r=await ask({title:`Add staff to ${site().name}`,ok:'Add',fields:[{l:'Name',req:1},{l:'Role',v:'Community Facilitator'},{l:'Phone',t:'tel'},{l:'Email',t:'email'},{l:'Start date',t:'date',v:today()}]});if(!r)return;
     if(all.some(s=>s.name.toLowerCase()===r[0].trim().toLowerCase()&&s.status!=='Archived'))return toast(`${r[0].trim()} is already on this roster.`,'err');
     try{await putSub(k,'staff',{id:uid(),name:r[0].trim(),role:r[1].trim(),phone:r[2].trim(),email:r[3].trim(),start:r[4]||'',end:'',status:'Active'});toast('Added to roster')}catch(e){writeErr(e)}};
@@ -1271,7 +1283,7 @@ function archivedRecHTML(m,r){const mod=M[m];let rows='';
     if(v===''||v==null)continue;rows+=`<tr><td style="font-weight:600;width:38%;vertical-align:top">${esc(f.l)}</td><td style="white-space:pre-wrap">${esc(v)}</td></tr>`}
   return `<div style="max-height:52vh;overflow:auto"><table>${rows}</table><p class="meta">Created ${esc(new Date(r.createdAt).toLocaleString())} by ${esc(r.createdBy||'?')}</p></div>`}
 function renderArchive(v){
-  const tabs=[['logs','Log entries'],['people','Past participants'],['staff','Archived staff'],...(CAN_ADMIN&&CAN_WRITE?[['run','Archive old entries']]:[])];
+  const tabs=[['logs','Log entries'],['people','Past participants'],['staff','Former staff'],...(CAN_ADMIN&&CAN_WRITE?[['run','Archive old entries']]:[])];
   if(!tabs.some(t=>t[0]===ARCH.tab))ARCH.tab='logs';
   let h=`<h1>Archive<span class="sopref">${esc(site().name)}</span></h1>
   <p class="sub">Records the site no longer works from day to day. Nothing here is deleted: archived log entries stay searchable and can be restored, and past participants and archived staff keep their history.</p>
@@ -1288,7 +1300,7 @@ function renderArchive(v){
     else h+=`<div class="card empty">Choose a log and a date range, then search. Leave the dates blank to see everything archived for this site.</div>`}
   if(ARCH.tab==='people')h+=`<div class="toolbar"><input class="search" id="pastQ" placeholder="Search past participants…" aria-label="Search past participants" value="${esc(pastQ)}"></div><div id="pastList">${pastParticipantsHTML(pastQ)}</div>`;
   if(ARCH.tab==='staff'){const arch=staffOf(curSite()).filter(s=>s.status==='Archived');
-    h+=arch.length?`<div class="tblwrap"><table><thead><tr><th>Name</th><th>Role</th><th>Start</th><th>End</th><th></th></tr></thead><tbody>${arch.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(fmtDate(s.start))}</td><td>${esc(fmtDate(s.end))}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-sr="${esc(s.id)}">Restore to roster</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<div class="card empty">No archived staff for this site.</div>`}
+    h+=arch.length?`<div class="tblwrap"><table><thead><tr><th>Name</th><th>Role</th><th>Start</th><th>End</th><th></th></tr></thead><tbody>${arch.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.role)}</td><td>${esc(fmtDate(s.start))}</td><td>${esc(fmtDate(s.end))}</td><td>${siteEditable()?`<button class="btn sm" type="button" data-sr="${esc(s.id)}">Restore to roster</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:`<div class="card empty">No former staff for this site.</div>`}
   if(ARCH.tab==='run'){const cand=archiveCandidates(ARCH.months);const total=MODS.reduce((a,m)=>a+cand[m].length,0);
     h+=`<div class="card" style="max-width:720px"><p style="margin-top:0">Moves <b>closed</b> entries older than the cutoff out of the live logs into the archive${SERVER()?' (a yearly archive spreadsheet in each site\'s Drive folder)':''}. This keeps the app quick as years of records build up. Open items are never archived: unresolved follow-ups, open incidents, unfinished work orders, active intakes, pending requests and requisitions, wellness check-ins not done, unacknowledged handoffs, and visitors still signed in.</p>
      <div class="toolbar"><label for="arMonths"><b>Archive entries older than</b></label><select id="arMonths" class="chip">${[3,6,12,18,24,36].map(n=>`<option value="${n}" ${n===ARCH.months?'selected':''}>${n} months</option>`).join('')}</select></div>
@@ -1321,7 +1333,7 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
   ${C('Behaviour Escalation Framework','NH 3.1.12','t-brown',`<ol><li>Incident Report</li><li>Room Status Update (cleanliness, runs alongside)</li><li>Written Warning (first / second / final)</li><li>Community Accountability Review (CAR) &amp; Agreement, with follow-up in 1–2 weeks</li><li>Urgent Warning (Final Written Notice)</li><li>Eviction Request Form</li><li>Program Review Committee decision</li><li>Debrief &amp; lessons learned</li></ol><p><b>Red-line items</b> (violence, weapons, sexual assault) may go straight to step 6. <b>3 CARs in 12 months</b> trigger a mandatory Placement Review.</p>`)}
   ${C('Missing participant','NH 3.1.16','t-brown',`<p><b>Thresholds:</b> High Risk: <b>24 h</b> without confirmed contact. Non-High Risk: <b>10 days</b>. Reassess at any time.</p><p><b>Before the threshold:</b> check logs, call or text the participant, ask discreetly, and document every attempt.</p><ol><li>Facilitator: Incident Report (unit, risk level, last seen, attempts, description)</li><li>Facilitator: phone the Site Manager</li><li>Manager: partner agencies by phone, plus email within 2 h (cc Director and Safety &amp; Ops Lead)</li><li>Manager: police missing person report. Record the occurrence #</li><li>Manager: email the Safety &amp; Ops Lead and Director the same day</li></ol><p>Keep the unit secured and belongings preserved.</p>`)}
   ${C('Law enforcement arrival','NH 3.1.11','t-brown',`<ol><li>Greet them, introduce yourself, and ask for a business card and the purpose of the visit.</li><li>Warrant: ask for a copy, check the name and DOB, check it is signed by a judge, and write the warrant # on the card.</li><li>Ask the officers to wait in the office.</li><li>Tell the participant privately and let them gather belongings.</li><li>Walk them to the office.</li><li>Log it in Shift Notes and file an Incident Report with photos of the warrant and card. Notify the Supervisor or Manager.</li></ol>`)}
-  ${C('Disruptive visitors & trespass','Guide 2.7.3','t-white',`<p>Assess, approach calmly, explain expectations, and offer a quiet space. Never confront aggressive visitors alone, and never make physical contact.</p><p><b>Level 1</b> verbal feedback → <b>Level 2</b> asked to leave → <b>Level 3</b> Notice of Trespass (needs Executive Director approval).</p><p>Violence or weapons: disengage, retreat and call <b>911</b>. Trespass refused: police non-emergency <b>${esc(site().nonEmergency||'—')}</b>.</p>`)}
+  ${C('Visitor disruption & trespass','Guide 2.7.3','t-white',`<p>Assess, approach calmly, explain expectations, and offer a quiet space. Never approach someone showing aggression on your own, and never make physical contact.</p><p><b>Level 1</b> verbal feedback → <b>Level 2</b> asked to leave → <b>Level 3</b> Notice of Trespass (needs Executive Director approval).</p><p>Violence or weapons: disengage, retreat and call <b>911</b>. If someone won't leave after a trespass notice: police non-emergency <b>${esc(site().nonEmergency||'—')}</b>.</p>`)}
   ${C('Work order severity','NH 3.3.10','t-brown',`<table><tr><td>${pill('1 — Critical')}</td><td>Gas leak, flooding, structural failure, no heat in winter, fire safety down. <b>Escalate immediately</b> by phone or Signal.</td></tr><tr><td>${pill('2 — Urgent')}</td><td>Plumbing failure, no hot water, broken lock. Submit the same day. Assigned within 24 h.</td></tr><tr><td>${pill('3 — Routine')}</td><td>Appliance issue or minor repair. Next Wednesday site visit.</td></tr><tr><td>${pill('4 — Low')}</td><td>Cosmetic. Batched with scheduled work.</td></tr></table><p>Only C&amp;M staff do repairs. No work order closes without a completion note.</p>`)}
   ${C('Participant privacy','Guide 2.7.2','t-white',`<p>Protect names, room numbers, contact info, DOB, health and history. Share only on a need-to-know basis.</p><p><b>Inquiry script:</b> <i>“I appreciate your concern, but I cannot disclose personal details due to confidentiality policies.”</i> Offer to connect them with the Community team. Never confirm or deny that someone lives here.</p><p><b>Exception:</b> imminent harm or a medical emergency. Share only the minimum with first responders, then brief the Shift Lead and log it.</p>`)}
   ${C('Professional boundaries','Guide 2.5.3','t-white',`<p>These apply 24/7, on and off site. <b>Do not</b>: give rides, lend or borrow money, give or receive gifts, socialise outside work, use personal social media or phone numbers, or make home visits.</p><p>Financial exploitation or romantic relationships lead to immediate termination.</p>`)}
