@@ -257,11 +257,11 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
    STORE — shared db when available, else this browser only
    ========================================================= */
 const MODS=['notes','handoff','patrols','incidents','visitors','roomchecks','wellness','inout','requests','intakes','engagement','workorders','requisitions'];
-let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,MY_UID=null;
+let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,CAN_SCHEDULE=true,MY_UID=null;
 let MODE='local',GAS_OFFLINE=false,SHEET_URL='',WEBAPP_URL='',ARCHIVE_URL='',GAS=null,ALLOWED_RAW=null,LAUNCH_SITE='',PENDING=0,SIGNIN_NEEDED=false,API=null,INSTALL_PROMPT=null;
 const SERVER=()=>MODE==='gas'||MODE==='api';
 let CFG=null,CFG_READY=false;const CACHE={};MODS.forEach(m=>CACHE[m]=[]);
-const STAFF={},PPL={};const SUBREADY=new Set();
+const STAFF={},PPL={},SCHED={};const SUBREADY=new Set();
 const INV={};let CHECKS={},AUDIT=null;let invReady={};
 const confirmed=new Set();let syncTimedOut=false;
 const LOCAL_KEY='12n-nh-shared-fallback-v1',PREF_KEY='12n-nh-pref-v1';
@@ -270,11 +270,11 @@ function savePref(){try{localStorage.setItem(PREF_KEY,JSON.stringify(PREF))}catc
 let LOCAL=null;
 function loadLocal(){try{LOCAL=JSON.parse(localStorage.getItem(LOCAL_KEY)||'null')}catch(e){}
   if(!LOCAL)LOCAL={cfg:DEFAULT_CFG(),rec:{},inv:{},checks:{},audits:{}};
-  for(const x of ['staff','participants','arch'])LOCAL[x]=LOCAL[x]||{};
+  for(const x of ['staff','participants','schedule','arch'])LOCAL[x]=LOCAL[x]||{};
   CFG=normalizeCfg(LOCAL.cfg);CFG_READY=true;MODS.forEach(m=>CACHE[m]=LOCAL.rec[m]||(LOCAL.rec[m]=[]));
   localSites()}
 function localSites(){for(const k in CFG.sites){INV[k]=LOCAL.inv[k]||(LOCAL.inv[k]=[]);invReady[k]=true;
-  STAFF[k]=LOCAL.staff[k]||(LOCAL.staff[k]=[]);PPL[k]=LOCAL.participants[k]||(LOCAL.participants[k]=[]);
+  STAFF[k]=LOCAL.staff[k]||(LOCAL.staff[k]=[]);PPL[k]=LOCAL.participants[k]||(LOCAL.participants[k]=[]);SCHED[k]=LOCAL.schedule[k]||(LOCAL.schedule[k]=[]);
   SUBREADY.add('staff-'+k);SUBREADY.add('ppl-'+k);setTimeout(()=>migrateLegacy(k),0)}}
 function persistLocal(){try{localStorage.setItem(LOCAL_KEY,JSON.stringify(LOCAL))}catch(e){toast('This browser is not keeping data. Export a backup.','err')}}
 const S=()=>CFG||DEFAULT_CFG();
@@ -332,7 +332,7 @@ async function putAudit(a){AUDIT=a;if(SHARED)await DBX.doc('checks/audit_'+curSi
 /* Staff and participant records (kind = 'staff' | 'participants'). */
 async function putSub(k,kind,obj){obj=clone(obj);
   if(SHARED)await DBX.collection(`sites/${k}/${kind}`).doc(obj.id).set(obj);
-  const store=kind==='staff'?STAFF:PPL;const a=store[k]||(store[k]=[]);const i=a.findIndex(x=>x.id===obj.id);if(i<0)a.push(obj);else a[i]=obj;
+  const store=kind==='staff'?STAFF:kind==='schedule'?SCHED:PPL;const a=store[k]||(store[k]=[]);const i=a.findIndex(x=>x.id===obj.id);if(i<0)a.push(obj);else a[i]=obj;
   if(!SHARED)persistLocal();scheduleRender()}
 /* Move legacy staff lists and participant names out of the config into their own records (managers only, once). */
 const migrating=new Set();
@@ -391,7 +391,8 @@ const recSubs=new Set();
 function subscribeSiteRecords(){if(!CFG||!SHARED)return;
   for(const k of allowedSites()){if(recSubs.has(k))continue;recSubs.add(k);
     sub('staff-'+k,DBX.collection(`sites/${k}/staff`),s=>{STAFF[k]=s.docs.map(d=>clone(d.data()));SUBREADY.add('staff-'+k);migrateLegacy(k);scheduleRender()});
-    sub('ppl-'+k,DBX.collection(`sites/${k}/participants`),s=>{PPL[k]=s.docs.map(d=>clone(d.data()));SUBREADY.add('ppl-'+k);migrateLegacy(k);scheduleRender()})}}
+    sub('ppl-'+k,DBX.collection(`sites/${k}/participants`),s=>{PPL[k]=s.docs.map(d=>clone(d.data()));SUBREADY.add('ppl-'+k);migrateLegacy(k);scheduleRender()});
+    sub('sched-'+k,DBX.collection(`sites/${k}/schedule`),s=>{SCHED[k]=s.docs.map(d=>clone(d.data()));scheduleRender()})}}
 /* A launch link (…?site=<id or name>) opens straight to that site's page. */
 function applyLaunchSite(){if(!LAUNCH_SITE||!CFG)return;const want=LAUNCH_SITE.trim().toLowerCase();
   const k=allowedSites().find(x=>x.toLowerCase()===want||String(S().sites[x].name).trim().toLowerCase()===want);
@@ -747,7 +748,7 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
 /* =========================================================
    NAV & HEADER
    ========================================================= */
-const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff']]],['Safety & Security',[['patrols'],['incidents'],['visitors']]],
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors']]],
  ['Participants',[['roomchecks'],['wellness'],['inout'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
@@ -805,7 +806,7 @@ let API_STARTED=false;
 function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in screen until the app has started */
   renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
-  if(cur==='info')return renderInfo(v);if(cur==='archive')return renderArchive(v);
+  if(cur==='info')return renderInfo(v);if(cur==='schedule')return renderSchedule(v);if(cur==='archive')return renderArchive(v);
   if(cur==='sop')return renderSOP(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
 
 /* =========================================================
@@ -1052,7 +1053,7 @@ function renderDash(v){
   const Tick=k=>`<input type="checkbox" class="tick" data-chk="${k}" ${CHECKS[chkKey(k)]?'checked':''} aria-label="Mark census review done">`;
   const np=pair().length;
   const tasks=[
-   ['Shift start','Confirm 2 staff on shift',np?`On shift: ${esc(pair().join(' & '))}`:'Choose both staff at the top of the page.',np>=2?pill('2 / 2','ok'):pill(`${np} / 2`,'bad'),'staff'],
+   ['Shift start','Confirm 2 staff on shift',np?`On shift: ${esc(pair().join(' & '))}`:(schedNow().length?`Scheduled: ${esc(schedNow().join(' & '))}`:'Choose both staff at the top of the page.'),np>=2?pill('2 / 2','ok'):(schedNow().length&&CAN_WRITE?`<button class="btn sm pri" type="button" id="useSched">Use schedule</button>`:pill(`${np} / 2`,'bad')),'schedule'],
    ['Shift start','Review occupancy census','Check the unit roster, pending move-ins/outs and emergency contacts.',Tick('census'),'site'],
    ['8:00–10:00','Morning Safety Walkthrough','Courtyard, shared bathrooms/laundry, Admin Building, micro-home exteriors.',St(has(/Morning/)),'patrols',{checkType:'Morning Safety Walkthrough (8–10 AM)'}],
    ['by 8:30','Post the daily whiteboard','Check it hasn\'t run in the last 60 days. Use trauma-informed language.',St(wb),'engagement',WB_PRESET],
@@ -1065,6 +1066,7 @@ function renderDash(v){
    ['9:30–10:00 PM','Evening Site Check','Emergency exits latched and locked, courtyard clear, bathrooms and Admin Building checked.',St(has(/Evening/)),'patrols',{checkType:'Evening Site Check (9:30–10 PM)',areas:['Emergency exits latched & locked','Courtyard & pathways','Shared bathrooms / showers / laundry','Admin Building interior']}],
    ['Last 30 min','Shift notes review & handoff','Resolve or assign follow-ups, then complete the handoff with the incoming lead.',St(ho),'handoff']];
   const A=[];
+  if(CAN_SCHEDULE){const gaps=schedGaps(curSite(),7);if(gaps)A.push(['warn',`${gaps} shift${gaps>1?'s':''} in the next 7 days ${gaps>1?'have':'has'} fewer than 2 staff scheduled.`,'schedule',''])}
   if(CAN_ADMIN&&CAN_WRITE){const c=archiveCandidates(12);const n=MODS.reduce((a,m)=>a+c[m].length,0);if(n)A.push(['info',`${n} closed entr${n===1?'y is':'ies are'} over a year old. Archive them to keep the app quick.`,'archive',''])}
   {const L=ioLatest(curSite());for(const [u,l] of Object.entries(L))if(l.t==='Out'&&(Date.now()-l.at)/36e5>24)A.push(['bad',`${unitLabel(u)} has been out since ${fmtDate(l.date)} ${l.time} (over 24 hours). Check the Missing Participant protocol.`,'inout',''])}
   if(np<2)A.push(['bad',np?`Only ${pair()[0]} is recorded on this shift. Shifts are staffed by two.`:'No staff recorded on this shift yet. Choose both staff at the top.','dash','']);
@@ -1100,6 +1102,7 @@ function renderDash(v){
   v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>openForm(b.dataset.q));
   v.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{const t=tasks[+b.dataset.task];t[5]&&M[t[4]]?openForm(t[4],null,t[5]):go(t[4])});
   v.querySelectorAll('[data-m][data-id]').forEach(b=>b.onclick=()=>{const m=b.dataset.m,id=b.dataset.id;if(!id){if(m==='dash')$('#on1').focus();else{if(m==='archive')ARCH.tab='run';go(m)}return}go(m);openForm(m,id)});
+  const us=$('#useSched');if(us)us.onclick=async()=>{const s=schedNow();if(s[0])await setPair(0,s[0]);if(s[1])await setPair(1,s[1])};
   v.querySelectorAll('[data-setup]').forEach(b=>b.onclick=()=>go(b.dataset.setup));const sd=$('#setupDone');if(sd)sd.onclick=()=>cfgSave(()=>{CFG.sites[curSite()].setupDone=true},'Setup checklist hidden');
   v.querySelectorAll('[data-chk]').forEach(c=>c.onchange=()=>setChk(c.dataset.chk,c.checked))}
 
@@ -1331,6 +1334,56 @@ function renderArchive(v){
       let done=0;try{for(const m of MODS){await archiveEntries(m,cand[m],n=>toast(`Archiving… ${done+n}/${total}`));done+=cand[m].length}
         if(GAS&&GAS.poll)GAS.poll();toast(`Archived ${done} entries`)}catch(e){writeErr(e);toast(`Stopped after ${done} of ${total}`,'err')}render()}}}
 
+/* =========================================================
+   SCHEDULE (two staff per shift; managers and supervisors edit, everyone views once published)
+   ========================================================= */
+const weekStart=ds=>{const d=new Date(ds+'T12:00');return addDays(ds,-((d.getDay()+6)%7))};
+const weekDays=w=>Array.from({length:7},(_,i)=>addDays(w,i));
+const dayName=ds=>new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'short'});
+const schedWeek=(k,w)=>(SCHED[k]||[]).find(x=>x.id===w);
+/* Scheduled pair for a date/shift (published weeks only, unless asked). */
+function schedFor(k,ds,i,drafts){const w=schedWeek(k,weekStart(ds));if(!w||(!w.published&&!drafts))return [];return (((w.days||{})[ds]||{})[i]||[]).filter(Boolean)}
+const schedNow=()=>schedFor(curSite(),today(),shiftIdx());
+function schedGaps(k,n){let g=0;for(let d=0;d<n;d++){const ds=addDays(today(),d);for(let i=0;i<3;i++){if(d===0&&i<shiftIdx()&&shiftIdx()!==2)continue;if(schedFor(k,ds,i,true).length<2)g++}}return g}
+let SCHED_WEEK='';
+function renderSchedule(v){
+  const k=curSite();if(!SCHED_WEEK)SCHED_WEEK=weekStart(today());const wk=SCHED_WEEK;const days=weekDays(wk);
+  const can=CAN_SCHEDULE&&CAN_WRITE&&site().status!=='Archived';const doc=schedWeek(k,wk);const w=doc?clone(doc):{id:wk,week:wk,days:{},published:false,notes:''};
+  const names=staffNames();const t0=today(),si=shiftIdx();
+  const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
+  const sel=(ds,i,j)=>{const cur=((((w.days||{})[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
+    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')}</select>`};
+  const mine=me()?[0,1].flatMap(o=>weekDays(addDays(weekStart(t0),7*o))).filter(ds=>ds>=t0).flatMap(ds=>[0,1,2].filter(i=>schedFor(k,ds,i).includes(me())&&!(ds===t0&&i<si&&si!==2)).map(i=>`${dayName(ds)} ${fmtDate(ds)} · ${SHIFTS[i]}`)):[];
+  v.innerHTML=`<h1>Schedule<span class="sopref">${esc(site().name)}</span></h1>
+  <p class="sub">Two staff on every shift. ${can?'You can build and publish this schedule. Staff see a week once it\'s published.':'Only managers and supervisors can change the schedule.'}</p>
+  <div class="toolbar"><button class="btn sm" type="button" id="wkPrev" aria-label="Previous week">◀</button><b>Week of ${esc(fmtDate(wk))}</b><button class="btn sm" type="button" id="wkNext" aria-label="Next week">▶</button>
+   ${wk!==weekStart(t0)?'<button class="btn sm" type="button" id="wkNow">This week</button>':''}
+   ${doc?pill(w.published?'Published':'Draft',w.published?'ok':'warn'):pill('Not started','')}
+   <span style="flex:1"></span>${can?`<button class="btn sm" type="button" id="wkCopy">Copy previous week</button><button class="btn sm ${w.published?'':'pri'}" type="button" id="wkPub">${w.published?'Unpublish':'Publish'}</button>`:''}</div>
+  ${!can&&!w.published?`<div class="card empty">The schedule for this week hasn't been published yet.</div>`:`
+  <div class="tblwrap"><table style="min-width:760px"><thead><tr><th>Shift</th>${days.map(ds=>`<th style="${ds===t0?'background:var(--sun);color:var(--onSun)':''}">${dayName(ds)}<div style="font-weight:400;text-transform:none">${esc(fmtDate(ds).replace(/, \d{4}$/,''))}</div></th>`).join('')}</tr></thead><tbody>
+   ${SHIFTS.map((sh,i)=>`<tr><td><b>${esc(sh.split(' ')[0])}</b><div class="meta" style="margin:0">${esc(sh.replace(/^\S+ /,''))}</div></td>${days.map(ds=>{const a=(((w.days||{})[ds]||{})[i]||[]).filter(Boolean);
+     const dbl=a.filter(n=>dayLoad[ds][n]>1);const now=ds===t0&&i===si;
+     return `<td style="min-width:110px;${now?'outline:2px solid var(--brand);outline-offset:-2px':''}">${can?sel(ds,i,0)+'<div style="height:4px"></div>'+sel(ds,i,1):(a.length?esc(a.join(' & ')):'<span class="meta" style="margin:0">—</span>')}
+      ${a.length<2&&(can||w.published)?`<div style="margin-top:4px">${pill(a.length?'1 of 2':'Needs 2','warn')}</div>`:''}${dbl.length?`<div style="margin-top:4px">${pill('2 shifts this day: '+dbl.join(', '),'warn')}</div>`:''}</td>`}).join('')}</tr>`).join('')}
+  </tbody></table></div>`}
+  <div class="grid g2" style="margin-top:16px;align-items:start">
+   <div class="card"><b>My upcoming shifts</b>${me()?(mine.length?`<ul style="margin:8px 0 0 18px;padding:0">${mine.slice(0,10).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="meta">No published shifts for you in the next two weeks.</p>'):'<p class="meta">Choose who is logging at the top to see your shifts.</p>'}</div>
+   <div class="card"><b>Notes for this week</b>${can?`<textarea id="wkNotes" aria-label="Notes for this week" style="width:100%;min-height:90px;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel)">${esc(w.notes||'')}</textarea>`:`<p style="white-space:pre-wrap">${esc(w.notes||'—')}</p>`}</div></div>`;
+  const save=async(mut,msg)=>{const d=clone(w);mut(d);d.updatedAt=new Date().toISOString();d.updatedBy=me()||MY_UID||'';try{await putSub(k,'schedule',d);if(msg)toast(msg)}catch(e){writeErr(e);render()}};
+  $('#wkPrev').onclick=()=>{SCHED_WEEK=addDays(wk,-7);render()};$('#wkNext').onclick=()=>{SCHED_WEEK=addDays(wk,7);render()};
+  const wn=$('#wkNow');if(wn)wn.onclick=()=>{SCHED_WEEK=weekStart(t0);render()};
+  v.querySelectorAll('[data-sd]').forEach(el=>el.onchange=()=>{const ds=el.dataset.sd,i=+el.dataset.si,j=+el.dataset.sj;
+    const other=((((w.days||{})[ds]||{})[i])||[])[1-j];if(el.value&&el.value===other){toast('Pick two different people for this shift.','err');render();return}
+    save(d=>{d.days=d.days||{};d.days[ds]=d.days[ds]||{};const a=(d.days[ds][i]||['','']).slice(0,2);while(a.length<2)a.push('');a[j]=el.value;d.days[ds][i]=a})});
+  const wc=$('#wkCopy');if(wc)wc.onclick=async()=>{const prev=schedWeek(k,addDays(wk,-7));if(!prev)return toast('There is no schedule for the previous week.','err');
+    if(doc&&Object.keys(doc.days||{}).length&&!await ask({title:'Replace this week?',body:'This week already has shifts filled in. Copy the previous week over them?',ok:'Copy'}))return;
+    save(d=>{d.days={};weekDays(prev.week).forEach((ds,n)=>{if((prev.days||{})[ds])d.days[addDays(wk,n)]=clone(prev.days[ds])});d.published=false},'Copied the previous week as a draft')};
+  const wp=$('#wkPub');if(wp)wp.onclick=async()=>{if(!w.published){const gaps=days.reduce((g,ds)=>g+[0,1,2].filter(i=>(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).length<2).length,0);
+      if(gaps&&!await ask({title:'Publish with gaps?',body:`${gaps} shift${gaps>1?'s have':' has'} fewer than 2 staff.`,ok:'Publish anyway'}))return}
+    save(d=>{d.published=!w.published;if(d.published){d.publishedAt=new Date().toISOString();d.publishedBy=me()||MY_UID||''}},w.published?'Schedule unpublished':'Schedule published')};
+  const nt=$('#wkNotes');if(nt)nt.onchange=()=>save(d=>{d.notes=nt.value})}
+
 function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>${title}<span class="tag ${tagc}">${tag}</span></h3>${body}</div>`;
   v.innerHTML=`<h1>SOP Quick Reference</h1><p class="sub">Summaries of the SOPs used most on shift. The binders are the official source: Brown (NH), Red (Safety), White (Handbook), Yellow (Community), Green (G&amp;A).</p>
   <div class="grid g2">
@@ -1418,6 +1471,8 @@ function recFlat(m,r){const o={Site:S().sites[r.site]?.name||r.site||''};
 function flatRows(m,all){const objs=sorted(all?recs(m):siteRecs(m)).map(r=>recFlat(m,r));const head=Object.keys(recFlat(m,{}));return [head,...objs.map(o=>head.map(h=>o[h]))]}
 function flatFor(c,d){
   if(c.startsWith('log-')&&M[c.slice(4)])return recFlat(c.slice(4),d);
+  const sc=c.match(/^sites\/([^/]+)\/schedule$/);
+  if(sc){const o={Site:S().sites[sc[1]]?.name||sc[1],'Week of':d.week,Published:d.published?'Yes':'No'};weekDays(d.week).forEach(ds=>SHIFTS.forEach((sh,i)=>{o[`${dayName(ds)} ${ds.slice(5)} · ${sh.split(' ')[0]}`]=((d.days||{})[ds]||{})[i]?.filter(Boolean).join(' & ')||''}));o.Notes=d.notes||'';return o}
   const sm=c.match(/^sites\/([^/]+)\/(staff|participants)$/);
   if(sm){const sn=S().sites[sm[1]]?.name||sm[1];return sm[2]==='staff'?{Site:sn,Name:d.name,Role:d.role,Phone:d.phone,Email:d.email,Start:d.start||'',End:d.end||'',Status:d.status}
     :{Site:sn,Participant:d.name,Status:d.status==='Active'?'Current':'Past',Unit:d.unit,'Moved in':d.moveIn,'Moved out':d.moveOut,'Exit reason':d.exitReason,'Approved appliances':d.appliances,Notes:d.notes}}
@@ -1436,10 +1491,11 @@ function exportExcel(){
   for(const k in S().sites)add('Inventory '+S().sites[k].name,invRows(k));
   add('Site Details Data',[['Site','Site status','Address','Unit','Unit status','Current participant','Unit notes'],...Object.entries(S().sites).flatMap(([k,s])=>s.units.map(u=>[s.name,s.status==='Archived'?'Closed':'Open',s.address,u.no,u.status,(pplOf(k).find(p=>p.id===u.participantId)||{}).name||u.name||'',u.notes]))]);
   add('Participants',[['Site','Participant','Status','Unit','Moved in','Moved out','Exit reason','Approved appliances','Notes','History'],...Object.entries(S().sites).flatMap(([k,s])=>pplOf(k).map(p=>[s.name,p.name,p.status==='Active'?'Current':'Past',p.unit,p.moveIn,p.moveOut,p.exitReason,p.appliances,p.notes,(p.history||[]).map(h=>`${h.date} ${h.event}`).join('; ')]))]);
+  add('Schedule',[['Site','Date','Shift','Staff 1','Staff 2','Published'],...Object.entries(S().sites).flatMap(([k,s])=>(SCHED[k]||[]).flatMap(w=>weekDays(w.week).flatMap(ds=>SHIFTS.map((sh,i)=>{const a=((w.days||{})[ds]||{})[i]||[];return [s.name,ds,sh,a[0]||'',a[1]||'',w.published?'Yes':'No']}).filter(r=>r[3]||r[4]))))]);
   add('Staff Roster',[['Site','Name','Role','Phone','Email','Start','End','Status'],...Object.entries(S().sites).flatMap(([k,s])=>staffOf(k).map(x=>[s.name,x.name,x.role,x.phone,x.email,x.start||'',x.end||'',x.status]))]);
   add('Contacts',[['Site','Role','Contact name','Phone / email','Escalate for'],...Object.values(S().sites).flatMap(s=>[[s.name,'Police non-emergency','',s.nonEmergency,''],[s.name,'Site phone','',s.sitePhone,''],...(s.contacts||[]).map(c=>[s.name,c.role,c.name,c.reach,c.when])])]);
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});download(`12N-NH-Site-Operations-${today()}.xlsx`,new Blob([buf]))}
-function exportJSON(){download(`12N-NH-backup-${today()}.json`,JSON.stringify({v:2,settings:clone(S()),rec:Object.fromEntries(MODS.map(m=>[m,recs(m)])),inv:INV,staff:STAFF,participants:PPL},null,1))}
+function exportJSON(){download(`12N-NH-backup-${today()}.json`,JSON.stringify({v:2,settings:clone(S()),rec:Object.fromEntries(MODS.map(m=>[m,recs(m)])),inv:INV,staff:STAFF,participants:PPL,schedule:SCHED},null,1))}
 function importJSON(file){if(!file)return;const rd=new FileReader();rd.onload=async()=>{let d;try{d=JSON.parse(rd.result);if(!d||!d.rec)throw 0}catch(e){toast('That file is not a valid backup.','err');return}
   // Site setup (sites, staff and participant rosters, contacts): managers only, and only when asked.
   if(d.settings&&d.settings.sites&&CAN_ADMIN){const names=Object.values(d.settings.sites).map(s=>s.name).join(', ');
@@ -1447,8 +1503,8 @@ function importJSON(file){if(!file)return;const rd=new FileReader();rd.onload=as
       const before=CFG;CFG=normalizeCfg(clone(d.settings));try{await putCfg();toast('Site setup copied')}catch(e){CFG=before;writeErr(e);return}}}
   const incoming=[];for(const m of MODS)for(const r of (d.rec[m]||[]))if(r&&r.id&&!recs(m).some(x=>x.id===r.id))incoming.push([m,r]);
   // Staff and participant records (backups from this version)
-  if(CAN_ADMIN)for(const kind of ['staff','participants']){const src=d[kind]||{};let n=0;
-    for(const k in src)if(S().sites[k])for(const x of src[k]||[]){const have=kind==='staff'?STAFF[k]:PPL[k];if(x&&x.id&&!(have||[]).some(y=>y.id===x.id)){try{await putSub(k,kind,x);n++}catch(e){writeErr(e);break}}}
+  if(CAN_ADMIN)for(const kind of ['staff','participants','schedule']){const src=d[kind]||{};let n=0;
+    for(const k in src)if(S().sites[k])for(const x of src[k]||[]){const have=kind==='staff'?STAFF[k]:kind==='schedule'?SCHED[k]:PPL[k];if(x&&x.id&&!(have||[]).some(y=>y.id===x.id)){try{await putSub(k,kind,x);n++}catch(e){writeErr(e);break}}}
     if(n)toast(`Imported ${n} ${kind==='staff'?'staff records':'participant records'}`)}
   const invIn=[];for(const k in (d.inv||{}))if(S().sites[k])for(const it of d.inv[k]||[])if(it&&it.id&&!(INV[k]||[]).some(x=>x.id===it.id))invIn.push([k,it]);
   if(!incoming.length&&!invIn.length){toast('Every entry in that backup is already here.');return}
@@ -1597,7 +1653,7 @@ async function bootApi(){
   try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}
   API=makeApiDb();GAS=API;await API.load();
   let sess=null;try{sess=JSON.parse(localStorage.getItem('nh-session')||'null')}catch(e){}
-  const applySess=u=>{MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_WRITE=u.role==='Admin'||u.role==='Staff';SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
+  const applySess=u=>{MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_SCHEDULE=u.role==='Admin'||u.role==='Supervisor';CAN_WRITE=['Admin','Supervisor','Staff'].includes(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
   let started=false;const startApp=()=>{if(started)return;started=true;API_STARTED=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
   const refresh=async()=>{try{const u=await API.run('whoami');if(sess&&sess.email&&u.email!==sess.email){await API.clearAll()}sess=u;localStorage.setItem('nh-session',JSON.stringify(u));applySess(u);startApp();render()}
     catch(e){if(e.code==='invalid_argument'){forgetToken();try{localStorage.removeItem('nh-session')}catch(x){}await API.clearAll();showSignIn(e.message)}
@@ -1610,15 +1666,15 @@ async function bootApi(){
   if(window.NH_CONFIG){await bootApi();return}
   if(window.google&&google.script&&google.script.run){
     MODE='gas';const g=makeGasDb();
-    try{const u=await g.run('whoami');MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_WRITE=u.role==='Admin'||u.role==='Staff';SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.archiveUrl||'';WEBAPP_URL=u.webAppUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null;
+    try{const u=await g.run('whoami');MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_SCHEDULE=u.role==='Admin'||u.role==='Supervisor';CAN_WRITE=['Admin','Supervisor','Staff'].includes(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.archiveUrl||'';WEBAPP_URL=u.webAppUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null;
       LAUNCH_SITE=await new Promise(res=>{try{google.script.url.getLocation(loc=>res((loc&&loc.parameter&&loc.parameter.site)||''))}catch(e){res('')}})}
     catch(e){$('#view').innerHTML=`<div class="card empty"><b>You don't have access to NH Site Docs.</b><br>${esc(e.message||'')}<br>Ask a manager to add your email to the Access tab of the data sheet.</div>`;MODE='denied';return}
     GAS=g;DBX=g.db;SHARED=true;CFG_READY=false;subscribeAll();g.start();render();return}
   if(window.claude&&typeof window.claude.use==='function'){MODE='claude';
     try{[DBX,USER,DL]=await Promise.all([claude.use('db'),claude.use('user'),claude.use('downloads')])}catch(e){}}
   if(DBX){SHARED=true;CFG_READY=false;
-    if(USER){try{MY_UID=await USER.id()}catch(e){}try{CAN_ADMIN=await USER.canEdit()}catch(e){CAN_ADMIN=false}try{const w=await USER.can('data.write');if(w===false)CAN_WRITE=false}catch(e){}}
-    else CAN_ADMIN=false;
+    if(USER){try{MY_UID=await USER.id()}catch(e){}try{CAN_ADMIN=await USER.canEdit()}catch(e){CAN_ADMIN=false}CAN_SCHEDULE=CAN_ADMIN;try{const w=await USER.can('data.write');if(w===false)CAN_WRITE=false}catch(e){}}
+    else{CAN_ADMIN=false;CAN_SCHEDULE=false}
     subscribeAll()}
   else{MODE='local';try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}loadLocal();applyLaunchSite()}
   render()})();

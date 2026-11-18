@@ -30,7 +30,7 @@ var TAB_NAMES = {
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
 var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs' };
-var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants))$/;
+var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants|schedule))$/;
 var ID_RE = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 var REQ_EMAIL = null; // set per request from the verified Google sign-in
 
@@ -94,13 +94,14 @@ function setup() {
     access.getRange(2, 1, rows.length, 4).setValues(rows);
     access.setFrozenRows(1);
     access.setColumnWidths(1, 4, 240);
-    access.getRange('B2:B500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Admin', 'Staff', 'Viewer'], true).build());
   }
+  // Roles: Admin (managers), Supervisor (schedules + logging), Staff (logging), Viewer (read only). Re-applied on every run.
+  access.getRange('B2:B500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Admin', 'Supervisor', 'Staff', 'Viewer'], true).build());
   Object.keys(TAB_NAMES).forEach(function (m) {
     var sh = tab_('log-' + m);
     if (FORMAL[m]) ensureHeaders_(sh, DOC_COLS);
   });
-  ['Inventory', 'Setup', 'Shift Checks', 'Staff', 'Participants', 'Removed'].forEach(function (n) { tabByName_(ss, n); });
+  ['Inventory', 'Setup', 'Shift Checks', 'Staff', 'Participants', 'Schedule', 'Removed'].forEach(function (n) { tabByName_(ss, n); });
   var blank = ss.getSheetByName('Sheet1');
   if (blank && blank.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(blank);
   var root = rootFolder_();
@@ -138,7 +139,7 @@ function user_() {
 }
 function normRole_(v) {
   v = String(v || '').trim().toLowerCase();
-  return v === 'admin' ? 'Admin' : v === 'staff' ? 'Staff' : v === 'viewer' ? 'Viewer' : '';
+  return v === 'admin' ? 'Admin' : v === 'supervisor' ? 'Supervisor' : v === 'staff' ? 'Staff' : v === 'viewer' ? 'Viewer' : '';
 }
 function parseSites_(v) {
   var list = String(v || '').split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(String);
@@ -224,7 +225,9 @@ function put(c, id, json, flatJson) {
   var u = user_();
   check_(c, id);
   if (u.role === 'Viewer') throw new Error('DENIED: You have view-only access.');
-  if ((c === 'config' || c.indexOf('sites/') === 0) && u.role !== 'Admin') throw new Error('DENIED: Only managers (Admin on the Access tab) can change site setup, rosters and participants.');
+  var isSchedule = /^sites\/[^/]+\/schedule$/.test(c);
+  if (isSchedule && u.role !== 'Admin' && u.role !== 'Supervisor') throw new Error('DENIED: Only managers and supervisors can change the schedule.');
+  if (!isSchedule && (c === 'config' || c.indexOf('sites/') === 0) && u.role !== 'Admin') throw new Error('DENIED: Only managers (Admin on the Access tab) can change site setup, rosters and participants.');
   if (c.indexOf('arch-') === 0) throw new Error('DENIED: Use the Archive page to archive entries.');
   if (String(json).length > 45000) throw new Error('DENIED: This entry is too long to save. Shorten the notes and try again.');
   var data = JSON.parse(json);
@@ -503,6 +506,7 @@ function tab_(c) {
     : c.indexOf('inv-') === 0 ? 'Inventory'
     : /\/staff$/.test(c) ? 'Staff'
     : /\/participants$/.test(c) ? 'Participants'
+    : /\/schedule$/.test(c) ? 'Schedule'
     : c === 'config' ? 'Setup' : c === 'checks' ? 'Shift Checks' : 'Other';
   return tabByName_(ss, name);
 }

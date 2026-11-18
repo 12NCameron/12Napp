@@ -103,13 +103,15 @@ The app files contain no participant data. Records live only in Google Drive and
 |---|---|---|---|
 | you@12neighbours.com | Admin | *(blank)* | Everything at every site |
 | `*@12neighbours.com` | Staff | *(blank)* | Everyone at 12N can log entries at any site |
-| supervisor@12neighbours.com | Admin | Site A | Manages one site |
+| manager@12neighbours.com | Admin | Site A | Manages one site |
+| supervisor@12neighbours.com | Supervisor | Site A | Builds and publishes that site's schedule, and logs entries |
 | sitea-tablet@12neighbours.com | Staff | Site A | A shared site device, locked to that site |
 | someone@12neighbours.com | Viewer | | Read only |
 
 **Roles:**
-- **Admin:** sets up and closes sites, manages rosters and participants, archives entries, and deletes entries.
-- **Staff:** logs entries.
+- **Admin (managers):** sets up and closes sites, manages rosters and participants, archives entries, deletes entries, and builds schedules.
+- **Supervisor:** builds and publishes the schedule (two staff per shift) and logs entries. Can't change site setup, rosters or participants, delete entries, or archive.
+- **Staff:** logs entries. Sees each week's schedule once it's published.
 - **Viewer:** reads only.
 
 **Sites:**
@@ -150,7 +152,8 @@ The app's menu links to the Staff Portal (you can change the link under **Sites 
   - **Move in**, **Transfer**, **Move out** (with date and reason) and **Re-admit**, all on the Participants & Units page.
   - Past participants keep their full history, along with every log entry about them.
   - Units can be marked **Out of service**.
-- **Staff:** **Active**, **Inactive** (on leave) or **Archived** (has left the site). Archived staff can be restored.
+- **Staff:** **Active**, **On leave** or **Former staff** (has left the site). Former staff can be restored.
+- **Schedule** (Shift → Schedule): managers and supervisors fill in two staff for each Day, Evening and Night shift, week by week. **Copy previous week** starts a new week as a draft, and **Publish** makes it visible to staff. The dashboard warns about shifts with fewer than 2 staff in the coming week, and **Use schedule** fills in "On shift" from the published schedule.
 - **Formal reports:** each incident report, wellness check, work order and handoff gets its own Google Doc within about 5 minutes.
   - Edits update the same Doc.
   - Deleting an entry marks its Doc as deleted rather than removing it.
