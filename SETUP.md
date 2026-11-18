@@ -101,18 +101,32 @@ The app files contain no participant data. Records live only in Google Drive and
 
 | Email | Role | Sites | What it means |
 |---|---|---|---|
-| you@12neighbours.com | Admin | *(blank)* | Everything at every site |
-| `*@12neighbours.com` | Staff | *(blank)* | Everyone at 12N can log entries at any site |
-| manager@12neighbours.com | Admin | Site A | Manages one site |
-| supervisor@12neighbours.com | Supervisor | Site A | Builds and publishes that site's schedule, and logs entries |
-| sitea-tablet@12neighbours.com | Staff | Site A | A shared site device, locked to that site |
+| you@12neighbours.com | Administrator | *(blank)* | Everything at every site, including opening and closing sites |
+| `*@12neighbours.com` | Facilitator | *(blank)* | Everyone at 12N can log entries at any site |
+| manager@12neighbours.com | Manager | Site A | Runs one site: rosters, participants, publishing the schedule |
+| supervisor@12neighbours.com | Supervisor | Site A | Reviews reports and drafts that site's schedule |
+| sitea-tablet@12neighbours.com | Facilitator | Site A | A shared site device, locked to that site |
 | someone@12neighbours.com | Viewer | | Read only |
 
-**Roles:**
-- **Admin (managers):** sets up and closes sites, manages rosters and participants, archives entries, deletes entries, and builds schedules.
-- **Supervisor:** builds and publishes the schedule (two staff per shift) and logs entries. Can't change site setup, rosters or participants, delete entries, or archive.
-- **Staff:** logs entries. Sees each week's schedule once it's published.
-- **Viewer:** reads only.
+**Roles** (each layer can do everything the layers below it can):
+
+| | Viewer | Facilitator | Supervisor | Manager | Administrator |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Read logs and the published schedule | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Log entries (notes, checks, incidents, in/out…) | | ✓ | ✓ | ✓ | ✓ |
+| Review incidents, manage work order stages | | | ✓ | ✓ | ✓ |
+| Staff roster and archive pages (view and search) | | | ✓ | ✓ | ✓ |
+| Draft the schedule and submit it for approval | | | ✓ | ✓ | ✓ |
+| Approve and publish the schedule | | | | ✓ | ✓ |
+| Edit rosters, participants and site contacts | | | | ✓ | ✓ |
+| Delete, archive and restore entries; export and import | | | | ✓ | ✓ |
+| Open data sheet and records folder links | | | | ✓ | ✓ |
+| Open or close sites, add or remove units, organization settings | | | | | ✓ |
+
+- Facilitators don't see the schedule builder, review fields, rosters, the archive or Sites & Export.
+- Supervisors' drafts stay private until a manager approves them. Managers see a reminder on the dashboard when a week is waiting.
+- The older names still work: **Admin** counts as Administrator and **Staff** as Facilitator. Change them in the Access tab when convenient.
+- The server enforces every limit, so hiding a button is never the only protection.
 
 **Sites:**
 - Leave Sites blank for all sites, or list site names separated by commas.
@@ -158,7 +172,7 @@ The app's menu links to the Staff Portal (you can change the link under **Sites 
   - Edits update the same Doc.
   - Deleting an entry marks its Doc as deleted rather than removing it.
   - The Doc's link is in the **Google Doc** column of the sheet.
-- **Archiving** (Archive page → Archive old entries, Admins only):
+- **Archiving** (Archive page → Archive old entries, managers and administrators):
   - Moves **closed** entries older than the cutoff (12 months is a good default) into that site's archive spreadsheet for that year.
   - Open items are never archived.
   - Archived entries stay searchable and can be restored.

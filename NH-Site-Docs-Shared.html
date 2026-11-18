@@ -175,6 +175,7 @@ td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowra
       <div class="tsel"><label for="meSel">Logging as</label><select id="meSel"></select></div>
       <span class="shiftpill" id="shiftPill"></span>
       <span class="syncpill" id="sync"><i></i><span>Connecting…</span></span>
+      <span class="pill" id="rolePill" hidden></span>
     </header>
     <div class="wrap" id="view"><p class="meta">Loading site records…</p></div>
   </main>
@@ -251,6 +252,12 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
    ========================================================= */
 const MODS=['notes','handoff','patrols','incidents','visitors','roomchecks','wellness','inout','requests','intakes','engagement','workorders','requisitions'];
 let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,CAN_SCHEDULE=true,MY_UID=null;
+/* Layers, lowest to highest. CAN_ADMIN = Manager and up (kept name), CAN_ORG = Administrator. */
+const RANK={Viewer:0,Facilitator:1,Supervisor:2,Manager:3,Administrator:4};
+const ROLE_ALIAS={Admin:'Administrator',Staff:'Facilitator'};
+let ROLE='Administrator',CAN_ORG=true,CAN_REVIEW=true,CAN_PUBLISH=true;
+function applyRole(r){ROLE=ROLE_ALIAS[r]||r||'Viewer';const n=RANK[ROLE]??0;
+  CAN_WRITE=n>=1;CAN_REVIEW=n>=2;CAN_SCHEDULE=n>=2;CAN_ADMIN=n>=3;CAN_PUBLISH=n>=3;CAN_ORG=n>=4}
 let MODE='local',GAS_OFFLINE=false,SHEET_URL='',WEBAPP_URL='',ARCHIVE_URL='',GAS=null,ALLOWED_RAW=null,LAUNCH_SITE='',PENDING=0,SIGNIN_NEEDED=false,API=null,INSTALL_PROMPT=null;
 const SERVER=()=>MODE==='gas'||MODE==='api';
 let CFG=null,CFG_READY=false;const CACHE={};MODS.forEach(m=>CACHE[m]=[]);
@@ -543,11 +550,11 @@ incidents:{title:'Incident Reports',nav:'Incident Reports',sheet:'Incident Repor
   {k:'appearance',l:'Last known description / context',t:'textarea',full:1,show:r=>r.reportType==='Missing Participant'},
   {t:'sect',l:'Reporter'},
   {k:'reporter',l:'Staff completing report',t:'staff',def:D.me,req:1},
-  {t:'sect',l:'Supervisor review (Site Supervisor / Manager)'},
-  {k:'review',l:'Review status',t:'select',o:['Submitted','Under Review','Follow-up Required','CAR Recommended','Closed'],def:'Submitted'},
-  {k:'escStep',l:'Escalation framework step',t:'select',o:ESC_STEPS,def:'—'},
-  {k:'agencies',l:'Partner agencies informed?',t:'seg',o:['N/A','Yes','No'],def:'N/A'},
-  {k:'reviewNotes',l:'Review / follow-up notes',t:'textarea',full:1}],
+  {t:'sect',l:'Supervisor review (Site Supervisor / Manager)',show:()=>CAN_REVIEW},
+  {k:'review',show:()=>CAN_REVIEW,l:'Review status',t:'select',o:['Submitted','Under Review','Follow-up Required','CAR Recommended','Closed'],def:'Submitted'},
+  {k:'escStep',show:()=>CAN_REVIEW,l:'Escalation framework step',t:'select',o:ESC_STEPS,def:'—'},
+  {k:'agencies',show:()=>CAN_REVIEW,l:'Partner agencies informed?',t:'seg',o:['N/A','Yes','No'],def:'N/A'},
+  {k:'reviewNotes',show:()=>CAN_REVIEW,l:'Review / follow-up notes',t:'textarea',full:1}],
  cols:['date','time','reportType','location','reporter',{l:'Filed',f:r=>lateness(r)},'review'],
  chips:[{l:'Open',f:r=>r.review!=='Closed'},{l:'Filed late (>12h)',f:r=>incLateHrs(r)>12},{l:'Police / EMS',f:r=>(r.services||[]).length},{l:'Missing participant',f:r=>r.reportType==='Missing Participant'}]},
 visitors:{title:'Guest & Contractor Sign-In/Out Log',nav:'Guest & Contractor Log',sheet:'Visitor Log',sop:'Guest and Contractor Sign-In Sheet · NH 3.3.1 · 3.3.2',
@@ -686,13 +693,13 @@ workorders:{title:'Maintenance Work Orders',nav:'Work Orders',sheet:'Work Orders
   {k:'source',l:'Identified through',t:'select',o:['Participant report','Staff observation','Daily Safety Walkthrough','Room Wellness Check','Evening Site Check','Inspection finding','Emergency call follow-up','Maintenance follow-up']},
   {k:'severity',l:'Severity / priority',t:'seg',full:1,o:['1 — Critical','2 — Urgent','3 — Routine','4 — Low'],def:'3 — Routine',req:1},
   {k:'sevInfo',t:'info',full:1,warn:1,show:r=>/^1|^2/.test(r.severity||''),html:r=>/^1/.test(r.severity)?'<b>Critical:</b> escalate now by phone or Signal to the Warehouse Manager. Do not wait for the next site visit.':'<b>Urgent:</b> submit today and flag Urgent in DOS. The Warehouse Manager assigns it within 24 hours.'},
-  {k:'stage',l:'Stage',t:'seg',full:1,o:['Awaiting Review','Assigned','In Progress','Completed'],def:'Awaiting Review'},
-  {k:'assigned',l:'Assigned to (C&M)',t:'text',show:r=>r.stage!=='Awaiting Review'},{k:'scheduled',l:'Scheduled date',t:'date',show:r=>r.stage!=='Awaiting Review'},
+  {k:'stage',show:()=>CAN_REVIEW,l:'Stage',t:'seg',full:1,o:['Awaiting Review','Assigned','In Progress','Completed'],def:'Awaiting Review'},
+  {k:'assigned',l:'Assigned to (C&M)',t:'text',show:r=>CAN_REVIEW&&r.stage!=='Awaiting Review'},{k:'scheduled',l:'Scheduled date',t:'date',show:r=>CAN_REVIEW&&r.stage!=='Awaiting Review'},
   {k:'submittedBy',l:'Submitted by',t:'staff',def:D.me,req:1},
   {k:'escalated',l:'Escalated since submission?',t:'seg',o:['No','Yes'],def:'No'},
   {k:'escNotes',l:'What changed / who was contacted',t:'textarea',full:1,show:r=>r.escalated==='Yes'},
-  {k:'completion',l:'Completion note',t:'textarea',full:1,show:r=>r.stage==='Completed',req:r=>r.stage==='Completed',hint:'Required to close. This is the permanent record of the work done.'},
-  {k:'closedBy',l:'Closed by',t:'staff',show:r=>r.stage==='Completed'}],
+  {k:'completion',l:'Completion note',t:'textarea',full:1,show:r=>CAN_REVIEW&&r.stage==='Completed',req:r=>r.stage==='Completed',hint:'Required to close. This is the permanent record of the work done.'},
+  {k:'closedBy',l:'Closed by',t:'staff',show:r=>CAN_REVIEW&&r.stage==='Completed'}],
  cols:['date','where','description','severity','stage',{l:'Age',f:r=>r.stage==='Awaiting Review'&&hoursSince(r.createdAt)>24?pill('Review overdue','bad'):''}],
  chips:[{l:'Open',f:r=>r.stage!=='Completed'},{l:'Awaiting review',f:r=>r.stage==='Awaiting Review'},{l:'Critical / urgent',f:r=>/^1|^2/.test(r.severity)&&r.stage!=='Completed'}]},
 requisitions:{title:'Supply Requisitions',nav:'Requisitions',sheet:'Requisitions',sop:'Guide · Inventory & Needs · NH 3.3.4 · 3.3.8',custom:'quickReq',
@@ -748,14 +755,17 @@ const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['hando
 let cur=(location.hash||'').slice(1)||'dash';const chipState={},searchState={};
 function badgeFor(id){
   if(id==='notes')return siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved').length;
-  if(id==='incidents')return siteRecs('incidents').filter(r=>r.review==='Submitted').length;
+  if(id==='incidents')return CAN_REVIEW?siteRecs('incidents').filter(r=>r.review==='Submitted').length:0;
+  if(id==='schedule')return CAN_PUBLISH?(SCHED[curSite()]||[]).filter(w=>w.submitted).length:0;
   if(id==='workorders')return siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1|^2/.test(r.severity)).length;
   if(id==='visitors')return siteRecs('visitors').filter(r=>!r.timeOut).length;
   if(id==='intakes')return siteRecs('intakes').filter(r=>r.status==='New Inquiry').length;
   if(id==='handoff')return siteRecs('handoff').filter(r=>r.status!=='Acknowledged').length;
   return 0}
+const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager'};
+const pageOk=id=>!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]];
 function renderNav(){let h=`<div class="logo"><img src="${LOGO}" alt="the 12 neighbours community" width="400" height="177"><small>NH Site Docs · Neighbourly Homes</small></div>`;
-  for(const [g,items] of NAV){h+=`<div class="ngrp">${g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
+  for(const [g,items0] of NAV){const items=items0.filter(([id])=>pageOk(id));if(!items.length)continue;h+=`<div class="ngrp">${g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
     h+=`<button class="nitem ${cur===id?'on':''}" type="button" data-go="${id}"><span>${esc(lab||M[id].nav)}</span>${b?`<span class="cnt">${b}</span>`:''}</button>`}}
   const portal=CFG&&CFG.portalUrl;
   if(portal&&/^https:\/\//.test(portal))h+=`<div class="ngrp">12 Neighbours</div><a class="nitem" href="${esc(portal)}" target="_blank" rel="noopener" style="text-decoration:none"><span>12N Staff Portal ↗</span></a>`;
@@ -774,7 +784,7 @@ function renderHeader(){
   $('#on2').innerHTML=`<option value="">— staff 2 —</option>`+opts(p2,st);
   $('#on1').disabled=$('#on2').disabled=!CAN_WRITE;
   const who=pair().length?pair():st;$('#meSel').innerHTML=`<option value="">— who is logging? —</option>`+opts(me(),who);
-  $('#shiftPill').textContent=shiftFor();updateSync()}
+  $('#shiftPill').textContent=shiftFor();const rp=$('#rolePill');if(rp){rp.hidden=!SHARED;rp.textContent=ROLE}updateSync()}
 $('#siteSel').onchange=e=>{PREF.site=e.target.value;SHOW_CLOSED=false;savePref();subscribeSite();render()};
 async function setPair(i,v){const p=pair2();p[i]=v;if(p[0]&&p[0]===p[1]){toast('Pick two different people for the shift.','err');renderHeader();return}
   CHECKS=Object.assign({},CHECKS,{['staff_'+shiftIdx()]:p,date:today(),site:curSite()});
@@ -789,14 +799,15 @@ function renderBanner(){let h='';
   else if(MODE==='gas'&&GAS_OFFLINE)h=`<div class="banner">Can't reach the shared log right now. New entries won't save until the connection is back. Note anything urgent on paper and enter it later.</div>`;
   else if(SHARED_REVOKED)h=`<div class="banner">Your access to this page changed. Reload the page to continue.</div>`;
   else if(!CAN_WRITE)h=`<div class="banner">You have <b>view-only</b> access, so you can read the logs but not add entries. ${SERVER()?'Ask a manager to change your role on the Access tab of the data sheet.':'Ask the page owner to share it with you as a <b>Contributor</b>.'}</div>`;
-  else if(CFG_READY&&!CFG)h=`<div class="banner">NH Site Docs hasn't been set up yet. ${CAN_ADMIN?`<button class="btn sm" type="button" id="initCfg">Set up the first site</button>`:'Ask a manager to finish setup.'}</div>`;
+  else if(CFG_READY&&!CFG)h=`<div class="banner">NH Site Docs hasn't been set up yet. ${CAN_ORG?`<button class="btn sm" type="button" id="initCfg">Set up the first site</button>`:'Ask a manager to finish setup.'}</div>`;
   else if(CFG&&ALLOWED_RAW&&!allowedSites().length)h=`<div class="banner">This account is set to a site that doesn't exist (${esc(ALLOWED_RAW.join(', '))}). Ask a manager to check the Sites column on the Access tab.</div>`;
-  else if(site().status==='Archived')h=`<div class="banner">${esc(site().name)} is <b>closed</b>${site().closed?` (since ${esc(fmtDate(site().closed))})`:''}. Its records are kept for reference. ${CAN_ADMIN?'Reopen it under Sites &amp; Export.':''}</div>`;
+  else if(site().status==='Archived')h=`<div class="banner">${esc(site().name)} is <b>closed</b>${site().closed?` (since ${esc(fmtDate(site().closed))})`:''}. Its records are kept for reference. ${CAN_ORG?'Reopen it under Sites &amp; Export.':''}</div>`;
   $('#banner').innerHTML=h;const gb=$('#gisBanner');if(gb)renderSignInButton(gb);const b=$('#initCfg');if(b)b.onclick=async()=>{const a=await ask({title:'Set up the first site',ok:'Create site',fields:[{l:'Site name',req:1,v:''},{l:'Number of units',t:'number',v:0}]});if(!a)return;
     CFG=DEFAULT_CFG();CFG.sites={c1:mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[1]||0)))};try{await putCfg();toast('Site created. Follow the setup checklist on the dashboard.');go('dash')}catch(e){CFG=null;writeErr(e)}}}
 
 let API_STARTED=false;
 function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in screen until the app has started */
+  if(!pageOk(cur)){cur='dash';try{location.hash='dash'}catch(e){}}
   renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
   if(cur==='info')return renderInfo(v);if(cur==='schedule')return renderSchedule(v);if(cur==='archive')return renderArchive(v);
@@ -1059,14 +1070,15 @@ function renderDash(v){
    ['9:30–10:00 PM','Evening Site Check','Emergency exits latched and locked, courtyard clear, bathrooms and Admin Building checked.',St(has(/Evening/)),'patrols',{checkType:'Evening Site Check (9:30–10 PM)',areas:['Emergency exits latched & locked','Courtyard & pathways','Shared bathrooms / showers / laundry','Admin Building interior']}],
    ['Last 30 min','Shift notes review & handoff','Resolve or assign follow-ups, then complete the handoff with the incoming lead.',St(ho),'handoff']];
   const A=[];
+  if(CAN_PUBLISH)(SCHED[curSite()]||[]).filter(w=>w.submitted).forEach(w=>A.push(['warn',`Schedule for the week of ${fmtDate(w.week)} is waiting for your approval${w.submittedBy?` (from ${w.submittedBy})`:''}.`,'schedule','']));
   if(CAN_SCHEDULE){const gaps=schedGaps(curSite(),7);if(gaps)A.push(['warn',`${gaps} shift${gaps>1?'s':''} in the next 7 days ${gaps>1?'have':'has'} fewer than 2 staff scheduled.`,'schedule',''])}
   if(CAN_ADMIN&&CAN_WRITE){const c=archiveCandidates(12);const n=MODS.reduce((a,m)=>a+c[m].length,0);if(n)A.push(['info',`${n} closed entr${n===1?'y is':'ies are'} over a year old. Archive them to keep the app quick.`,'archive',''])}
   {const L=ioLatest(curSite());for(const [u,l] of Object.entries(L))if(l.t==='Out'&&(Date.now()-l.at)/36e5>24)A.push(['bad',`${unitLabel(u)} has been out since ${fmtDate(l.date)} ${l.time} (over 24 hours). Check the Missing Participant protocol.`,'inout',''])}
   if(np<2)A.push(['bad',np?`Only ${pair()[0]} is recorded on this shift. Shifts are staffed by two.`:'No staff recorded on this shift yet. Choose both staff at the top.','dash','']);
-  siteRecs('incidents').filter(r=>r.review==='Submitted').forEach(r=>A.push(['warn',`Incident awaiting supervisor review: ${r.reportType} (${fmtDate(r.date)})`,'incidents',r.id]));
+  if(CAN_REVIEW)siteRecs('incidents').filter(r=>r.review==='Submitted').forEach(r=>A.push(['warn',`Incident awaiting supervisor review: ${r.reportType} (${fmtDate(r.date)})`,'incidents',r.id]));
   siteRecs('incidents').filter(r=>r.reportType==='Missing Participant'&&r.review!=='Closed').forEach(r=>A.push(['bad',`Missing participant file open (${r.risk||'risk not set'}): daily leadership update required`,'incidents',r.id]));
   siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1/.test(r.severity)).forEach(r=>A.push(['bad',`Critical work order open: ${r.where}: ${String(r.description).slice(0,70)}`,'workorders',r.id]));
-  siteRecs('workorders').filter(r=>r.stage==='Awaiting Review'&&hoursSince(r.createdAt)>24).forEach(r=>A.push(['warn',`Work order awaiting review >24h: ${r.where}`,'workorders',r.id]));
+  if(CAN_REVIEW)siteRecs('workorders').filter(r=>r.stage==='Awaiting Review'&&hoursSince(r.createdAt)>24).forEach(r=>A.push(['warn',`Work order awaiting review >24h: ${r.where}`,'workorders',r.id]));
   siteRecs('notes').filter(followDue).forEach(r=>A.push(['bad',`Follow-up overdue (${r.followUpWho||'unassigned'}, due ${fmtWhen(r.followUpBy)}): ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
   siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'&&r.priority==='HIGH'&&!followDue(r)).forEach(r=>A.push(['bad',`High-priority follow-up: ${r.participantLabel||''}: ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
   siteRecs('wellness').filter(r=>roomFollow(r)&&r.checkInDone!=='Yes'&&r.checkInDue<=t).forEach(r=>A.push([r.checkInDue<t?'bad':'warn',`Private check-in ${r.checkInDue<t?'overdue':'due today'}: ${r.unitLabel}`,'wellness',r.id]));
@@ -1094,7 +1106,7 @@ function renderDash(v){
    </div></div>`;
   v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>openForm(b.dataset.q));
   v.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>{const t=tasks[+b.dataset.task];t[5]&&M[t[4]]?openForm(t[4],null,t[5]):go(t[4])});
-  v.querySelectorAll('[data-m][data-id]').forEach(b=>b.onclick=()=>{const m=b.dataset.m,id=b.dataset.id;if(!id){if(m==='dash')$('#on1').focus();else{if(m==='archive')ARCH.tab='run';go(m)}return}go(m);openForm(m,id)});
+  v.querySelectorAll('[data-m][data-id]').forEach(b=>b.onclick=()=>{const m=b.dataset.m,id=b.dataset.id;if(!id){if(m==='dash')$('#on1').focus();else{if(m==='archive')ARCH.tab='run';if(m==='schedule'){const w=(SCHED[curSite()]||[]).find(x=>x.submitted);if(w)SCHED_WEEK=w.week}go(m)}return}go(m);openForm(m,id)});
   const us=$('#useSched');if(us)us.onclick=async()=>{const s=schedNow();if(s[0])await setPair(0,s[0]);if(s[1])await setPair(1,s[1])};
   v.querySelectorAll('[data-setup]').forEach(b=>b.onclick=()=>go(b.dataset.setup));const sd=$('#setupDone');if(sd)sd.onclick=()=>cfgSave(()=>{CFG.sites[curSite()].setupDone=true},'Setup checklist hidden');
   v.querySelectorAll('[data-chk]').forEach(c=>c.onchange=()=>setChk(c.dataset.chk,c.checked))}
@@ -1204,7 +1216,7 @@ function renderParticipants(v){
     <td style="white-space:nowrap">${!ed?'':x.status==='Occupied'&&p?`<button class="btn sm" type="button" data-tr="${x.no}">Transfer</button> <button class="btn sm danger" type="button" data-out="${x.no}">Move out</button>`
       :x.status==='Out of service'?`<button class="btn sm" type="button" data-svc="${x.no}" data-to="Vacant">Back in service</button>`
       :x.status==='Occupied'?'':`<button class="btn sm pri" type="button" data-in="${x.no}">Move in</button> <button class="btn sm" type="button" data-svc="${x.no}" data-to="Out of service">Out of service</button>`}</td></tr>`}).join('')}
-  </tbody></table></div>`:`<div class="card empty" style="margin-bottom:22px">No units yet. ${CAN_ADMIN?'Add units under <a href="#setup">Sites &amp; Export</a>.':'Ask a manager to add units.'}</div>`}
+  </tbody></table></div>`:`<div class="card empty" style="margin-bottom:22px">No units yet. ${CAN_ORG?'Add units under <a href="#setup">Sites &amp; Export</a>.':'Ask a manager to add units.'}</div>`}
   <div class="infob warn" style="margin-bottom:18px">All appliance approvals go through management. Log requests under <a href="#requests">Participant Requests</a>.</div>
   <div class="toolbar"><h2 style="font-size:18px;margin:0">Past participants</h2><span class="pill">${pplOf(k).filter(p=>p.status==='Archived').length}</span>
    <input class="search" id="pastQ" placeholder="Search past participants…" aria-label="Search past participants" value="${esc(pastQ)}"></div><div id="pastList">${pastParticipantsHTML(pastQ)}</div>`;
@@ -1335,46 +1347,63 @@ const weekDays=w=>Array.from({length:7},(_,i)=>addDays(w,i));
 const dayName=ds=>new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'short'});
 const schedWeek=(k,w)=>(SCHED[k]||[]).find(x=>x.id===w);
 /* Scheduled pair for a date/shift (published weeks only, unless asked). */
-function schedFor(k,ds,i,drafts){const w=schedWeek(k,weekStart(ds));if(!w||(!w.published&&!drafts))return [];return (((w.days||{})[ds]||{})[i]||[]).filter(Boolean)}
+/* What facilitators see: the approved copy. Weeks saved before approvals existed used days + published. */
+const pubDays=w=>w?(w.publishedDays||(w.published&&!('publishedDays' in w)?w.days:null)):null;
+function schedFor(k,ds,i,drafts){const w=schedWeek(k,weekStart(ds));const src=drafts?(w&&w.days):pubDays(w);if(!src)return [];return ((src[ds]||{})[i]||[]).filter(Boolean)}
 const schedNow=()=>schedFor(curSite(),today(),shiftIdx());
 function schedGaps(k,n){let g=0;for(let d=0;d<n;d++){const ds=addDays(today(),d);for(let i=0;i<3;i++){if(d===0&&i<shiftIdx()&&shiftIdx()!==2)continue;if(schedFor(k,ds,i,true).length<2)g++}}return g}
 let SCHED_WEEK='';
 function renderSchedule(v){
   const k=curSite();if(!SCHED_WEEK)SCHED_WEEK=weekStart(today());const wk=SCHED_WEEK;const days=weekDays(wk);
-  const can=CAN_SCHEDULE&&CAN_WRITE&&site().status!=='Archived';const doc=schedWeek(k,wk);const w=doc?clone(doc):{id:wk,week:wk,days:{},published:false,notes:''};
-  const names=staffNames();const t0=today(),si=shiftIdx();
-  const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
-  const sel=(ds,i,j)=>{const cur=((((w.days||{})[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
+  const can=CAN_SCHEDULE&&CAN_WRITE&&site().status!=='Archived';const doc=schedWeek(k,wk);
+  const w=doc?clone(doc):{id:wk,week:wk,days:{},notes:''};const pub=pubDays(w);
+  const view=can?(w.days||{}):(pub||{});const names=staffNames();const t0=today(),si=shiftIdx();
+  const changed=!!pub&&JSON.stringify(pub)!==JSON.stringify(w.days||{});
+  const status=!doc?pill('Not started',''):w.submitted?pill('Waiting for approval','warn'):pub?(changed&&can?pill('Published · draft has changes','warn'):pill('Published','ok')):pill('Draft','');
+  const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
+  const sel=(ds,i,j)=>{const cur=(((view[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
     return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')}</select>`};
   const mine=me()?[0,1].flatMap(o=>weekDays(addDays(weekStart(t0),7*o))).filter(ds=>ds>=t0).flatMap(ds=>[0,1,2].filter(i=>schedFor(k,ds,i).includes(me())&&!(ds===t0&&i<si&&si!==2)).map(i=>`${dayName(ds)} ${fmtDate(ds)} · ${SHIFTS[i]}`)):[];
+  const intro=!can?'This is the approved schedule. Talk to your supervisor about changes.'
+    :CAN_PUBLISH?'Build the week, then approve and publish it. Facilitators only see what you publish.'
+    :'Build the week as a draft, then submit it. A manager approves and publishes it before facilitators see it.';
   v.innerHTML=`<h1>Schedule<span class="sopref">${esc(site().name)}</span></h1>
-  <p class="sub">Two staff on every shift. ${can?'You can build and publish this schedule. Staff see a week once it\'s published.':'Only managers and supervisors can change the schedule.'}</p>
+  <p class="sub">Two staff on every shift. ${intro}</p>
   <div class="toolbar"><button class="btn sm" type="button" id="wkPrev" aria-label="Previous week">◀</button><b>Week of ${esc(fmtDate(wk))}</b><button class="btn sm" type="button" id="wkNext" aria-label="Next week">▶</button>
    ${wk!==weekStart(t0)?'<button class="btn sm" type="button" id="wkNow">This week</button>':''}
-   ${doc?pill(w.published?'Published':'Draft',w.published?'ok':'warn'):pill('Not started','')}
-   <span style="flex:1"></span>${can?`<button class="btn sm" type="button" id="wkCopy">Copy previous week</button><button class="btn sm ${w.published?'':'pri'}" type="button" id="wkPub">${w.published?'Unpublish':'Publish'}</button>`:''}</div>
-  ${!can&&!w.published?`<div class="card empty">The schedule for this week hasn't been published yet.</div>`:`
+   ${can?status:''}${can&&w.submitted&&w.submittedBy?`<span class="meta" style="margin:0">Submitted by ${esc(w.submittedBy)}</span>`:''}${can&&pub&&w.publishedBy?`<span class="meta" style="margin:0">Published by ${esc(w.publishedBy)}</span>`:''}
+   <span style="flex:1"></span>${can?`<button class="btn sm" type="button" id="wkCopy">Copy previous week</button>`:''}
+   ${can&&!CAN_PUBLISH&&!w.submitted?`<button class="btn sm pri" type="button" id="wkSubmit">Submit for approval</button>`:''}
+   ${can&&!CAN_PUBLISH&&w.submitted?`<button class="btn sm" type="button" id="wkWithdraw">Withdraw submission</button>`:''}
+   ${CAN_PUBLISH&&can?`<button class="btn sm pri" type="button" id="wkPub">${pub&&!changed&&!w.submitted?'Published':'Approve &amp; publish'}</button>${pub?'<button class="btn sm" type="button" id="wkUnpub">Unpublish</button>':''}`:''}</div>
+  ${!can&&!pub?`<div class="card empty">The schedule for this week hasn't been published yet.</div>`:`
   <div class="tblwrap"><table style="min-width:760px"><thead><tr><th>Shift</th>${days.map(ds=>`<th style="${ds===t0?'background:var(--sun);color:var(--onSun)':''}">${dayName(ds)}<div style="font-weight:400;text-transform:none">${esc(fmtDate(ds).replace(/, \d{4}$/,''))}</div></th>`).join('')}</tr></thead><tbody>
-   ${SHIFTS.map((sh,i)=>`<tr><td><b>${esc(sh.split(' ')[0])}</b><div class="meta" style="margin:0">${esc(sh.replace(/^\S+ /,''))}</div></td>${days.map(ds=>{const a=(((w.days||{})[ds]||{})[i]||[]).filter(Boolean);
+   ${SHIFTS.map((sh,i)=>`<tr><td><b>${esc(sh.split(' ')[0])}</b><div class="meta" style="margin:0">${esc(sh.replace(/^\S+ /,''))}</div></td>${days.map(ds=>{const a=((view[ds]||{})[i]||[]).filter(Boolean);
      const dbl=a.filter(n=>dayLoad[ds][n]>1);const now=ds===t0&&i===si;
      return `<td style="min-width:110px;${now?'outline:2px solid var(--brand);outline-offset:-2px':''}">${can?sel(ds,i,0)+'<div style="height:4px"></div>'+sel(ds,i,1):(a.length?esc(a.join(' & ')):'<span class="meta" style="margin:0">—</span>')}
-      ${a.length<2&&(can||w.published)?`<div style="margin-top:4px">${pill(a.length?'1 of 2':'Needs 2','warn')}</div>`:''}${dbl.length?`<div style="margin-top:4px">${pill('2 shifts this day: '+dbl.join(', '),'warn')}</div>`:''}</td>`}).join('')}</tr>`).join('')}
+      ${can&&a.length<2?`<div style="margin-top:4px">${pill(a.length?'1 of 2':'Needs 2','warn')}</div>`:''}${can&&dbl.length?`<div style="margin-top:4px">${pill('2 shifts this day: '+dbl.join(', '),'warn')}</div>`:''}</td>`}).join('')}</tr>`).join('')}
   </tbody></table></div>`}
   <div class="grid g2" style="margin-top:16px;align-items:start">
    <div class="card"><b>My upcoming shifts</b>${me()?(mine.length?`<ul style="margin:8px 0 0 18px;padding:0">${mine.slice(0,10).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="meta">No published shifts for you in the next two weeks.</p>'):'<p class="meta">Choose who is logging at the top to see your shifts.</p>'}</div>
-   <div class="card"><b>Notes for this week</b>${can?`<textarea id="wkNotes" aria-label="Notes for this week" style="width:100%;min-height:90px;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel)">${esc(w.notes||'')}</textarea>`:`<p style="white-space:pre-wrap">${esc(w.notes||'—')}</p>`}</div></div>`;
-  const save=async(mut,msg)=>{const d=clone(w);mut(d);d.updatedAt=new Date().toISOString();d.updatedBy=me()||MY_UID||'';try{await putSub(k,'schedule',d);if(msg)toast(msg)}catch(e){writeErr(e);render()}};
+   <div class="card"><b>Notes for this week</b>${can?`<textarea id="wkNotes" aria-label="Notes for this week" style="width:100%;min-height:90px;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel)">${esc(w.notes||'')}</textarea>`:`<p style="white-space:pre-wrap">${esc(pub?(w.notes||'—'):'—')}</p>`}</div></div>`;
+  const who=()=>me()||MY_UID||'';
+  const save=async(mut,msg)=>{const d=clone(w);mut(d);d.updatedAt=new Date().toISOString();d.updatedBy=who();try{await putSub(k,'schedule',d);if(msg)toast(msg)}catch(e){writeErr(e);render()}};
   $('#wkPrev').onclick=()=>{SCHED_WEEK=addDays(wk,-7);render()};$('#wkNext').onclick=()=>{SCHED_WEEK=addDays(wk,7);render()};
   const wn=$('#wkNow');if(wn)wn.onclick=()=>{SCHED_WEEK=weekStart(t0);render()};
   v.querySelectorAll('[data-sd]').forEach(el=>el.onchange=()=>{const ds=el.dataset.sd,i=+el.dataset.si,j=+el.dataset.sj;
     const other=((((w.days||{})[ds]||{})[i])||[])[1-j];if(el.value&&el.value===other){toast('Pick two different people for this shift.','err');render();return}
     save(d=>{d.days=d.days||{};d.days[ds]=d.days[ds]||{};const a=(d.days[ds][i]||['','']).slice(0,2);while(a.length<2)a.push('');a[j]=el.value;d.days[ds][i]=a})});
   const wc=$('#wkCopy');if(wc)wc.onclick=async()=>{const prev=schedWeek(k,addDays(wk,-7));if(!prev)return toast('There is no schedule for the previous week.','err');
-    if(doc&&Object.keys(doc.days||{}).length&&!await ask({title:'Replace this week?',body:'This week already has shifts filled in. Copy the previous week over them?',ok:'Copy'}))return;
-    save(d=>{d.days={};weekDays(prev.week).forEach((ds,n)=>{if((prev.days||{})[ds])d.days[addDays(wk,n)]=clone(prev.days[ds])});d.published=false},'Copied the previous week as a draft')};
-  const wp=$('#wkPub');if(wp)wp.onclick=async()=>{if(!w.published){const gaps=days.reduce((g,ds)=>g+[0,1,2].filter(i=>(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).length<2).length,0);
-      if(gaps&&!await ask({title:'Publish with gaps?',body:`${gaps} shift${gaps>1?'s have':' has'} fewer than 2 staff.`,ok:'Publish anyway'}))return}
-    save(d=>{d.published=!w.published;if(d.published){d.publishedAt=new Date().toISOString();d.publishedBy=me()||MY_UID||''}},w.published?'Schedule unpublished':'Schedule published')};
+    if(doc&&Object.keys(doc.days||{}).length&&!await ask({title:'Replace this week\'s draft?',body:'This week already has shifts filled in. Copy the previous week over them?',ok:'Copy'}))return;
+    save(d=>{d.days={};weekDays(prev.week).forEach((ds,n)=>{if((prev.days||{})[ds])d.days[addDays(wk,n)]=clone(prev.days[ds])})},'Copied the previous week into the draft')};
+  const gaps=()=>days.reduce((g,ds)=>g+[0,1,2].filter(i=>(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).length<2).length,0);
+  const ws=$('#wkSubmit');if(ws)ws.onclick=async()=>{const g=gaps();if(g&&!await ask({title:'Submit with gaps?',body:`${g} shift${g>1?'s have':' has'} fewer than 2 staff.`,ok:'Submit anyway'}))return;
+    save(d=>{d.submitted=true;d.submittedBy=who();d.submittedAt=new Date().toISOString()},'Sent to a manager for approval')};
+  const ww=$('#wkWithdraw');if(ww)ww.onclick=()=>save(d=>{d.submitted=false},'Submission withdrawn');
+  const wp=$('#wkPub');if(wp)wp.onclick=async()=>{const g=gaps();if(g&&!await ask({title:'Publish with gaps?',body:`${g} shift${g>1?'s have':' has'} fewer than 2 staff.`,ok:'Publish anyway'}))return;
+    save(d=>{d.publishedDays=clone(d.days||{});d.published=true;d.publishedAt=new Date().toISOString();d.publishedBy=who();d.submitted=false},'Schedule approved and published')};
+  const wu=$('#wkUnpub');if(wu)wu.onclick=async()=>{if(!await ask({title:'Unpublish this week?',body:'Facilitators will no longer see it until it is published again. The draft is kept.',ok:'Unpublish'}))return;
+    save(d=>{d.publishedDays=null;d.published=false},'Schedule unpublished')};
   const nt=$('#wkNotes');if(nt)nt.onchange=()=>save(d=>{d.notes=nt.value})}
 
 function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>${title}<span class="tag ${tagc}">${tag}</span></h3>${body}</div>`;
@@ -1401,8 +1430,8 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
 function launchLink(k){const base=MODE==='api'?location.origin+location.pathname:WEBAPP_URL;return base?`${base}?site=${encodeURIComponent(k)}`:''}
 async function copyText(t,msg){try{await navigator.clipboard.writeText(t);toast(msg||'Copied')}
   catch(e){await ask({title:'Copy this link',body:`<input readonly value="${esc(t)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px" onfocus="this.select()">`,ok:'Done',cancel:''})}}
-function renderSetup(v){const ad=CAN_ADMIN&&CAN_WRITE&&!!CFG;const dis=ad?'':'disabled';const keys=allowedSites();
-  v.innerHTML=`<h1>Sites &amp; Export</h1><p class="sub">${MODE==='api'?'Entries save on this device first, then sync to the NH Site Docs Google Sheet. Formal reports are also kept as Google Docs in each site\'s Drive folder.':MODE==='gas'?'Entries save to the NH Site Docs Google Sheet, and every device sees them within about 20 seconds.':SHARED?'Entries save to this page\'s shared log, and everyone it\'s shared with sees them live.':'Entries are saved in this browser only.'} Managers set up, open and close sites here.</p>
+function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disabled';const keys=allowedSites();
+  v.innerHTML=`<h1>Sites &amp; Export</h1><p class="sub">${MODE==='api'?'Entries save on this device first, then sync to the NH Site Docs Google Sheet. Formal reports are also kept as Google Docs in each site\'s Drive folder.':MODE==='gas'?'Entries save to the NH Site Docs Google Sheet, and every device sees them within about 20 seconds.':SHARED?'Entries save to this page\'s shared log, and everyone it\'s shared with sees them live.':'Entries are saved in this browser only.'} ${CAN_ORG?'Administrators open and close sites here.':'Only administrators can open or close sites, change units or change organization settings.'}</p>
   <div class="grid g2" style="align-items:start">
    <div class="card" style="grid-column:1/-1"><b style="font-size:16px">Sites</b><p class="meta" style="margin-top:2px">Each site keeps its own staff, participants, contacts, logs and inventory. Closing a site keeps every record, hides it from the site picker and stops new entries being expected.${SERVER()?' A site\'s <b>launch link</b> opens the app straight to that site: open it on that site\'s computer, tablet or phone, then install the app.':''}</p>
     <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
@@ -1465,7 +1494,7 @@ function flatRows(m,all){const objs=sorted(all?recs(m):siteRecs(m)).map(r=>recFl
 function flatFor(c,d){
   if(c.startsWith('log-')&&M[c.slice(4)])return recFlat(c.slice(4),d);
   const sc=c.match(/^sites\/([^/]+)\/schedule$/);
-  if(sc){const o={Site:S().sites[sc[1]]?.name||sc[1],'Week of':d.week,Published:d.published?'Yes':'No'};weekDays(d.week).forEach(ds=>SHIFTS.forEach((sh,i)=>{o[`${dayName(ds)} ${ds.slice(5)} · ${sh.split(' ')[0]}`]=((d.days||{})[ds]||{})[i]?.filter(Boolean).join(' & ')||''}));o.Notes=d.notes||'';return o}
+  if(sc){const pd=pubDays(d);const o={Site:S().sites[sc[1]]?.name||sc[1],'Week of':d.week,Status:pd?'Published':d.submitted?'Waiting for approval':'Draft','Published by':d.publishedBy||''};weekDays(d.week).forEach(ds=>SHIFTS.forEach((sh,i)=>{o[`${dayName(ds)} ${ds.slice(5)} · ${sh.split(' ')[0]}`]=((pd||d.days||{})[ds]||{})[i]?.filter(Boolean).join(' & ')||''}));o.Notes=d.notes||'';return o}
   const sm=c.match(/^sites\/([^/]+)\/(staff|participants)$/);
   if(sm){const sn=S().sites[sm[1]]?.name||sm[1];return sm[2]==='staff'?{Site:sn,Name:d.name,Role:d.role,Phone:d.phone,Email:d.email,Start:d.start||'',End:d.end||'',Status:d.status}
     :{Site:sn,Participant:d.name,Status:d.status==='Active'?'Current':'Past',Unit:d.unit,'Moved in':d.moveIn,'Moved out':d.moveOut,'Exit reason':d.exitReason,'Approved appliances':d.appliances,Notes:d.notes}}
@@ -1484,14 +1513,14 @@ function exportExcel(){
   for(const k in S().sites)add('Inventory '+S().sites[k].name,invRows(k));
   add('Site Details Data',[['Site','Site status','Address','Unit','Unit status','Current participant','Unit notes'],...Object.entries(S().sites).flatMap(([k,s])=>s.units.map(u=>[s.name,s.status==='Archived'?'Closed':'Open',s.address,u.no,u.status,(pplOf(k).find(p=>p.id===u.participantId)||{}).name||u.name||'',u.notes]))]);
   add('Participants',[['Site','Participant','Status','Unit','Moved in','Moved out','Exit reason','Approved appliances','Notes','History'],...Object.entries(S().sites).flatMap(([k,s])=>pplOf(k).map(p=>[s.name,p.name,p.status==='Active'?'Current':'Past',p.unit,p.moveIn,p.moveOut,p.exitReason,p.appliances,p.notes,(p.history||[]).map(h=>`${h.date} ${h.event}`).join('; ')]))]);
-  add('Schedule',[['Site','Date','Shift','Staff 1','Staff 2','Published'],...Object.entries(S().sites).flatMap(([k,s])=>(SCHED[k]||[]).flatMap(w=>weekDays(w.week).flatMap(ds=>SHIFTS.map((sh,i)=>{const a=((w.days||{})[ds]||{})[i]||[];return [s.name,ds,sh,a[0]||'',a[1]||'',w.published?'Yes':'No']}).filter(r=>r[3]||r[4]))))]);
+  add('Schedule',[['Site','Date','Shift','Staff 1','Staff 2','Published'],...Object.entries(S().sites).flatMap(([k,s])=>(SCHED[k]||[]).flatMap(w=>weekDays(w.week).flatMap(ds=>SHIFTS.map((sh,i)=>{const pd=pubDays(w);const a=((pd||w.days||{})[ds]||{})[i]||[];return [s.name,ds,sh,a[0]||'',a[1]||'',pd?'Yes':'No']}).filter(r=>r[3]||r[4]))))]);
   add('Staff Roster',[['Site','Name','Role','Phone','Email','Start','End','Status'],...Object.entries(S().sites).flatMap(([k,s])=>staffOf(k).map(x=>[s.name,x.name,x.role,x.phone,x.email,x.start||'',x.end||'',x.status]))]);
   add('Contacts',[['Site','Role','Contact name','Phone / email','Escalate for'],...Object.values(S().sites).flatMap(s=>[[s.name,'Police non-emergency','',s.nonEmergency,''],[s.name,'Site phone','',s.sitePhone,''],...(s.contacts||[]).map(c=>[s.name,c.role,c.name,c.reach,c.when])])]);
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});download(`12N-NH-Site-Operations-${today()}.xlsx`,new Blob([buf]))}
 function exportJSON(){download(`12N-NH-backup-${today()}.json`,JSON.stringify({v:2,settings:clone(S()),rec:Object.fromEntries(MODS.map(m=>[m,recs(m)])),inv:INV,staff:STAFF,participants:PPL,schedule:SCHED},null,1))}
 function importJSON(file){if(!file)return;const rd=new FileReader();rd.onload=async()=>{let d;try{d=JSON.parse(rd.result);if(!d||!d.rec)throw 0}catch(e){toast('That file is not a valid backup.','err');return}
   // Site setup (sites, staff and participant rosters, contacts): managers only, and only when asked.
-  if(d.settings&&d.settings.sites&&CAN_ADMIN){const names=Object.values(d.settings.sites).map(s=>s.name).join(', ');
+  if(d.settings&&d.settings.sites&&CAN_ORG){const names=Object.values(d.settings.sites).map(s=>s.name).join(', ');
     if(await ask({title:'Also copy the site setup?',body:`The backup includes setup for: ${names}.\nThis replaces the sites, staff rosters, participant rosters and contacts here.`,ok:'Replace setup',cancel:'Keep current setup'})){
       const before=CFG;CFG=normalizeCfg(clone(d.settings));try{await putCfg();toast('Site setup copied')}catch(e){CFG=before;writeErr(e);return}}}
   const incoming=[];for(const m of MODS)for(const r of (d.rec[m]||[]))if(r&&r.id&&!recs(m).some(x=>x.id===r.id))incoming.push([m,r]);
@@ -1646,7 +1675,7 @@ async function bootApi(){
   try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}
   API=makeApiDb();GAS=API;await API.load();
   let sess=null;try{sess=JSON.parse(localStorage.getItem('nh-session')||'null')}catch(e){}
-  const applySess=u=>{MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_SCHEDULE=u.role==='Admin'||u.role==='Supervisor';CAN_WRITE=['Admin','Supervisor','Staff'].includes(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
+  const applySess=u=>{MY_UID=u.email||null;applyRole(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
   let started=false;const startApp=()=>{if(started)return;started=true;API_STARTED=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
   const refresh=async()=>{try{const u=await API.run('whoami');if(sess&&sess.email&&u.email!==sess.email){await API.clearAll()}sess=u;localStorage.setItem('nh-session',JSON.stringify(u));applySess(u);startApp();render()}
     catch(e){if(e.code==='invalid_argument'){forgetToken();try{localStorage.removeItem('nh-session')}catch(x){}await API.clearAll();showSignIn(e.message)}
@@ -1659,15 +1688,15 @@ async function bootApi(){
   if(window.NH_CONFIG){await bootApi();return}
   if(window.google&&google.script&&google.script.run){
     MODE='gas';const g=makeGasDb();
-    try{const u=await g.run('whoami');MY_UID=u.email||null;CAN_ADMIN=u.role==='Admin';CAN_SCHEDULE=u.role==='Admin'||u.role==='Supervisor';CAN_WRITE=['Admin','Supervisor','Staff'].includes(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.archiveUrl||'';WEBAPP_URL=u.webAppUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null;
+    try{const u=await g.run('whoami');MY_UID=u.email||null;applyRole(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.archiveUrl||'';WEBAPP_URL=u.webAppUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null;
       LAUNCH_SITE=await new Promise(res=>{try{google.script.url.getLocation(loc=>res((loc&&loc.parameter&&loc.parameter.site)||''))}catch(e){res('')}})}
     catch(e){$('#view').innerHTML=`<div class="card empty"><b>You don't have access to NH Site Docs.</b><br>${esc(e.message||'')}<br>Ask a manager to add your email to the Access tab of the data sheet.</div>`;MODE='denied';return}
     GAS=g;DBX=g.db;SHARED=true;CFG_READY=false;subscribeAll();g.start();render();return}
   if(window.claude&&typeof window.claude.use==='function'){MODE='claude';
     try{[DBX,USER,DL]=await Promise.all([claude.use('db'),claude.use('user'),claude.use('downloads')])}catch(e){}}
   if(DBX){SHARED=true;CFG_READY=false;
-    if(USER){try{MY_UID=await USER.id()}catch(e){}try{CAN_ADMIN=await USER.canEdit()}catch(e){CAN_ADMIN=false}CAN_SCHEDULE=CAN_ADMIN;try{const w=await USER.can('data.write');if(w===false)CAN_WRITE=false}catch(e){}}
-    else{CAN_ADMIN=false;CAN_SCHEDULE=false}
+    if(USER){try{MY_UID=await USER.id()}catch(e){}let ed=false;try{ed=await USER.canEdit()}catch(e){}applyRole(ed?'Administrator':'Facilitator');try{const w=await USER.can('data.write');if(w===false)applyRole('Viewer')}catch(e){}}
+    else applyRole('Facilitator')
     subscribeAll()}
   else{MODE='local';try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}loadLocal();applyLaunchSite()}
   render()})();

@@ -88,15 +88,15 @@ function setup() {
   var access = ss.getSheetByName('Access') || ss.insertSheet('Access', 0);
   if (access.getLastRow() < 1) {
     access.getRange(1, 1, 1, 4).setValues([['Email', 'Role', 'Sites', 'Notes']]).setFontWeight('bold');
-    var rows = [[owner, 'Admin', '', 'Owner of the data sheet · blank Sites = every site']];
+    var rows = [[owner, 'Administrator', '', 'Owner of the data sheet · blank Sites = every site']];
     var domain = owner.split('@')[1] || '';
-    if (domain && !/^(gmail|googlemail)\.com$/.test(domain)) rows.push(['*@' + domain, 'Staff', '', 'Everyone with a ' + domain + ' account can log entries at any site']);
+    if (domain && !/^(gmail|googlemail)\.com$/.test(domain)) rows.push(['*@' + domain, 'Facilitator', '', 'Everyone with a ' + domain + ' account can log entries at any site']);
     access.getRange(2, 1, rows.length, 4).setValues(rows);
     access.setFrozenRows(1);
     access.setColumnWidths(1, 4, 240);
   }
-  // Roles: Admin (managers), Supervisor (schedules + logging), Staff (logging), Viewer (read only). Re-applied on every run.
-  access.getRange('B2:B500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Admin', 'Supervisor', 'Staff', 'Viewer'], true).build());
+  // Roles, lowest to highest: Viewer, Facilitator, Supervisor, Manager, Administrator. Re-applied on every run.
+  access.getRange('B2:B500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Administrator', 'Manager', 'Supervisor', 'Facilitator', 'Viewer'], true).build());
   Object.keys(TAB_NAMES).forEach(function (m) {
     var sh = tab_('log-' + m);
     if (FORMAL[m]) ensureHeaders_(sh, DOC_COLS);
@@ -132,14 +132,53 @@ function user_() {
     else if (!wild && email && who.indexOf('*@') === 0 && email.split('@')[1] === who.slice(2)) wild = entry;
   });
   if (!email) throw new Error('AUTH: Sign in with your 12 Neighbours account.');
-  if (email === owner) return { email: email, role: 'Admin', sites: own ? own.sites : null };
+  if (email === owner) return { email: email, role: 'Administrator', sites: own ? own.sites : null };
   var e = own || wild;
   if (!e) throw new Error('DENIED: ' + email + ' is not on the NH Site Docs access list. Ask a manager to add you.');
   return { email: email, role: e.role, sites: e.sites };
 }
+/* Layers, lowest to highest. "Admin" and "Staff" are the names used before Nov 2026 and still work. */
+var RANK = { Viewer: 0, Facilitator: 1, Supervisor: 2, Manager: 3, Administrator: 4 };
 function normRole_(v) {
   v = String(v || '').trim().toLowerCase();
-  return v === 'admin' ? 'Admin' : v === 'supervisor' ? 'Supervisor' : v === 'staff' ? 'Staff' : v === 'viewer' ? 'Viewer' : '';
+  return v === 'administrator' || v === 'admin' ? 'Administrator' : v === 'manager' ? 'Manager' : v === 'supervisor' ? 'Supervisor'
+    : v === 'facilitator' || v === 'staff' ? 'Facilitator' : v === 'viewer' ? 'Viewer' : '';
+}
+function atLeast_(u, role) { return (RANK[u.role] || 0) >= RANK[role]; }
+function need_(u, role, what) { if (!atLeast_(u, role)) throw new Error('DENIED: ' + what); }
+function readRecord_(c, id) {
+  var sh = tab_(c), row = findRow_(sh, c, id);
+  if (!row) return null;
+  try { return JSON.parse(sh.getRange(row, 5).getValue()); } catch (e) { return null; }
+}
+/* Managers may change their own sites' details, contacts and units; opening or closing sites,
+   adding or removing units and organization settings need an Administrator. */
+function checkConfigChange_(u, data) {
+  if (atLeast_(u, 'Administrator')) return;
+  need_(u, 'Manager', 'Only managers and administrators can change site details.');
+  var old = readConfig_();
+  if (!old) throw new Error('DENIED: Only an administrator can set up the first site.');
+  if (String(old.portalUrl || '') !== String(data.portalUrl || '')) throw new Error('DENIED: Only administrators can change organization settings.');
+  var a = Object.keys(old.sites || {}).sort().join('|'), b = Object.keys(data.sites || {}).sort().join('|');
+  if (a !== b) throw new Error('DENIED: Only administrators can open new sites.');
+  var allowed = allowedIds_(u);
+  Object.keys(data.sites || {}).forEach(function (k) {
+    var o = old.sites[k] || {}, n = data.sites[k] || {};
+    if (!siteOk_(allowed, k)) { if (JSON.stringify(o) !== JSON.stringify(n)) throw new Error('DENIED: Your account is not set up for that site.'); return; }
+    if ((o.status || 'Active') !== (n.status || 'Active') || String(o.closed || '') !== String(n.closed || '')) throw new Error('DENIED: Only administrators can close or reopen sites.');
+    if ((o.units || []).length !== (n.units || []).length) throw new Error('DENIED: Only administrators can add or remove units.');
+  });
+}
+/* Supervisors build drafts and submit them; publishing (what facilitators see) needs a Manager. */
+var PUBLISH_FIELDS = ['publishedDays', 'publishedAt', 'publishedBy', 'published'];
+function checkScheduleChange_(u, c, id, data) {
+  if (atLeast_(u, 'Manager')) return;
+  need_(u, 'Supervisor', 'Only supervisors and managers can work on the schedule.');
+  var old = readRecord_(c, id) || {};
+  PUBLISH_FIELDS.forEach(function (k) {
+    if (JSON.stringify(old[k] === undefined ? null : old[k]) !== JSON.stringify(data[k] === undefined ? null : data[k]))
+      throw new Error('DENIED: Publishing the schedule needs a manager. Submit it for approval instead.');
+  });
 }
 function parseSites_(v) {
   var list = String(v || '').split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(String);
@@ -183,7 +222,7 @@ function siteOk_(allowed, site) { return !allowed || !site || allowed[site] === 
 /* ---------------- API ---------------- */
 
 function whoami() {
-  var u = user_(), admin = u.role === 'Admin';
+  var u = user_(), admin = atLeast_(u, 'Manager');
   return {
     email: u.email, role: u.role, sites: u.sites,
     sheetUrl: admin ? SpreadsheetApp.getActiveSpreadsheet().getUrl() : '',
@@ -224,13 +263,13 @@ function changes(since) {
 function put(c, id, json, flatJson) {
   var u = user_();
   check_(c, id);
-  if (u.role === 'Viewer') throw new Error('DENIED: You have view-only access.');
-  var isSchedule = /^sites\/[^/]+\/schedule$/.test(c);
-  if (isSchedule && u.role !== 'Admin' && u.role !== 'Supervisor') throw new Error('DENIED: Only managers and supervisors can change the schedule.');
-  if (!isSchedule && (c === 'config' || c.indexOf('sites/') === 0) && u.role !== 'Admin') throw new Error('DENIED: Only managers (Admin on the Access tab) can change site setup, rosters and participants.');
+  need_(u, 'Facilitator', 'You have view-only access.');
   if (c.indexOf('arch-') === 0) throw new Error('DENIED: Use the Archive page to archive entries.');
   if (String(json).length > 45000) throw new Error('DENIED: This entry is too long to save. Shorten the notes and try again.');
   var data = JSON.parse(json);
+  if (c === 'config') checkConfigChange_(u, data);
+  else if (/^sites\/[^/]+\/schedule$/.test(c)) checkScheduleChange_(u, c, id, data);
+  else if (c.indexOf('sites/') === 0) need_(u, 'Manager', 'Only managers can change staff rosters and participants.');
   if (!siteOk_(allowedIds_(u), siteOf_(c, id, data))) throw new Error('DENIED: Your account is not set up for that site.');
   var flat = {};
   try { flat = flatJson ? JSON.parse(flatJson) : {}; } catch (e) { flat = {}; }
@@ -256,7 +295,7 @@ function put(c, id, json, flatJson) {
 function remove(c, id) {
   var u = user_();
   check_(c, id);
-  if (u.role !== 'Admin') throw new Error('DENIED: Only managers can delete entries.');
+  need_(u, 'Manager', 'Only managers can delete entries.');
   return withLock_(function () {
     var sh = tab_(c), row = findRow_(sh, c, id);
     if (!row) return { ts: Number(PropertiesService.getScriptProperties().getProperty('ts')) || 0 };
@@ -271,7 +310,7 @@ function remove(c, id) {
 
 function archiveMove(m, ids) {
   var u = user_();
-  if (u.role !== 'Admin') throw new Error('DENIED: Only managers can archive entries.');
+  need_(u, 'Manager', 'Only managers can archive entries.');
   if (!TAB_NAMES[m]) throw new Error('DENIED: Unknown log.');
   var want = {};
   (ids || []).forEach(function (id) { if (ID_RE.test(String(id))) want[String(id)] = true; });
@@ -304,7 +343,7 @@ function archiveMove(m, ids) {
 
 function archiveRestore(m, ids, site, year) {
   var u = user_();
-  if (u.role !== 'Admin') throw new Error('DENIED: Only managers can restore entries.');
+  need_(u, 'Manager', 'Only managers can restore entries.');
   if (!TAB_NAMES[m]) throw new Error('DENIED: Unknown log.');
   var want = {}, left = 0;
   (ids || []).forEach(function (id) { if (ID_RE.test(String(id))) { want[String(id)] = true; left++; } });
@@ -327,6 +366,7 @@ function archiveRestore(m, ids, site, year) {
 
 function archiveQuery(m, site, from, to) {
   var u = user_();
+  need_(u, 'Supervisor', 'Only supervisors and managers can search the archive.');
   if (!TAB_NAMES[m]) throw new Error('DENIED: Unknown log.');
   if (!siteOk_(allowedIds_(u), String(site))) throw new Error('DENIED: Your account is not set up for that site.');
   var out = [], reg = archiveRegistry_()[site] || {};
