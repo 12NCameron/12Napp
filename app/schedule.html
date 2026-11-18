@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NH Schedule Generator</title>
+<meta name="theme-color" content="#1d2360">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+/* NH Schedule Generator: a temporary, stand-alone tool. 12 Neighbours brand colours (cream, 12N blue, brush yellow). */
+:root{--bg:#f8f4e9;--panel:#fff;--panel2:#fbf8f1;--ink:#1f2240;--ink2:#4a4d68;--ink3:#767990;--line:#e6e0d2;--line2:#f0ebe0;
+  --brand:#3443b5;--brandSoft:#e8eaf8;--onBrand:#fff;--sun:#f9d46b;--onSun:#1d2360;--nav:#1d2360;
+  --ok:#2f7a45;--okSoft:#e3f2e7;--warn:#9a5c08;--warnSoft:#fbf0dc;--bad:#b23a32;--badSoft:#fbe5e2;--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#14162a;--panel:#1d2038;--panel2:#23274a;--ink:#eceefe;--ink2:#c3c7e6;--ink3:#9095b8;--line:#343a62;--line2:#2a2f52;
+  --brand:#9aa5ff;--brandSoft:#2a3168;--onBrand:#11143a;--ok:#6cc287;--okSoft:#1d3324;--warn:#e0a84a;--warnSoft:#3a2c14;--bad:#ef7b72;--badSoft:#3d1f1c;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+header{background:var(--nav);color:#eef0ff;padding:12px max(16px,env(safe-area-inset-left));display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header img{height:52px;border-radius:8px;background:#f8f4e9}
+header h1{margin:0;font-size:20px}header p{margin:2px 0 0;color:#aab1e2;font-size:13px}
+main{max-width:1200px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-left)) 60px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+h2{font-size:17px;margin:0 0 10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--ink2)}
+input,select,textarea{font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--panel)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit;font-size:14px}
+.btn:hover{border-color:var(--brand)}.btn.pri{background:var(--brand);border-color:var(--brand);color:var(--onBrand)}.btn.sm{padding:3px 8px;font-size:13px}
+.btn.ghost{background:transparent;border-color:transparent}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{background:var(--panel2);text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink2);padding:8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chips label{font-size:12px;border:1px solid var(--line);border-radius:14px;padding:2px 8px;cursor:pointer;user-select:none}
+.chips input{display:none}.chips label.on{background:var(--brandSoft);border-color:var(--brand);color:var(--brand)}
+.chips label.off.on{background:var(--badSoft);border-color:var(--bad);color:var(--bad)}
+.pill{display:inline-block;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:600;background:var(--line2);color:var(--ink2)}
+.p-ok{background:var(--okSoft);color:var(--ok)}.p-warn{background:var(--warnSoft);color:var(--warn)}.p-bad{background:var(--badSoft);color:var(--bad)}
+.cell select{width:100%;margin-bottom:4px;padding:3px 4px;font-size:13px}
+.cell.locked{background:var(--brandSoft)}
+.meta{font-size:12px;color:var(--ink3)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--nav);color:#eef0ff;padding:9px 16px;border-radius:9px;font-size:14px}
+#print{display:none}
+@media print{
+  body{background:#fff;color:#000}header,main{display:none!important}
+  #print{display:block;font:11pt Arial,sans-serif}#print h2{margin:0 0 4px}#print table{width:100%;border-collapse:collapse;margin-top:8px}
+  #print th,#print td{border:1px solid #888;padding:6px;text-align:left;vertical-align:top}#print th{background:#eee}
+  @page{size:landscape;margin:12mm}}
+</style>
+</head>
+<body>
+<header><img src="data:image/jpeg;base64,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" alt="the 12 neighbours community" width="118" height="52">
+ <div><h1>NH Schedule Generator</h1><p>Temporary tool until scheduling in NH Site Docs is in use. Saved in this browser only.</p></div></header>
+<main>
+ <div class="card"><h2>1 · Site and week</h2>
+  <div class="row">
+   <label class="f">Site<input id="site" placeholder="e.g. Site A"></label>
+   <label class="f">Week starting (Monday)<input id="start" type="date"></label>
+   <label class="f">Weeks<select id="weeks"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+   <label class="f">Staff per shift<select id="per"><option>1</option><option selected>2</option><option>3</option></select></label>
+   <label class="f">Rest between shifts (hours)<select id="rest"><option value="8">8</option><option value="16" selected>16 (no back-to-back)</option><option value="24">24</option></select></label>
+  </div>
+  <div class="row" style="margin-top:10px"><span class="meta">Shifts:</span><div class="chips" id="shiftsOn"></div></div></div>
+
+ <div class="card"><h2>2 · Staff</h2>
+  <p class="meta" style="margin:0 0 8px">Add everyone who can work at this site. Tick the shifts each person can work, mark regular days off, and list any time-off dates (e.g. 2026-11-20, 2026-11-21).</p>
+  <div class="tbl"><table><thead><tr><th>Name</th><th>Can work</th><th>Days off</th><th>Time off (dates)</th><th>Max shifts / week</th><th></th></tr></thead><tbody id="staffRows"></tbody></table></div>
+  <div class="row" style="margin-top:10px"><button class="btn" id="addStaff" type="button">＋ Add staff member</button>
+   <textarea id="paste" rows="1" placeholder="…or paste names, one per line" style="flex:1;min-width:200px"></textarea><button class="btn" id="addPaste" type="button">Add pasted names</button></div></div>
+
+ <div class="card"><h2>3 · Schedule</h2>
+  <div class="row" style="margin-bottom:10px"><button class="btn pri" id="gen" type="button">Generate schedule</button>
+   <button class="btn" id="clear" type="button">Clear unlocked shifts</button><span style="flex:1"></span>
+   <button class="btn" id="printBtn" type="button">Print</button><button class="btn" id="csv" type="button">Download CSV</button><button class="btn" id="copy" type="button">Copy as text</button></div>
+  <p class="meta" style="margin:0 0 8px">Change anyone with the drop-downs. 🔒 locks a shift so <b>Generate</b> keeps it. Generating again spreads shifts fairly among available staff, respecting days off, time off, shift types, the weekly maximum and the rest time.</p>
+  <div id="grid"></div>
+  <div id="summary" style="margin-top:14px"></div></div>
+</main>
+<div id="print"></div>
+<script>
+'use strict';
+const SHIFTS=[{k:'N',name:'Night',time:'12 AM – 8 AM',start:0},{k:'D',name:'Day',time:'8 AM – 4 PM',start:8},{k:'E',name:'Evening',time:'4 PM – 12 AM',start:16}];
+const DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return iso(d)};
+const monday=ds=>{const d=new Date(ds+'T12:00');return addDays(ds,-((d.getDay()+6)%7))};
+const nice=ds=>new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+const KEY='nh-schedule-generator-v1';
+let S;try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+if(!S)S={site:'',start:monday(addDays(iso(new Date()),7)),weeks:1,per:2,rest:16,shiftsOn:['N','D','E'],staff:[],cells:{}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const uid=()=>Math.random().toString(36).slice(2,9);
+function toast(m){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2500)}
+
+/* ---------- slots ---------- */
+const days=()=>Array.from({length:7*S.weeks},(_,i)=>addDays(S.start,i));
+const activeShifts=()=>SHIFTS.filter(s=>S.shiftsOn.includes(s.k));
+const cellKey=(ds,k)=>ds+'|'+k;
+const cell=(ds,k)=>S.cells[cellKey(ds,k)]||(S.cells[cellKey(ds,k)]={names:[],locked:false});
+const absStart=(ds,k)=>Math.round((new Date(ds+'T00:00')-new Date(S.start+'T00:00'))/36e5)+SHIFTS.find(s=>s.k===k).start;
+
+/* ---------- generator ---------- */
+function canWork(p,ds,k){const wd=(new Date(ds+'T12:00').getDay()+6)%7;
+  if(!(p.shifts||['N','D','E']).includes(k))return false;if((p.off||[]).includes(wd))return false;
+  if(String(p.timeoff||'').split(/[\s,;]+/).filter(Boolean).includes(ds))return false;return true}
+function generate(){
+  const ds=days(),sh=activeShifts();const load={},times={};
+  S.staff.forEach(p=>{load[p.id]=0;times[p.id]=[]});
+  const byName=n=>S.staff.find(p=>p.name===n);
+  const weekOf=d=>Math.floor((new Date(d+'T12:00')-new Date(S.start+'T12:00'))/864e5/7);
+  const wkLoad={};const addLoad=(p,d,k)=>{load[p.id]++;times[p.id].push(absStart(d,k));const w=weekOf(d);wkLoad[p.id+'|'+w]=(wkLoad[p.id+'|'+w]||0)+1};
+  // keep locked shifts
+  for(const d of ds)for(const s of sh){const c=cell(d,s.k);if(c.locked)c.names.filter(Boolean).forEach(n=>{const p=byName(n);if(p)addLoad(p,d,s.k)});else c.names=[]}
+  const restOk=(p,t)=>times[p.id].every(x=>Math.abs(x-t)>=8+S.rest);
+  let unfilled=0;
+  for(const d of ds)for(const s of sh){const c=cell(d,s.k);if(c.locked)continue;const t=absStart(d,s.k);
+    for(let j=0;j<S.per;j++){
+      const cand=S.staff.filter(p=>p.name&&!c.names.includes(p.name)&&canWork(p,d,s.k)&&restOk(p,t)&&(wkLoad[p.id+'|'+weekOf(d)]||0)<(+p.max||99));
+      if(!cand.length){c.names.push('');unfilled++;continue}
+      cand.sort((a,b)=>load[a.id]-load[b.id]||Math.random()-.5);
+      const p=cand[0];c.names.push(p.name);addLoad(p,d,s.k)}}
+  save();render();toast(unfilled?`Schedule made. ${unfilled} spot${unfilled>1?'s':''} couldn't be filled: add staff or loosen the limits.`:'Schedule made. Every shift has staff.')}
+
+/* ---------- warnings for the current grid (including hand edits) ---------- */
+function issues(){const out={};const ds=days(),sh=activeShifts();const worked={};
+  for(const d of ds)for(const s of sh){const c=cell(d,s.k);const n=c.names.filter(Boolean);const w=[];
+    if(n.length<S.per)w.push([n.length?`${n.length} of ${S.per}`:`Needs ${S.per}`,'warn']);
+    n.forEach(name=>{const p=S.staff.find(x=>x.name===name);if(p&&!canWork(p,d,s.k))w.push([`${name}: not available`,'bad']);(worked[name]=worked[name]||[]).push(absStart(d,s.k))});
+    out[cellKey(d,s.k)]=w}
+  const rest={};for(const [name,ts] of Object.entries(worked)){ts.sort((a,b)=>a-b);for(let i=1;i<ts.length;i++)if(ts[i]-ts[i-1]<8+S.rest)rest[name]=(rest[name]||0)+1}
+  return {cells:out,rest,worked}}
+
+/* ---------- render ---------- */
+function renderSetup(){$('#site').value=S.site;$('#start').value=S.start;$('#weeks').value=S.weeks;$('#per').value=S.per;$('#rest').value=S.rest;
+  $('#shiftsOn').innerHTML=SHIFTS.map(s=>`<label class="${S.shiftsOn.includes(s.k)?'on':''}"><input type="checkbox" data-sk="${s.k}" ${S.shiftsOn.includes(s.k)?'checked':''}>${s.name} (${s.time})</label>`).join('');
+  $('#staffRows').innerHTML=S.staff.map(p=>`<tr data-id="${p.id}"><td><input data-f="name" value="${esc(p.name)}" aria-label="Name" style="width:150px"></td>
+    <td><div class="chips">${SHIFTS.map(s=>{const on=(p.shifts||['N','D','E']).includes(s.k);return `<label class="${on?'on':''}"><input type="checkbox" data-shift="${s.k}" ${on?'checked':''}>${s.name}</label>`}).join('')}</div></td>
+    <td><div class="chips">${DOW.map((d,i)=>{const on=(p.off||[]).includes(i);return `<label class="off ${on?'on':''}"><input type="checkbox" data-off="${i}" ${on?'checked':''}>${d}</label>`}).join('')}</div></td>
+    <td><input data-f="timeoff" value="${esc(p.timeoff||'')}" placeholder="YYYY-MM-DD, …" aria-label="Time off dates" style="width:170px"></td>
+    <td><input data-f="max" type="number" min="1" max="21" value="${esc(p.max||5)}" aria-label="Max shifts per week" style="width:70px"></td>
+    <td><button class="btn sm ghost" type="button" data-rm aria-label="Remove ${esc(p.name)}">✕</button></td></tr>`).join('')||`<tr><td colspan="6" class="meta">No staff yet.</td></tr>`}
+function renderGrid(){const ds=days(),sh=activeShifts();const iss=issues();const names=S.staff.map(p=>p.name).filter(Boolean);
+  let h='';
+  for(let w=0;w<S.weeks;w++){const wd=ds.slice(w*7,w*7+7);
+    h+=`<div class="tbl" style="margin-bottom:12px"><table style="min-width:820px"><thead><tr><th>Shift</th>${wd.map(d=>`<th>${esc(nice(d))}</th>`).join('')}</tr></thead><tbody>
+     ${sh.map(s=>`<tr><td><b>${s.name}</b><div class="meta">${s.time}</div></td>${wd.map(d=>{const c=cell(d,s.k);
+       const sel=j=>{const cur=c.names[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];return `<select data-d="${d}" data-k="${s.k}" data-j="${j}" aria-label="${s.name} ${d} staff ${j+1}"><option value="">—</option>${list.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')}</select>`};
+       return `<td class="cell ${c.locked?'locked':''}">${Array.from({length:S.per},(_,j)=>sel(j)).join('')}
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"><button class="btn sm ghost" type="button" data-lock="${d}|${s.k}" title="${c.locked?'Unlock':'Lock'} this shift" aria-label="${c.locked?'Unlock':'Lock'} ${s.name} ${d}">${c.locked?'🔒':'🔓'}</button>
+        ${(iss.cells[cellKey(d,s.k)]||[]).map(([m,c2])=>`<span class="pill p-${c2}">${esc(m)}</span>`).join('')}</div></td>`}).join('')}</tr>`).join('')}
+     </tbody></table></div>`}
+  $('#grid').innerHTML=S.staff.length?h:'<p class="meta">Add staff first, then generate.</p>';
+  // summary
+  const rows=S.staff.filter(p=>p.name).map(p=>{const n=(iss.worked[p.name]||[]).length;const perWk=n/S.weeks;
+    return `<tr><td>${esc(p.name)}</td><td>${n}</td><td>${n*8}</td><td>${perWk>(+p.max||99)?'<span class="pill p-bad">Over weekly max</span>':''} ${iss.rest[p.name]?`<span class="pill p-warn">Short rest ×${iss.rest[p.name]}</span>`:''}</td></tr>`}).join('');
+  const total=ds.length*sh.length*S.per,filled=ds.reduce((a,d)=>a+sh.reduce((b,s)=>b+cell(d,s.k).names.filter(Boolean).length,0),0);
+  $('#summary').innerHTML=S.staff.length?`<h2>Summary <span class="pill ${filled===total?'p-ok':'p-warn'}">${filled} of ${total} spots filled</span></h2>
+    ${filled<total?`<p class="meta" style="margin:0 0 8px">This schedule needs <b>${total}</b> staff spots. With everyone's weekly maximum, the staff list can cover about <b>${Math.min(total,S.staff.filter(p=>p.name).reduce((a,p)=>a+(+p.max||5),0)*S.weeks)}</b>. To fill the rest: add staff, raise weekly maximums, or shorten the rest time.</p>`:''}
+    <div class="tbl"><table><thead><tr><th>Staff</th><th>Shifts</th><th>Hours</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>`:''}
+function render(){renderSetup();renderGrid()}
+
+/* ---------- events ---------- */
+$('#site').oninput=e=>{S.site=e.target.value;save()};
+$('#start').onchange=e=>{if(!e.target.value)return;const m=monday(e.target.value);if(m!==e.target.value)toast('Moved to the Monday of that week.');S.start=m;save();render()};
+$('#weeks').onchange=e=>{S.weeks=+e.target.value;save();render()};
+$('#per').onchange=e=>{S.per=+e.target.value;for(const c of Object.values(S.cells))c.names=c.names.slice(0,S.per);save();render()};
+$('#rest').onchange=e=>{S.rest=+e.target.value;save();render()};
+$('#shiftsOn').onchange=e=>{const k=e.target.dataset.sk;if(!k)return;S.shiftsOn=e.target.checked?[...new Set([...S.shiftsOn,k])]:S.shiftsOn.filter(x=>x!==k);if(!S.shiftsOn.length)S.shiftsOn=[k];save();render()};
+$('#addStaff').onclick=()=>{S.staff.push({id:uid(),name:'',shifts:['N','D','E'],off:[],timeoff:'',max:5});save();render();const r=document.querySelectorAll('#staffRows input[data-f="name"]');r[r.length-1].focus()};
+$('#addPaste').onclick=()=>{const have=new Set(S.staff.map(p=>p.name.toLowerCase()));const add=$('#paste').value.split(/\n|,/).map(x=>x.trim()).filter(x=>x&&!have.has(x.toLowerCase()));
+  add.forEach(n=>S.staff.push({id:uid(),name:n,shifts:['N','D','E'],off:[],timeoff:'',max:5}));$('#paste').value='';save();render();toast(add.length?`Added ${add.length} staff`:'No new names to add')};
+$('#staffRows').addEventListener('change',e=>{const tr=e.target.closest('tr[data-id]');if(!tr)return;const p=S.staff.find(x=>x.id===tr.dataset.id);const el=e.target;
+  if(el.dataset.f){const old=p.name;p[el.dataset.f]=el.dataset.f==='max'?Math.max(1,+el.value||1):el.value.trim();
+    if(el.dataset.f==='name'&&old&&old!==p.name)for(const c of Object.values(S.cells))c.names=c.names.map(n=>n===old?p.name:n)}
+  if(el.dataset.shift){const k=el.dataset.shift;const s=p.shifts||['N','D','E'];p.shifts=el.checked?[...new Set([...s,k])]:s.filter(x=>x!==k)}
+  if(el.dataset.off){const i=+el.dataset.off;const o=p.off||[];p.off=el.checked?[...new Set([...o,i])]:o.filter(x=>x!==i)}
+  save();render()});
+$('#staffRows').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;const tr=b.closest('tr');const p=S.staff.find(x=>x.id===tr.dataset.id);
+  if(p.name&&!confirm(`Remove ${p.name}? Their shifts in this schedule are cleared.`))return;
+  for(const c of Object.values(S.cells))c.names=c.names.map(n=>n===p.name?'':n);S.staff=S.staff.filter(x=>x!==p);save();render()});
+$('#grid').addEventListener('change',e=>{const el=e.target;if(!el.dataset.d)return;const c=cell(el.dataset.d,el.dataset.k);const j=+el.dataset.j;
+  if(el.value&&c.names.some((n,i)=>i!==j&&n===el.value)){toast('That person is already on this shift.');renderGrid();return}
+  while(c.names.length<S.per)c.names.push('');c.names[j]=el.value;save();renderGrid()});
+$('#grid').addEventListener('click',e=>{const b=e.target.closest('[data-lock]');if(!b)return;const [d,k]=b.dataset.lock.split('|');const c=cell(d,k);c.locked=!c.locked;save();renderGrid()});
+$('#gen').onclick=()=>{if(!S.staff.filter(p=>p.name).length)return toast('Add staff first.');generate()};
+$('#clear').onclick=()=>{if(!confirm('Clear every shift that is not locked?'))return;for(const c of Object.values(S.cells))if(!c.locked)c.names=[];save();render()};
+
+/* ---------- output ---------- */
+function rowsOut(){const out=[];for(const d of days())for(const s of activeShifts()){const n=cell(d,s.k).names;out.push([d,nice(d),`${s.name} (${s.time})`,...Array.from({length:S.per},(_,j)=>n[j]||'')])}return out}
+$('#csv').onclick=()=>{const head=['Date','Day','Shift',...Array.from({length:S.per},(_,j)=>`Staff ${j+1}`)];
+  const q=v=>/[",\n]/.test(v)?`"${String(v).replace(/"/g,'""')}"`:v;const csv='﻿'+[head,...rowsOut()].map(r=>r.map(q).join(',')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`Schedule ${S.site||'site'} ${S.start}.csv`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
+$('#copy').onclick=async()=>{const txt=`Schedule · ${S.site||'Site'} · week of ${nice(S.start)}\n`+rowsOut().map(r=>`${r[1]} · ${r[2]}: ${r.slice(3).filter(Boolean).join(' & ')||'(open)'}`).join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('Copied. Paste it into an email or message.')}catch(e){toast('Copy is blocked here. Use Download CSV instead.')}};
+$('#printBtn').onclick=()=>{const ds=days(),sh=activeShifts();let h='';
+  for(let w=0;w<S.weeks;w++){const wd=ds.slice(w*7,w*7+7);
+    h+=`<h2>${esc(S.site||'Site')} · Schedule · week of ${esc(nice(wd[0]))}</h2><table><thead><tr><th>Shift</th>${wd.map(d=>`<th>${esc(nice(d))}</th>`).join('')}</tr></thead><tbody>
+     ${sh.map(s=>`<tr><td><b>${s.name}</b><br>${s.time}</td>${wd.map(d=>`<td>${cell(d,s.k).names.filter(Boolean).map(esc).join('<br>')||'—'}</td>`).join('')}</tr>`).join('')}</tbody></table>
+     <p style="font-size:9pt;color:#555">Two staff per shift. Printed ${esc(new Date().toLocaleString())}.</p>${w<S.weeks-1?'<div style="page-break-after:always"></div>':''}`}
+  $('#print').innerHTML=h;window.print()};
+render();
+</script>
+</body>
+</html>

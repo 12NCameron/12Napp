@@ -16,4 +16,5 @@ Shift documentation for 12 Neighbours · Neighbourly Homes sites: shift notes, h
 | `Code.gs` | The Google Apps Script server. Paste into Apps Script; it isn't run from here. |
 | `build.py` | Builds `app/` and `NH-Site-Docs-Offline.html` from the source. |
 | `NH-Site-Docs-Offline.html` | An emergency single-device copy with no server. |
+| `app/schedule.html` | A temporary, standalone schedule generator (no sign-in; saved in the browser) at `https://12ncameron.github.io/12Napp/schedule.html`. It's hand-written, so `build.py` doesn't touch it. |
 | `assets/` | The 12 Neighbours logo. The app icons in `app/` and the wordmark inside the app are made from it. |
