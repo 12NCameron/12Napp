@@ -153,7 +153,7 @@ td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowra
 .catrow td{background:var(--panel2);font-weight:700;color:var(--brand)}
 .ref h3{margin:0 0 6px;font-size:16px}.ref ol,.ref ul{margin:6px 0 0 18px;padding:0}.ref li{margin:3px 0}.ref p{margin:6px 0}
 .ref .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;margin-left:6px}
-.t-brown{background:var(--brandSoft);color:var(--brand)}.t-white{background:var(--line2);color:var(--ink2)}
+.t-red{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}.t-brown{background:var(--brandSoft);color:var(--brand)}.t-white{background:var(--line2);color:var(--ink2)}
 .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--nav);color:var(--navInk);padding:9px 16px;border-radius:9px;z-index:60;font-size:14px;box-shadow:var(--sh);max-width:calc(100% - 32px)}
 .toast.err{background:var(--badSoft);color:var(--bad);border:1px solid var(--bad)}
 .banner{background:var(--warnSoft);color:var(--warnInk);padding-block:8px;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));font-size:13px;border-bottom:1px solid var(--line)}
@@ -221,7 +221,9 @@ function shiftFor(t){const h=+String(t||nowTime()).split(':')[0];return h>=8&&h<
 
 /* ---------- Defaults (no personal data lives in the page itself) ---------- */
 const SEED_INV=[["INV-001","Consumable","Office Supplies","Pencils","Monthly",10],["INV-002","Consumable","Office Supplies","Pens","Monthly",15],["INV-003","Consumable","Office Supplies","Dry Erase Markers","Monthly",4],["INV-004","Consumable","Office Supplies","Sharpies - Regular","Monthly",2],["INV-005","Consumable","Office Supplies","Sharpies - Thick","Monthly",2],["INV-006","Consumable","Office Supplies","Highlighters","Quarterly",2],["INV-007","Persistent","Office Supplies","Scissors","As Needed",2],["INV-008","Persistent","Office Supplies","Stapler","As Needed",1],["INV-009","Consumable","Office Supplies","Staples","As Needed",2],["INV-010","Consumable","Office Supplies","Paper Clips - Standard","As Needed",50],["INV-011","Consumable","Office Supplies","Paper Clips - Large","As Needed",5],["INV-012","Consumable","Office Supplies","Paper - Printer","Monthly",200],["INV-013","Consumable","Office Supplies","Sticky Notes","Monthly",5],["INV-014","Consumable","Office Supplies","Tape - Clear Scotch","Monthly",2],["INV-015","Consumable","Office Supplies","Tape - Duct White","Monthly",1],["INV-016","Consumable","Office Supplies","Tape - Packing Clear","Monthly",1],["INV-017","Consumable","Office Supplies","Glue - Sticks","As Needed",1],["INV-018","Consumable","Office Supplies","Envelopes - Letter","As Needed",20],["INV-019","Consumable","Cleaning & Sanitation","Toilet Paper","Weekly",15],["INV-020","Consumable","Cleaning & Sanitation","Paper Towel","Weekly",6],["INV-021","Consumable","Cleaning & Sanitation","Dish Soap","Weekly",2],["INV-022","Consumable","Cleaning & Sanitation","Floor Cleaner","Monthly",2],["INV-023","Consumable","Cleaning & Sanitation","Multipurpose Cleaner","Bi-weekly",2],["INV-024","Consumable","Cleaning & Sanitation","Lysol Wipes","Weekly",4],["INV-025","Consumable","Cleaning & Sanitation","Sponges - Dish","Bi-weekly",4],["INV-026","Consumable","Cleaning & Sanitation","Bleach","Monthly",1],["INV-027","Consumable","Cleaning & Sanitation","Toilet Bowl Cleaner","Monthly",1],["INV-028","Consumable","Cleaning & Sanitation","Hand Soap Refill","Monthly",4],["INV-029","Consumable","Cleaning & Sanitation","Hand Sanitizer Refill","Monthly",2],["INV-030","Consumable","Cleaning & Sanitation","45L Long White Garbage Bags","Weekly",20],["INV-031","Consumable","Cleaning & Sanitation","Large Black Garbage Bags","Weekly",20],["INV-032","Consumable","Cleaning & Sanitation","Kleenex","Bi-weekly",5],["INV-033","Consumable","Cleaning & Sanitation","Laundry Pods","Monthly",50],["INV-034","Consumable","Cleaning & Sanitation","Mop Head Regular","Monthly",2],["INV-035","Consumable","Cleaning & Sanitation","Magic Eraser","Monthly",2],["INV-036","Consumable","Safety & Aid","Gloves - Nitrile","Monthly",200],["INV-037","Consumable","Safety & Aid","Facemasks","Monthly",50],["INV-038","Consumable","Safety & Aid","Naloxone Kits","Monthly",14],["INV-039","Persistent","Safety & Aid","First Aid Kit","Monthly",2],["INV-040","Consumable","Safety & Aid","AA Batteries","Monthly",4],["INV-041","Consumable","Safety & Aid","AAA Batteries","Monthly",10],["INV-042","Persistent","Safety & Aid","Flashlights","As Needed",4],["INV-043","Consumable","Programming & Meals","Coffee","Weekly",2],["INV-044","Consumable","Programming & Meals","Coffee Filters","Monthly",10]];
-const INV_CATS=["Office Supplies","Cleaning & Sanitation","Safety & Aid","Programming & Meals","Seasonal & Outdoor","Facilities & Storage","Appliances","Cleaning Equipment"];
+const INV_CATS=["Office Supplies","Cleaning & Sanitation","Safety & Aid","Programming & Meals","Entertainment & Games","Seasonal & Outdoor","Facilities & Storage","Appliances","Cleaning Equipment"];
+const ASSET_LOCS=['Office','Staff Lounge','Staff Bathroom','Laundry Room','Electrical Room','Courtyard','Guest Unit','Storage'];
+const ASSET_COND=['Good','Needs Repair','Missing','New'],ASSET_STATUS=['Operational','Needs Maintenance','Required'];
 const seedInvItem=([id,type,cat,item,freq,par])=>({id,type,cat,item,freq,office:0,bath:0,guest:0,par,cond:'Good'});
 const DIRECTORY=[
  /* Template roles only: each site fills in its own names and numbers under Participants & Contacts. */
@@ -265,7 +267,11 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
 /* =========================================================
    STORE — shared db when available, else this browser only
    ========================================================= */
-const MODS=['notes','handoff','patrols','incidents','visitors','roomchecks','wellness','inout','requests','intakes','engagement','workorders','requisitions'];
+const MODS=['notes','handoff','patrols','incidents','visitors','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','requests','intakes','engagement','workorders','requisitions'];
+const AUDIT_KEYS=['sz','admin','laundry','baths','units','kitchen','utility','life','house','env','bldg','sec'];
+const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object.entries(o).filter(([,x])=>x&&x.v==='No').map(([k])=>k));
+const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
+const toMin=s=>{const m=/^(\d\d):(\d\d)/.exec(s||'');return m?+m[1]*60+ +m[2]:null};
 let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,CAN_SCHEDULE=true,MY_UID=null;
 /* Layers, lowest to highest. CAN_ADMIN = Manager and up (kept name), CAN_ORG = Administrator. */
 const RANK={Viewer:0,Facilitator:1,Supervisor:2,Manager:3,Administrator:4};
@@ -372,7 +378,8 @@ const recDate=r=>r.date||String(r.createdAt||'').slice(0,10);
 const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
   incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!roomFollow(r)||r.checkInDone==='Yes',inout:()=>true,
   requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
-  requisitions:r=>['Received','Denied','Not approved'].includes(r.status)};
+  requisitions:r=>['Received','Denied','Not approved'].includes(r.status),
+  guestunit:r=>r.status!=='Booked'&&r.status!=='In use'||r.date<today(),safetyaudit:r=>r.status==='Completed'||!auditNo(r).length,firstaid:()=>true};
 function archiveCandidates(months){const cutoff=addDays(today(),-Math.round(months*30.44));const ok=new Set(allowedSites());
   return Object.fromEntries(MODS.map(m=>[m,recs(m).filter(r=>ok.has(r.site)&&recDate(r)&&recDate(r)<cutoff&&IS_CLOSED[m](r))]))}
 async function archiveEntries(m,list,progress){
@@ -463,7 +470,7 @@ const PILL={HIGH:'bad',High:'bad',MEDIUM:'warn',Medium:'warn',LOW:'info',Low:'in
  Stocked:'ok','Low Stock':'warn','Out of Stock':'bad','Not Stocked':'',Surplus:'info',
  Requested:'warn',Ordered:'info',Received:'ok','New Inquiry':'warn','Contact Logged':'info','Card Active':'acc','Referred to Case Management':'purple',Admitted:'ok',
  'In HIFIS':'ok','Not in HIFIS':'bad',Unsure:'warn','On site':'warn','Signed out':'ok',
- 'Needs Follow-Up':'warn',Urgent:'bad',P:'ok',FU:'warn',U:'bad',In:'ok',Out:'warn',
+ 'Needs Follow-Up':'warn',Urgent:'bad',Booked:'info','In use':'acc','Did not attend':'','On demand':'',Operational:'ok','Needs Maintenance':'warn',Required:'bad','Needs Repair':'warn',Missing:'bad',New:'info',Low:'warn',P:'ok',FU:'warn',U:'bad',In:'ok',Out:'warn',
  Occupied:'ok',Vacant:'','Pending Move-in':'warn','Out of service':'bad',Active:'ok',Inactive:'warn',Archived:''};
 /* Earlier wording, shown in today's person-centred words (stored values are left as recorded). */
 const SAY={Fail:'Follow-up',Denied:'Not approved','Disruptive Visitor':'Visitor disruption','Behaviour Escalation':'Escalating situation','Policy Reminder':'Community agreement reminder','Voluntary exit':'Chose to move on','Eviction / placement ended':'Program participation ended',Incarceration:'In custody',Deceased:'Passed away'};
@@ -648,6 +655,164 @@ wellness:{title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Ch
   {k:'checkInDone',l:'Check-in completed?',t:'seg',o:['No','Yes'],def:'No',show:r=>roomFollow(r)}],
  cols:['date','unit','staff','roomStatus',{l:'Flagged items',f:r=>esc(roomFlags(r).map(x=>`${x.item} (${x.v})`).join(', '))},{l:'Check-in',f:r=>roomFollow(r)?(r.checkInDone==='Yes'?pill('Completed'):pill('Due '+fmtDate(r.checkInDue),r.checkInDue<today()?'bad':'warn')):''}],
  chips:[{l:'Needs follow-up',f:r=>roomFollow(r)&&r.checkInDone!=='Yes'},{l:'Urgent',f:r=>r.roomStatus==='Urgent'},{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)}]},
+guestunit:{title:'Guest Unit Booking',nav:'Guest Unit Bookings',sheet:'Guest Unit Bookings',sop:'12N Guest Unit Policy · Guest Unit Sign-Up Sheet',
+ desc:'The Guest Unit is for participants to spend time with approved guests. Open 8:00 AM – 8:00 PM, last booking starts at 6:00 PM, 2 hours maximum. The participant and their guest both sign the paper sheet (yellow binder in the office).',
+ fields:[
+  {k:'policy',t:'info',full:1,html:()=>'<b>Guest Unit guidelines</b><ul style="margin:6px 0 0 18px;padding:0"><li>The guest stays with the participant who booked the unit. Guests are never in the unit alone.</li><li>Former 12 Neighbours participants can\'t be guests.</li><li>The unit is for approved visits only, not a warming space.</li><li>No smoking in the unit.</li></ul>'},
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'start',l:'Start time',t:'time',req:1,hint:'Between 8:00 AM and 6:00 PM.'},{k:'end',l:'End time',t:'time',req:1,hint:'No later than 8:00 PM, and at most 2 hours after the start.'},
+  {k:'unit',l:'Participant (who booked)',t:'unit',req:1},{k:'guest',l:'Guest name',t:'text',req:1},
+  {k:'signed',l:'Participant and guest both signed the sign-up sheet',t:'seg',o:['Yes','No'],req:1},
+  {k:'status',l:'Status',t:'seg',o:['Booked','In use','Completed','Cancelled','Did not attend'],def:'Booked',req:1},
+  {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},
+  {k:'notes',l:'Notes',t:'textarea',full:1,hint:'Describe what happened if the guidelines weren\'t followed. Pausing Guest Unit privileges is a manager\'s decision.'}],
+ cols:['date',{l:'Time',f:r=>esc(`${r.start||''}–${r.end||''}`)},'unit','guest','status','staff'],
+ chips:[{l:'Today',f:r=>r.date===today()},{l:'Upcoming',f:r=>r.date>=today()&&r.status==='Booked'},{l:'In use',f:r=>r.status==='In use'}]},
+safetyaudit:{title:'NH Safety Audit',nav:'Monthly Safety Audit',sheet:'Safety Audits',sop:'Safety Manual (Red) · NH Safety Audit Checklist · Work Site Inspections',copy:1,
+ desc:'Complete monthly. Answer Yes, No or N/A for each item, and add a note for anything marked No. Items marked No become action items with an owner and a due date. Hazards needing repair also need a work order.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
+  {k:'auditor',l:'Auditor',t:'staff',def:D.me,req:1},{k:'auditor2',l:'Other auditors',t:'text'},
+  {t:'sect',l:'1 · Safety zone'},
+  {k:'sz',l:'1 · Safety zone',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Safety zone set up, organized and clearly identified'],
+    ['Safety map posted and up to date','Shows fire extinguishers, naloxone kits, emergency contacts and exits'],
+    ['Emergency contacts posted and current','Fire, police, ambulance, on-call staff'],
+    ['SDS binder present, accessible and current','Updated whenever a new hazardous product comes to site'],
+    ['First aid kit present and fully stocked','Use the First Aid Kit Check; restock after any use'],
+    ['Evacuation plan filed, roles outlined, practised with staff'],
+    ['Naloxone / overdose response kit in safety zone'],
+    ['Incident report forms available'],
+    ['All staff know where the safety zone is and what is in it'],
+    ['Safety zone free of clutter','Everything reachable within seconds'],
+    ['Biohazard clean-up kit available','Gloves, masks, cleaning agent, hot water access, bucket, hose'],
+    ['Puncture-resistant gloves available to staff'],
+    ['List of staff trained in First Aid and in Naloxone'],
+    ['Fire extinguishers mounted, visible, charged and in date','Laundry room, kitchen, office']]},
+  {t:'sect',l:'2 · Admin office'},
+  {k:'admin',l:'2 · Admin office',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Heat tape alarm lights visible from or near safety zone'],
+    ['Security cameras working'],
+    ['Staff have a tidy, ergonomic work space with heat / air conditioning']]},
+  {t:'sect',l:'3 · Laundry room'},
+  {k:'laundry',l:'3 · Laundry room',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Laundry room wiped down; dryer lint trap emptied'],
+    ['Hot water at a safe temperature','Water heater 60 °C (140 °F); tap water no hotter than 49 °C (120 °F)'],
+    ['Fire extinguisher mounted, signed and in date'],
+    ['Laundry room locked; bookable in 2-hour blocks'],
+    ['Storage unit locked'],
+    ['Cleaning supplies dispensed by staff in small amounts']]},
+  {t:'sect',l:'4 · Bathrooms and shower rooms'},
+  {k:'baths',l:'4 · Bathrooms and shower rooms',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Doors kept closed (not propped open)'],
+    ['Thermostats at accessible height and secure from tampering'],
+    ['Walls and floors washed down daily; cleaned during shifts'],
+    ['P-traps secure and covered'],
+    ['Shower exhaust fan adequate (walls not dripping after use)']]},
+  {t:'sect',l:'5 · Sleeping units'},
+  {k:'units',l:'5 · Sleeping units',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['All units numbered / clearly identified'],
+    ['Smoke detector present and caged in each unit; no tampering'],
+    ['Grip tape on all unit steps; entry steps level and safe'],
+    ['Grab bar or railing at unit entry'],
+    ['Door knobs and latches working'],
+    ['Window screens in place'],
+    ['No burn damage or strong smoke odour (or it has been addressed)'],
+    ['Participants aware of the no-combustion-in-units policy'],
+    ['Air quality / ventilation adequate']]},
+  {t:'sect',l:'6 · Kitchen and guest unit'},
+  {k:'kitchen',l:'6 · Kitchen and guest unit',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Heat-resistant backsplash panel'],
+    ['Smoke detector present and caged (kitchen and guest unit)'],
+    ['Fire extinguisher mounted, inspected and in date'],
+    ['Grip tape on steps'],
+    ['Storage unit locked'],
+    ['P-traps secure'],
+    ['Kitchen clean']]},
+  {t:'sect',l:'7 · Utility area (wiring and plumbing)'},
+  {k:'utility',l:'7 · Utility area (wiring and plumbing)',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Utility space tidy, with clear expectations for staff'],
+    ['No wires on the ground; wire mats where wires cross paths'],
+    ['Wires and electrical panels labelled'],
+    ['Staff have had an overview of the electrical system'],
+    ['Pipe insulation intact (no animal damage)'],
+    ['No construction debris; storage not a crush or fall risk']]},
+  {t:'sect',l:'8 · Life safety and fire prevention'},
+  {k:'life',l:'8 · Life safety and fire prevention',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Smoke detectors in all units and common areas; cages intact'],
+    ['Smoke detectors checked hourly; staff know the clear reading and what to do'],
+    ['Photoelectric smoke detectors in place','More sensitive to particulate from some substances'],
+    ['Designated outdoor smoking areas marked, with proper butt disposal','Pails with sand are acceptable where approved'],
+    ['Exit routes and gate access clear'],
+    ['Emergency door alarms armed; no crawl-through gaps under doors'],
+    ['Site lighting working for night safety'],
+    ['No burn marks or fire damage in units or common areas']]},
+  {t:'sect',l:'9 · Cleanliness and housekeeping'},
+  {k:'house',l:'9 · Cleanliness and housekeeping',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Courtyard free of garbage piles; bins available and not overflowing'],
+    ['Garbage emptied every 2 hours, using the trolley'],
+    ['Dumpster accessible; lid manageable by one staff member'],
+    ['Garbage bags / liners stocked'],
+    ['Walkways clear; no trip hazards'],
+    ['Grounds tidy; odours controlled'],
+    ['Dead limbs / debris cleared from the perimeter']]},
+  {t:'sect',l:'10 · Community environment and wellbeing'},
+  {k:'env',l:'10 · Community environment and wellbeing',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Seating and common areas safe and intact'],
+    ['No aggressive graffiti or vandalism'],
+    ['Environment calm and respectful; no unsafe gatherings'],
+    ['Clear sightlines; no hidden corners collecting risk items'],
+    ['Courtyard lights working; shade available in warm weather'],
+    ['Staff presence and check-ins happening'],
+    ['Participant belongings managed (storage solutions in place)'],
+    ['Chairs and communal furniture stored safely']]},
+  {t:'sect',l:'11 · Building and maintenance'},
+  {k:'bldg',l:'11 · Building and maintenance',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Grip tape on all stairs and wet-weather steps'],
+    ['Doors, gates and fences secure and working'],
+    ['Windows undamaged; exterior lighting working'],
+    ['Drainage good; no pooling water'],
+    ['Snow, ice and slip hazards controlled (seasonal)'],
+    ['Benches and outdoor structures in good repair'],
+    ['Skirting in place under units to protect exterior wires'],
+    ['Maintenance issues logged as work orders'],
+    ['Perimeter checks happening']]},
+  {t:'sect',l:'12 · Security and supplies'},
+  {k:'sec',l:'12 · Security and supplies',t:'yntable',full:1,vals:['Yes','No','N/A'],o:[
+    ['Cameras unobstructed; no dead zones where people can hide or camp'],
+    ['Perimeter secure; no unauthorized camping'],
+    ['Access control working; no unauthorized vehicles or items'],
+    ['Laundry room and storage units kept locked'],
+    ['Cleaning supplies dispensed by staff, not left accessible'],
+    ['Night perimeter checks completed safely; no unsafe pockets'],
+    ['PPE supplies available (gloves, masks)'],
+    ['Garbage trolley available and used'],
+    ['Storage totes not heavy or awkward above head height']]},
+  {t:'sect',l:'Summary'},
+  {k:'houseScore',l:'Cleanliness / housekeeping score (out of 10)',t:'number'},
+  {k:'score',l:'Overall site score (out of 10)',t:'number',req:1},
+  {k:'actions',l:'Immediate action items',t:'textarea',full:1,req:r=>auditNo(r).length>0,hint:'One per line: action, owner, due date. Required when any item is marked No.'},
+  {k:'status',l:'Action items',t:'seg',o:['Open','Completed'],def:'Open'},
+  {k:'signoff',l:'Auditor sign-off',t:'seg',o:['Signed'],req:1,hint:'Confirms the audit was completed as recorded.'}],
+ cols:['date','auditor',{l:'Marked No',f:r=>{const n=auditNo(r).length;return n?pill(n+' item'+(n>1?'s':''),'warn'):pill('None','ok')}},'score','status'],
+ chips:[{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)},{l:'Open actions',f:r=>r.status!=='Completed'&&auditNo(r).length>0}]},
+firstaid:{title:'First Aid Kit Check',nav:'First Aid Kit Checks',sheet:'First Aid Kit Checks',sop:'Safety Manual (Red) · First Aid Kit Contents Checklist',copy:1,
+ desc:'Check each kit weekly and after any use. Mark each item Stocked, Low or Missing against the minimum shown. Low or missing items can go straight to Requisitions.',
+ fields:[
+  {k:'date',l:'Date checked',t:'date',req:1,def:D.today},{k:'kit',l:'Kit location',t:'text',req:1,def:'Safety zone'},{k:'staff',l:'Checked by',t:'staff',def:D.me,req:1},
+  {k:'reason',l:'Reason',t:'seg',o:['Weekly check','After use','Restocked'],def:'Weekly check'},
+  {t:'sect',l:'PPE & safety'},
+  {k:'fa0',l:'PPE & safety',t:'yntable',full:1,vals:['Stocked','Low','Missing'],o:[['Gloves','Full box minimum'], ['CPR face shields','2–3'], ['Naloxone kits','2–4']]},
+  {t:'sect',l:'Cleaning supplies'},
+  {k:'fa1',l:'Cleaning supplies',t:'yntable',full:1,vals:['Stocked','Low','Missing'],o:[['Antiseptic wipes','1 full box minimum'], ['Alcohol wipes','1 full box minimum'], ['Saline / wound wash','1–2 bottles'], ['Hand sanitizer','1 bottle']]},
+  {t:'sect',l:'Bandages and dressings'},
+  {k:'fa2',l:'Bandages and dressings',t:'yntable',full:1,vals:['Stocked','Low','Missing'],o:[['Adhesive bandages','Assorted sizes, 1 full box minimum'], ['Sterile gauze pads','1 full box minimum'], ['Low-adherent dressings','5–10'], ['Large wound / combine dressings','5–10'], ['Finger dressings / closures','5–10']]},
+  {t:'sect',l:'Bandaging material'},
+  {k:'fa3',l:'Bandaging material',t:'yntable',full:1,vals:['Stocked','Low','Missing'],o:[['Conforming bandages','Various sizes, 4–10'], ['Triangular bandages','2–4'], ['Heavyweight / pressure bandages','3–5'], ['Adhesive tape','2 rolls']]},
+  {t:'sect',l:'Eye care, tools, burns and cold'},
+  {k:'fa4',l:'Eye care, tools, burns and cold',t:'yntable',full:1,vals:['Stocked','Low','Missing'],o:[['Eye pads','5–10'], ['Eye wash','1 bottle'], ['Scissors','1 pair'], ['Tweezers','1 pair'], ['Safety pins','10–15'], ['Burn gel','2–4'], ['Instant ice packs','2–4']]},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','kit','staff','reason',{l:'Needs restock',f:r=>{const n=faLow(r).length;return n?pill(n+' item'+(n>1?'s':''),'warn'):pill('All stocked','ok')}}],
+ chips:[{l:'Needs restock',f:r=>faLow(r).length>0}]},
 inout:{title:'Participant Time In/Out',nav:'Participant In/Out',sheet:'Participant In-Out Log',sop:'Participant Time In/Out Sheet',custom:'inoutGrid',
  desc:'One sheet per shift, like the paper form. Tap Out when a participant leaves the site and In when they come back. The two facilitators on shift are recorded with each sheet. Anyone out for more than 24 hours is flagged on the dashboard (Missing Participant protocol, NH 3.1.16).',
  fields:[
@@ -763,8 +928,8 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
 /* =========================================================
    NAV & HEADER
    ========================================================= */
-const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors']]],
- ['Participants',[['roomchecks'],['wellness'],['inout'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['safetyaudit'],['firstaid']]],
+ ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
 let cur=(location.hash||'').slice(1)||'dash';const chipState={},searchState={};
@@ -942,6 +1107,14 @@ async function saveForm(){
   if(m==='engagement'&&d.category==='Daily Whiteboard'&&d.quote){const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
     const rep=recs('engagement').find(r=>r.id!==d.id&&r.category==='Daily Whiteboard'&&norm(r.quote)===norm(d.quote)&&Math.abs((new Date(d.date)-new Date(r.date))/864e5)<60);
     if(rep&&!await ask({title:'Quote used recently',body:`This quote was posted on ${fmtDate(rep.date)}, less than 60 days ago.`,ok:'Save anyway'}))return}
+  if(m==='guestunit'){const s=toMin(d.start),e=toMin(d.end);
+    if(s<480||s>1080){toast('Bookings start between 8:00 AM and 6:00 PM.','err');return}
+    if(e<=s||e>1200){toast('The end time must be after the start and no later than 8:00 PM.','err');return}
+    if(e-s>120){toast('Guest Unit bookings are 2 hours at most.','err');return}
+    if(!['Cancelled','Did not attend'].includes(d.status)){const clash=siteRecs('guestunit').find(r=>r.id!==d.id&&r.date===d.date&&!['Cancelled','Did not attend'].includes(r.status)&&toMin(r.start)<e&&toMin(r.end)>s);
+      if(clash){toast(`The Guest Unit is already booked ${clash.start}–${clash.end} that day.`,'err');return}}
+    const norm=x=>String(x||'').toLowerCase().replace(/[^a-z]+/g,' ').trim();const past=pplOf(curSite()).filter(p=>p.status!=='Active'&&norm(p.name)&&norm(p.name)===norm(d.guest));
+    if(past.length&&!await ask({title:'Check the guest',body:`“${d.guest}” matches the name of a former participant. Former 12 Neighbours participants can't be Guest Unit guests. Save only if this is a different person.`,ok:'Different person, save'}))return}
   if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
     if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
   delete d._statusSet;
@@ -957,9 +1130,16 @@ async function saveForm(){
   if(m==='incidents'&&isNew&&await ask({title:'Add a shift log reference?',body:'The guideline asks for a brief note in the shift log that points to this Incident Report, plus any instructions the incoming team needs.',ok:'Add reference',cancel:'Not now'}))
     openForm('notes',null,{type:'Incident Report filed',irStatus:'Filed',location:d.location,priority:/Violence|Medical|Missing|Police/.test(d.reportType)?'HIGH':'MEDIUM',participant:'Neighbourly Homes (general)',
       notes:`Incident Report filed: ${d.reportType} at ${d.location}${d.locationDetail?' ('+d.locationDetail+')':''}, ${fmtDate(d.date)} ${d.time}.`});
+  if(m==='firstaid')await offerFaReq(d);
+  if(m==='safetyaudit'&&isNew){const b=[...Object.keys(d.bldg||{}),...Object.keys(d.utility||{})].filter(i=>((d.bldg||{})[i]||(d.utility||{})[i]).v==='No');
+    if(b.length)offerWO({notes:b.map(i=>{const x=(d.bldg||{})[i]||(d.utility||{})[i];return i+(x.n?' – '+x.n:'')}).join('\n')},'Monthly Safety Audit')}
   if(m==='patrols'&&isNew&&((d.observed||[]).includes('Maintenance needed')||(d.observed||[]).includes('Damage, leaks or pests')))offerWO(d,'Daily Safety Walkthrough');
   if(m==='wellness'&&isNew){const fl=roomFlags(d).filter(x=>['appliances','plumbing','general','sleeping'].includes(x.table)&&x.item!=='Floor & Clutter'&&x.item!=='Trash & Waste'&&x.item!=='Odour');
     if(fl.length||(d.support||[]).includes('Maintenance / repairs')||d.smokeResult==='Fail')offerWO(Object.assign({},d,{notes:[...fl.map(x=>`${x.item}: ${x.v==='U'?'Urgent':'Follow-up'}${x.n?' – '+x.n:''}`),d.smokeResult==='Fail'?'Smoke detector failed test':'',d.notes||''].filter(Boolean).join('\n')}),'Room Wellness Check')}}
+async function offerFaReq(d){const low=faLow(d);if(!low.length)return;const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied','Not approved'].includes(r.status)).map(r=>r.item));
+  const add=low.filter(x=>!open.has('First aid: '+x.item));if(!add.length)return;
+  if(!await ask({title:`Request ${add.length} first aid item${add.length>1?'s':''}?`,body:add.map(x=>`${x.item} (${x.v==='Missing'?'missing':'low'})`).join(', '),ok:'Create requisitions',cancel:'Not now'}))return;
+  const now=new Date().toISOString();try{for(const x of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:'First aid: '+x.item,qty:'',reason:`First aid kit (${d.kit}): ${x.v==='Missing'?'missing':'low'}`,priority:/Naloxone|Gloves/.test(x.item)||x.v==='Missing'?'High':'Medium',status:'Requested'});toast('Requisitions created')}catch(e){writeErr(e)}}
 async function offerWO(rec,src){if(await ask({title:'Create a work order?',body:'Maintenance was flagged. SOP 3.3.10: every maintenance issue needs a work order.',ok:'Create work order',cancel:'Not now'}))
   openForm('workorders',null,{source:src,where:rec.unit?'Unit '+rec.unit:'',description:[rec.internal,rec.external,rec.notes,rec.action].filter(Boolean).join('\n')})}
 async function delRec(){const m=draftMod,id=draft.id;if(!await ask({title:'Delete this entry?',body:'It will be removed for everyone. This cannot be undone.',ok:'Delete',danger:true}))return;
@@ -1089,6 +1269,11 @@ function renderDash(v){
   if(CAN_SCHEDULE){const gaps=schedGaps(curSite(),7);if(gaps)A.push(['warn',`${gaps} shift${gaps>1?'s':''} in the next 7 days ${gaps>1?'have':'has'} fewer than 2 staff scheduled.`,'schedule',''])}
   if(CAN_ADMIN&&CAN_WRITE){const c=archiveCandidates(12);const n=MODS.reduce((a,m)=>a+c[m].length,0);if(n)A.push(['info',`${n} closed entr${n===1?'y is':'ies are'} over a year old. Archive them to keep the app quick.`,'archive',''])}
   {const L=ioLatest(curSite());for(const [u,l] of Object.entries(L))if(l.t==='Out'&&(Date.now()-l.at)/36e5>24)A.push(['bad',`${unitLabel(u)} has been out since ${fmtDate(l.date)} ${l.time} (over 24 hours). Check the Missing Participant protocol.`,'inout',''])}
+  if(CAN_REVIEW&&+t.slice(8)>=7&&!siteRecs('safetyaudit').some(r=>(r.date||'').slice(0,7)===t.slice(0,7)))A.push(['warn','The monthly safety audit hasn\'t been done yet this month.','safetyaudit','']);
+  if(CAN_REVIEW)siteRecs('safetyaudit').filter(r=>r.status!=='Completed'&&auditNo(r).length).forEach(r=>A.push(['warn',`Safety audit action items still open (${fmtDate(r.date)}).`,'safetyaudit',r.id]));
+  {const fa=siteRecs('firstaid').map(r=>r.date).sort().pop();if(!fa||fa<addDays(t,-7))A.push(['warn',fa?`First aid kit last checked ${fmtDate(fa)}. Kits are checked weekly.`:'No first aid kit check recorded yet. Kits are checked weekly.','firstaid',''])}
+  {const nowM=toMin(nowTime());siteRecs('guestunit').filter(r=>r.date===t&&r.status==='In use'&&toMin(r.end)<nowM).forEach(r=>A.push(['warn',`Guest Unit booking for ${r.unitLabel||'a participant'} ended at ${r.end}. Check in and update the booking.`,'guestunit',r.id]));
+   const next=siteRecs('guestunit').filter(r=>r.date===t&&r.status==='Booked'&&toMin(r.start)>=nowM).sort((a,b)=>a.start.localeCompare(b.start))[0];if(next)A.push(['info',`Guest Unit booked today ${next.start}–${next.end} (${next.unitLabel||''}).`,'guestunit',next.id])}
   if(np<2)A.push(['bad',np?`Only ${pair()[0]} is recorded on this shift. Shifts are staffed by two.`:'No staff recorded on this shift yet. Choose both staff at the top.','dash','']);
   if(CAN_REVIEW)siteRecs('incidents').filter(r=>r.review==='Submitted').forEach(r=>A.push(['warn',`Incident awaiting supervisor review: ${r.reportType} (${fmtDate(r.date)})`,'incidents',r.id]));
   siteRecs('incidents').filter(r=>r.reportType==='Missing Participant'&&r.review!=='Closed').forEach(r=>A.push(['bad',`Missing participant file open (${r.risk||'risk not set'}): daily leadership update required`,'incidents',r.id]));
@@ -1130,42 +1315,74 @@ function renderDash(v){
    INVENTORY
    ========================================================= */
 function invCalc(i){const total=(+i.office||0)+(+i.bath||0)+(+i.guest||0);const par=+i.par||0;
-  const status=total===0&&par===0?'Not Stocked':total===0?'Out of Stock':total<=par?'Low Stock':par===0?'Surplus':'Stocked';return {...i,total,status,order:par>total?par-total:0}}
+  const asset=i.type==='Persistent';const status=par===0?'On demand':total===0?'Out of Stock':total<=par?'Low Stock':'Stocked';
+  const cond=i.cond==='Fair'?'Good':i.cond==='Maintenance'?'Needs Repair':(i.cond||'Good');const op=i.opStatus||(cond==='Needs Repair'?'Needs Maintenance':cond==='Missing'?'Required':'Operational');
+  const order=par>total?par-total:0;return {...i,total,status,order,cond,opStatus:op,cost:order*(+i.price||0),maint:asset&&op!=='Operational'}}
+const money=n=>'$'+(Math.round((+n||0)*100)/100).toFixed(2);
+let invGuide=false;try{invGuide=localStorage.getItem('nh_invGuide')==='1'}catch(e){}
 let invFilter='all';
 function renderInventory(v){
   const k=curSite();const items=INV[k]||[];const calc=items.map(invCalc);
-  let h=`<h1>Inventory &amp; Par Levels<span class="sopref">Guide · Inventory · NH 3.3.4 · 3.3.8</span></h1>
-  <p class="sub">Weekly audit: count the office, bathroom and guest-unit closets and compare against par. An item goes into the restock queue when total stock ≤ par. Counts should match within 5%. Asset write-offs need Operations Manager sign-off.</p>`;
+  let h=`<h1>Inventory &amp; Par Levels<span class="sopref">Inventory SOP · NH 3.3.4 · 3.3.8</span></h1>
+  <p class="sub">Weekly audit: walk room by room (office → staff bathroom → guest unit), update the counts, and record where surplus is stored. Take supplies out of the count for the room you took them from, and add deliveries once they're put away. Par 0 means on demand: never reordered automatically. Asset write-offs need Operations Manager sign-off.</p>`;
   if(!invReady[k]){v.innerHTML=h+`<div class="card empty">Loading inventory…</div>`;return}
   if(!items.length){v.innerHTML=h+`<div class="card empty">No inventory items for ${esc(site().name)} yet.<br><br>${CAN_WRITE?`<button class="btn pri" type="button" id="loadStd">Load the standard 44-item list</button>`:''}</div>`;
     const b=$('#loadStd');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Loading…';try{for(const s of SEED_INV)await putInv(k,seedInvItem(s));toast('Standard list loaded')}catch(e){writeErr(e);b.disabled=false}};return}
-  const low=calc.filter(i=>i.status==='Low Stock').length,out=calc.filter(i=>i.status==='Out of Stock').length;
-  let show=calc;if(invFilter==='restock')show=show.filter(i=>i.status==='Low Stock'||i.status==='Out of Stock');else if(invFilter!=='all')show=show.filter(i=>i.cat===invFilter);
-  h+=`<div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Items tracked</div><div class="v">${calc.length}</div></div>
-   <div class="card kpi"><div class="l">Low stock</div><div class="v" style="color:var(--warn)">${low}</div></div><div class="card kpi"><div class="l">Out of stock</div><div class="v" style="color:var(--bad)">${out}</div></div>
-   <div class="card kpi"><div class="l">Last audit</div><div class="v" style="font-size:16px">${AUDIT?esc(fmtDate(AUDIT.date))+'<div class="meta" style="margin:0">by '+esc(AUDIT.by)+'</div>':'Not yet'}</div></div></div>
+  const cons=calc.filter(i=>i.type!=='Persistent');const low=cons.filter(i=>i.status==='Low Stock').length,out=cons.filter(i=>i.status==='Out of Stock').length;
+  const due=cons.filter(i=>i.order>0),cost=due.reduce((s,i)=>s+i.cost,0),maint=calc.filter(i=>i.maint).length,od=calc.filter(i=>i.status==='On demand').length;
+  let show=calc;if(invFilter==='restock')show=show.filter(i=>i.type!=='Persistent'&&i.order>0);else if(invFilter==='maint')show=show.filter(i=>i.maint);else if(invFilter==='ondemand')show=show.filter(i=>i.status==='On demand');
+  else if(invFilter==='assets')show=show.filter(i=>i.type==='Persistent');else if(invFilter!=='all')show=show.filter(i=>i.cat===invFilter);
+  const kpi=(l,val,c,f)=>`<button type="button" class="card kpi" data-kf="${f}" style="text-align:left;cursor:pointer;border:1px solid var(--line)"><div class="l">${l}</div><div class="v" ${c?`style="color:var(--${c})"`:''}>${val}</div></button>`;
+  h+=`<div class="grid g4" style="margin-bottom:14px">${kpi('Out of stock',out,'bad','restock')}${kpi('Low stock',low,'warn','restock')}
+   ${kpi('Reorder now',`${due.length}<div class="meta" style="margin:0">${cost?money(cost)+' estimated':'add prices for a cost'}</div>`,'','restock')}${kpi('Assets needing attention',maint,maint?'warn':'','maint')}</div>
+  <p class="meta" style="margin:-6px 0 10px">${calc.length} items · ${od} on demand (par 0) · Last weekly audit: ${AUDIT?esc(fmtDate(AUDIT.date))+' by '+esc(AUDIT.by):'not yet'}</p>
   <div class="toolbar"><button class="btn pri" type="button" id="audit">✓ Mark weekly audit complete</button><button class="btn" type="button" id="addInv">＋ Add item</button>
-   <button class="btn" type="button" id="toReq">Send restock queue to Requisitions</button>
-   <select class="chip" id="invFilt" aria-label="Filter inventory"><option value="all">All categories</option><option value="restock" ${invFilter==='restock'?'selected':''}>Restock queue only</option>${INV_CATS.map(c=>`<option ${invFilter===c?'selected':''}>${c}</option>`).join('')}</select>
+   <button class="btn" type="button" id="draftMail">✉ Draft restock email</button><button class="btn" type="button" id="toReq">Send restock queue to Requisitions</button>
+   <select class="chip" id="invFilt" aria-label="Filter inventory"><option value="all">All stock</option>${[['restock','Restock queue'],['maint','Assets needing attention'],['assets','Persistent assets'],['ondemand','On demand (par 0)']].map(([v2,l])=>`<option value="${v2}" ${invFilter===v2?'selected':''}>${l}</option>`).join('')}${INV_CATS.map(c=>`<option ${invFilter===c?'selected':''}>${c}</option>`).join('')}</select>
+   <label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="invGuide" ${invGuide?'checked':''}> Show storage locations</label>
    <button class="btn sm" type="button" id="invCsv">⇩ CSV</button></div>
-  <div class="tblwrap inv"><table><thead><tr><th>ID</th><th>Item</th><th>Type</th><th>Freq.</th><th>Office</th><th>Bathroom</th><th>Guest</th><th>Total</th><th>Par</th><th>Status</th><th>To order</th><th>Condition</th><th></th></tr></thead><tbody>`;
-  let lastCat='';
+  <div class="tblwrap inv"><table><thead><tr><th>Item</th><th>Freq.</th><th>Office</th><th>Bathroom</th><th>Guest</th><th>Total</th><th>Par</th><th>Status</th><th>To order</th><th>Unit price</th><th>Condition / status</th><th></th></tr></thead><tbody>`;
+  let lastCat='';const ro=CAN_WRITE?'':'disabled';
   for(const i of show.sort((a,b)=>INV_CATS.indexOf(a.cat)-INV_CATS.indexOf(b.cat)||a.id.localeCompare(b.id))){
-    if(i.cat!==lastCat){h+=`<tr class="catrow"><td colspan="13">${esc(i.cat)}</td></tr>`;lastCat=i.cat}
-    const n=f=>`<input type="number" min="0" inputmode="numeric" value="${esc(i[f])}" data-inv="${esc(i.id)}" data-f="${f}" aria-label="${f} for ${esc(i.item)}">`;
-    h+=`<tr><td class="meta" style="margin:0;white-space:nowrap">${esc(i.id)}</td><td>${esc(i.item)}</td><td>${esc(i.type)}</td><td>${esc(i.freq)}</td><td>${n('office')}</td><td>${n('bath')}</td><td>${n('guest')}</td><td><b>${i.total}</b></td><td>${n('par')}</td><td>${pill(i.status)}</td><td>${i.order||''}</td>
-     <td><select data-inv="${esc(i.id)}" data-f="cond" aria-label="Condition of ${esc(i.item)}">${['Good','Fair','Maintenance'].map(o=>`<option ${o===i.cond?'selected':''}>${o}</option>`).join('')}</select></td>
+    if(i.cat!==lastCat){h+=`<tr class="catrow"><td colspan="12">${esc(i.cat)}</td></tr>`;lastCat=i.cat}
+    const n=f=>`<span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap">${ro?'':`<button type="button" class="btn sm ghost" data-step="-1" data-sid="${esc(i.id)}" data-f="${f}" aria-label="One fewer ${esc(i.item)} (${f})" style="padding:2px 6px">−</button>`}<input type="number" ${ro} min="0" inputmode="numeric" value="${esc(i[f])}" data-inv="${esc(i.id)}" data-f="${f}" aria-label="${f} count for ${esc(i.item)}" style="width:52px">${ro?'':`<button type="button" class="btn sm ghost" data-step="1" data-sid="${esc(i.id)}" data-f="${f}" aria-label="One more ${esc(i.item)} (${f})" style="padding:2px 6px">+</button>`}</span>`;
+    const asset=i.type==='Persistent';
+    const sel=(f,opts,val,lab)=>`<select ${ro} data-inv="${esc(i.id)}" data-f="${f}" aria-label="${lab} of ${esc(i.item)}">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
+    h+=`<tr><td><b style="font-weight:600">${esc(i.item)}</b><div class="meta" style="margin:0">${esc(i.id)} · ${esc(i.type)}${asset&&i.assetLoc?' · '+esc(i.assetLoc):''}</div>
+      ${invGuide?`<input ${ro} data-inv="${esc(i.id)}" data-f="storage" value="${esc(i.storage||'')}" placeholder="Where is it kept? Where is surplus stored?" aria-label="Storage location for ${esc(i.item)}" style="width:100%;min-width:200px;margin-top:4px">`:''}</td>
+     <td>${esc(i.freq)}</td><td>${n('office')}</td><td>${n('bath')}</td><td>${n('guest')}</td><td><b>${i.total}</b></td><td><input type="number" ${ro} min="0" value="${esc(i.par)}" data-inv="${esc(i.id)}" data-f="par" aria-label="Par level for ${esc(i.item)}" style="width:52px"></td>
+     <td>${asset?'<span class="meta" style="margin:0">Asset</span>':pill(i.status)}</td><td>${!asset&&i.order?i.order:''}</td>
+     <td><input type="number" ${ro} min="0" step="0.01" value="${esc(i.price??'')}" data-inv="${esc(i.id)}" data-f="price" aria-label="Unit price for ${esc(i.item)}" style="width:72px"></td>
+     <td style="white-space:nowrap">${sel('cond',ASSET_COND,i.cond,'Condition')}${asset?' '+sel('opStatus',ASSET_STATUS,i.opStatus,'Status')+' '+sel('assetLoc',['',...ASSET_LOCS],i.assetLoc||'','Location'):''}</td>
      <td>${CAN_ADMIN?`<button class="btn sm ghost danger" type="button" data-rm="${esc(i.id)}" aria-label="Remove ${esc(i.item)}">✕</button>`:''}</td></tr>`}
   v.innerHTML=h+`</tbody></table></div>`;
-  $('#invFilt').onchange=e=>{invFilter=e.target.value;render()};$('#invCsv').onclick=exportInvCSV;$('#audit').onclick=markAudit;$('#addInv').onclick=addInvItem;$('#toReq').onclick=restockToReq;
-  v.querySelectorAll('[data-inv]').forEach(el=>el.onchange=async()=>{const it=clone(items.find(x=>x.id===el.dataset.inv));const f=el.dataset.f;it[f]=f==='cond'?el.value:(el.value===''?0:Math.max(0,+el.value));it.updatedAt=new Date().toISOString();it.updatedBy=me();try{await putInv(k,it)}catch(e){writeErr(e)}});
+  $('#invFilt').onchange=e=>{invFilter=e.target.value;render()};$('#invCsv').onclick=exportInvCSV;$('#audit').onclick=markAudit;$('#addInv').onclick=addInvItem;$('#toReq').onclick=restockToReq;$('#draftMail').onclick=draftRestockEmail;
+  $('#invGuide').onchange=e=>{invGuide=e.target.checked;try{localStorage.setItem('nh_invGuide',invGuide?'1':'0')}catch(x){}render()};
+  v.querySelectorAll('[data-kf]').forEach(b=>b.onclick=()=>{invFilter=b.dataset.kf;render()});
+  const save=async(id,f,val)=>{const it=clone(items.find(x=>x.id===id));it[f]=val;if(f==='cond'&&it.type==='Persistent'&&!items.find(x=>x.id===id).opStatus)it.opStatus=val==='Needs Repair'?'Needs Maintenance':val==='Missing'?'Required':'Operational';
+    it.updatedAt=new Date().toISOString();it.updatedBy=me();try{await putInv(k,it)}catch(e){writeErr(e)}};
+  const TXT=['cond','opStatus','assetLoc','storage'];
+  v.querySelectorAll('[data-inv]').forEach(el=>el.onchange=()=>{const f=el.dataset.f;save(el.dataset.inv,f,TXT.includes(f)?el.value.trim():f==='price'?(el.value===''?'':Math.max(0,+el.value)):(el.value===''?0:Math.max(0,Math.round(+el.value))))});
+  v.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const it=items.find(x=>x.id===b.dataset.sid);save(it.id,b.dataset.f,Math.max(0,(+it[b.dataset.f]||0)+ +b.dataset.step))});
   v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{const it=items.find(x=>x.id===b.dataset.rm);if(await ask({title:`Remove “${it.item}”?`,body:'Asset write-offs need Operations Manager sign-off.',ok:'Remove',danger:true}))try{await delInvItem(k,it.id)}catch(e){writeErr(e)}})}
-async function addInvItem(){const a=await ask({title:'Add inventory item',ok:'Add item',fields:[{l:'Item name',req:1},{l:'Category',o:INV_CATS,v:'Office Supplies'},{l:'Type',o:['Consumable','Persistent'],v:'Consumable'},{l:'Replacement frequency',o:['Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually'],v:'Monthly'},{l:'Par level',t:'number',v:2}]});
+async function draftRestockEmail(){const k=curSite(),s=site();const calc=(INV[k]||[]).map(invCalc).filter(i=>i.type!=='Persistent');
+  const line=i=>`- ${i.item}: order ${i.order} (have ${i.total}, par ${i.par})${i.price?` · ${money(i.price)} each, ${money(i.cost)}`:''}`;
+  const crit=calc.filter(i=>i.status==='Out of Stock'),rec=calc.filter(i=>i.status==='Low Stock'),od=calc.filter(i=>i.status==='On demand').length;
+  const tot=[...crit,...rec].reduce((a,i)=>a+i.cost,0);
+  const subject=`${s.name} Inventory Check - Weekly Restock List (${fmtDate(today())})`;
+  const body=[`Hello,`,``,`Here is this week's restock list for ${s.name}.`,``,`CRITICAL / WHAT WE NEED (out of stock)`,...(crit.length?crit.map(line):['- Nothing out of stock']),``,
+    `RECOMMENDED / WHAT WE COULD USE (low stock)`,...(rec.length?rec.map(line):['- Nothing low']),``,tot?`Estimated total: ${money(tot)}`:'',
+    od?`${od} on-demand item${od>1?'s are':' is'} (par 0) left off this list to avoid unnecessary spending.`:'',``,`Thank you,`,`${s.name} team${me()?' ('+me()+')':''}`].filter((x,i,a)=>x!==''||a[i-1]!=='').join('\n');
+  const to=s.restockEmail||'';
+  const r=await ask({title:'Weekly restock email',ok:'Copy text',cancel:'Close',body:`<b>To:</b> ${to?esc(to):'<i>not set. Add it under Site Info &amp; Contacts.</i>'}<br><b>Subject:</b> ${esc(subject)}<textarea readonly style="width:100%;min-height:260px;margin-top:8px;font:13px/1.4 ui-monospace,monospace;border:1px solid var(--line);border-radius:8px;padding:8px">${esc(body)}</textarea>
+    ${to?`<a class="btn sm" style="margin-top:8px;display:inline-block" href="mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}">Open in my email app</a>`:''}`});
+  if(r)copyText(`Subject: ${subject}\n\n${body}`,'Restock email copied')}
+async function addInvItem(){const a=await ask({title:'Add inventory item',ok:'Add item',fields:[{l:'Item name',req:1},{l:'Category',o:INV_CATS,v:'Office Supplies'},{l:'Type',o:['Consumable','Persistent'],v:'Consumable'},{l:'Replacement frequency',o:['Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually'],v:'Monthly'},{l:'Par level (0 = on demand, never reordered)',t:'number',v:2},{l:'Unit price (optional)',t:'number',v:''},{l:'Storage location / surplus notes (optional)',v:''}]});
   if(!a)return;const k=curSite();const n=(INV[k]||[]).reduce((m,i)=>Math.max(m,+String(i.id).replace(/\D/g,'')||0),0)+1;
-  try{await putInv(k,{id:'INV-'+String(n).padStart(3,'0'),type:a[2],cat:a[1],item:a[0].trim(),freq:a[3],office:0,bath:0,guest:0,par:Math.max(0,+a[4]||0),cond:'Good'});toast('Item added')}catch(e){writeErr(e)}}
+  try{await putInv(k,{id:'INV-'+String(n).padStart(3,'0'),type:a[2],cat:a[1],item:a[0].trim(),freq:a[3],office:0,bath:0,guest:0,par:Math.max(0,+a[4]||0),price:a[5]===''?'':Math.max(0,+a[5]||0),storage:a[6].trim(),cond:a[2]==='Persistent'?'New':'Good',...(a[2]==='Persistent'?{opStatus:'Operational'}:{})});toast('Item added')}catch(e){writeErr(e)}}
 async function markAudit(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');try{await putAudit({date:today(),by:me(),site:curSite()});toast('Weekly audit recorded')}catch(e){writeErr(e)}}
 async function restockToReq(){if(!me())return toast('Choose your name in “Staff on shift” first.','err');
-  const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0);const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied','Not approved'].includes(r.status)).map(r=>r.item));
+  const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0&&i.type!=='Persistent');const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied','Not approved'].includes(r.status)).map(r=>r.item));
   const add=q.filter(i=>!open.has(i.item));if(!add.length)return toast('The restock queue is already in Requisitions.');
   if(!await ask({title:`Create ${add.length} requisition(s)?`,body:'One for each item at or below par that does not already have an open requisition.',ok:'Create'}))return;
   const now=new Date().toISOString();try{for(const i of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:i.item,qty:i.order,reason:`Restock to par (${i.total}/${i.par})`,priority:i.status==='Out of Stock'&&/Safety/.test(i.cat)?'High':'Medium',status:'Requested'});
@@ -1254,7 +1471,8 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
    <div class="fld"><label for="si_addr">Address</label><input id="si_addr" ${ro} value="${esc(s.address)}"></div>
    <div class="fld"><label for="si_phone">Site phone</label><input id="si_phone" ${ro} type="tel" value="${esc(s.sitePhone)}"></div>
    <div class="fld"><label for="si_police">Police non-emergency</label><input id="si_police" ${ro} type="tel" value="${esc(s.nonEmergency)}"></div>
-   <div class="fld"><label for="si_open">Opened</label><input id="si_open" ${ro} type="date" value="${esc(s.opened)}"></div></div>
+   <div class="fld"><label for="si_open">Opened</label><input id="si_open" ${ro} type="date" value="${esc(s.opened)}"></div>
+   <div class="fld"><label for="si_restock">Restock orders go to (email)</label><input id="si_restock" ${ro} type="email" value="${esc(s.restockEmail||'')}" placeholder="manager@12neighbours.com"></div></div>
   <h2 style="font-size:18px">Contact &amp; escalation directory</h2>
   <div class="tblwrap inv"><table><thead><tr><th>Role</th><th>Contact name</th><th>Phone / email</th><th>Escalate for</th><th></th></tr></thead><tbody>
    ${(s.contacts||[]).map((c,i)=>`<tr>${['role','name','reach','when'].map(f=>`<td><input ${ro} style="width:100%;min-width:${f==='when'?220:150}px" value="${esc(c[f])}" data-c="${i}" data-f="${f}" aria-label="${f} for contact ${i+1}"></td>`).join('')}
@@ -1262,7 +1480,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
   </tbody></table></div>
   <div class="toolbar" style="margin-top:10px">${ro?'':`<button class="btn" type="button" id="addContact">＋ Add contact</button>`}<span class="meta" style="margin:0">Check this directory at each monthly review.</span></div>`;
   const k=curSite();const fld=(id,f,msg)=>{const el=$(id);el.onchange=()=>cfgSave(()=>{CFG.sites[k][f]=el.value.trim()},msg||'Saved')};
-  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');
+  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');
   v.querySelectorAll('[data-c]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[k].contacts[+el.dataset.c][el.dataset.f]=el.value},'Contact saved'));
   v.querySelectorAll('[data-crm]').forEach(b=>b.onclick=async()=>{const c=s.contacts[+b.dataset.crm];if(await ask({title:'Remove this contact?',body:esc(`${c.role||''}${c.name?': '+c.name:''}`),ok:'Remove',danger:true}))cfgSave(()=>{CFG.sites[k].contacts.splice(+b.dataset.crm,1)},'Contact removed')});
   const ac=$('#addContact');if(ac)ac.onclick=()=>cfgSave(()=>{CFG.sites[k].contacts.push({role:'',name:'',reach:'',when:''})})}
@@ -1422,7 +1640,7 @@ function renderSchedule(v){
   const nt=$('#wkNotes');if(nt)nt.onchange=()=>save(d=>{d.notes=nt.value})}
 
 function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>${title}<span class="tag ${tagc}">${tag}</span></h3>${body}</div>`;
-  v.innerHTML=`<h1>SOP Quick Reference</h1><p class="sub">Summaries of the SOPs used most on shift. The binders are the official source: Brown (NH), Red (Safety), White (Handbook), Yellow (Community), Green (G&amp;A).</p>
+  v.innerHTML=`<h1>SOP Quick Reference</h1><p class="sub">Summaries of the SOPs used most on shift. The binders are the official source: Brown (NH), Red (Safety), White (All-Employees Handbook), Yellow (Community), Green (G&amp;A), Blue (Neighbourly Ventures), Pink (Neighbourly Coffee), plus the Inventory SOP and Guest Unit Policy.</p>
   <div class="grid g2">
   ${C('Emergency procedures','NH 3.1.7','t-brown',`<ol><li>Stay calm. Call <b>911</b> for imminent danger, a medical need or a crime.</li><li>Notify another staff member right away. Never respond alone if it feels unsafe.</li><li>Clear the area if needed. Give CPR or Naloxone as needed.</li><li>Give emergency services a clear, calm summary.</li><li>Afterwards: Incident Report within 12 h, debrief with the Site Supervisor, offer staff support, notify agency partners if hospitalised.</li></ol><p><b>Fire:</b> pull the alarm, evacuate to the meeting point, and don't re-enter until cleared.</p>`)}
   ${C('Shift notes: what to log','12N Note Taking Guideline','t-brown',`<p><b>Ask:</b> would this change what staff need to know or do?</p><p><b>Log:</b> meaningful wellness changes, missed scheduled check-ins, requests or commitments that need follow-up, safety concerns, site issues such as a leak or a supply shortage, and completed work that matters to the next shift.</p><p><b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment.</p><p><b>Each entry:</b> date and time, what happened, what staff did, and the outcome. Briefly note completed work that matters to the next shift. Use the location and approved participant identifier when needed.</p><p><b>Write what you observed:</b> for example, “Participant declined room cleaning assistance.” Attribute second-hand information to its source. Quote exact words only when they matter to the response. Leave out guesses, diagnoses and unrelated personal details.</p><p><b>Follow-up:</b> say who will act, what they need to do, and when.</p><p><b>Incidents:</b> escalate urgent concerns first, then file the Incident Report. In the shift log, briefly reference it and note what the incoming team needs to do.</p><p class="meta" style="margin:0"><i>Example:</i> At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order. Evening shift to check the repair status by 6 p.m. and update the participant.</p>`)}
@@ -1437,6 +1655,29 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
   ${C('Unit room checks','NH 3.1.6 · Form v1.0','t-brown',`<p>Every second Thursday, 2–4 PM, with notice posted 48 h ahead. Knock, wait, announce. Visual check only: trash, unsafe electrical items, odours or distress, cleanliness. No opening bins, drawers or bags without immediate risk <i>and</i> supervisor approval.</p><p>Use the official <b>Unit Room Check Form</b>: rate each item P (Pass), FU (Follow-Up) or U (Urgent). Overall status: All Clear / Needs Follow-Up / Urgent. Notify Management for anything urgent, unapproved appliances or electrical panel concerns. Test smoke detectors on the first Thursday of the month. Offer a private check-in within 48 h when follow-up is needed.</p>`)}
   ${C('Shift handoff','NH 3.3.5','t-brown',`<p>Final 15 minutes of the shift, with a 10-minute overlap when possible. Cover participant updates, site updates, incidents (even low-level) and the “to follow up” list.</p><p>Shifts: Day 08:00–16:00 · Evening 16:00–00:00 · Night 00:00–08:00.</p>`)}
   ${C('Safety walkthroughs','NH 3.1.5 · 3.1.8','t-brown',`<p><b>Morning</b> 8–10 AM and <b>Midday</b> 12–2 PM: courtyard and paths, social areas, shared bathrooms/showers/laundry, Admin Building, micro-home exteriors.</p><p><b>Evening</b> 9:30–10 PM: emergency exits latched and locked, courtyard clear, shared spaces, Admin restock needs. Quiet hours reminder only. Participants don't have to leave.</p><p><b>Gate alarm:</b> arm, disarm and re-arm it exactly as set out in NH SOP 3.1.9 (in the binder). Report every activation as a near miss.</p>`)}
+  ${C('When to call police','Safety · Incident Response Matrix','t-red',`<table>
+   <tr><td><b>Firearm present</b></td><td>Don't approach. Evacuate if you can. <b>Call 911 now.</b> Notify a supervisor.</td></tr>
+   <tr><td><b>Other weapon</b></td><td>Keep your distance and disengage. 911 if the threat is active; non-emergency if they won't leave.</td></tr>
+   <tr><td><b>Assault / threats, fighting</b></td><td>Never step in physically. Ask them to leave if it's safe. 911 if anyone is in immediate danger, otherwise non-emergency.</td></tr>
+   <tr><td><b>Harassment</b></td><td>Name the behaviour calmly and ask for it to stop. Police only if it becomes threats or violence.</td></tr>
+   <tr><td><b>Substance-related disturbance, trespassing, refusing to leave</b></td><td>Ask them to leave if it's safe and don't escalate. Non-emergency line if they refuse.</td></tr></table>
+   <p>Every case: consider a No Trespass notice, then report and document it in an Incident Report.</p>`)}
+  ${C('Needle-stick or sharps injury','Safety · SOP','t-red',`<ol><li>Wash the area with soap and warm water. Let it bleed gently on its own; don't squeeze. Flush eyes, nose or mouth with clean water for several minutes.</li><li>Tell a supervisor right away. They arrange a ride to the emergency department (911 if there is urgent medical distress).</li><li>Go to hospital as soon as possible, for an exposure assessment and preventive treatment if needed.</li><li>Keep others away from the area. Don't recap or handle the sharp.</li><li>Complete an Incident Report the same day.</li></ol><p>The manager checks in within 24 hours and supports appointments and WorkSafeNB reporting.</p>`)}
+  ${C('Picking up a used needle','Safety · Community SOP','t-red',`<ol><li>Put on puncture-resistant gloves first.</li><li>Pick it up by the barrel with the sharp end away from you. Never bend, break or recap it.</li><li>Put it straight into a sharps bin. Never in the garbage, recycling or a toilet.</li><li>Remove the gloves and wash your hands.</li><li>Log the date, time, exact location and what you did.</li></ol><p>Only trained staff dispose of sharps. If no one trained is available, keep the area clear and wait for support.</p>`)}
+  ${C('Fire','Safety · Fire Evacuation','t-red',`<p><b>Small fire:</b> have someone call 911 while you get the ABC extinguisher. <b>P</b>ull the pin, <b>A</b>im at the base of the fire nearest you, <b>S</b>queeze, <b>S</b>weep. If it empties and the fire isn't out, confirm 911 was called.</p>
+   <p><b>Evacuate:</b> sound the alarm, leave everything, close doors behind you and help anyone who needs it. Tell 911 the exact unit or space, what you see and whether anyone is trapped.</p>
+   <p><b>At the meeting point:</b> take a headcount from the sign-in sheets and in/out log, report anyone missing to responders, keep the access route clear, and don't re-enter until responders say it's safe.</p>
+   <p><b>Trapped:</b> stay low, block gaps under the door, signal from a window and call 911 with your location.</p>`)}
+  ${C('Severe weather','Safety · SOP','t-red',`<p><b>Before:</b> watch Environment Canada alerts. Secure outdoor furniture, close windows and doors, charge phones, and check the 3-day supply of water, food, flashlights, batteries, blankets and first aid.</p><p><b>During:</b> shelter in place unless authorities say to evacuate. Use flashlights, never candles. Avoid floodwater. In extreme cold, check on participants with health concerns and keep paths clear of snow and ice.</p><p><b>After:</b> look for downed lines, gas leaks, fallen trees and flooding, and report them. Document damage with the Operations Lead and debrief.</p>`)}
+  ${C('Security threat / lockdown','Safety · Community Security Threat','t-red',`<ol><li>Keep yourself safe and assess from a distance. Trust your instincts.</li><li>Call 911: location, description, weapons seen, direction of travel.</li><li>If a lockdown is needed: everyone into the nearest building, lock doors and windows, lights off, stay quiet and out of sight, phones silenced.</li><li>Secure access points if it is safe. One person speaks with police. Use text or approved apps for updates; stay off social media.</li><li>Evacuate only if police direct it, then take a headcount.</li><li>Wait for police to give the all-clear. Offer first aid and emotional support, then debrief and document.</li></ol>`)}
+  ${C('Power, water or heat outage','Safety · Utility Failure','t-red',`<p>Find out whether it affects one unit or the whole site. Check breakers if you can, report it to the utility, and tell the on-call manager. Tell participants what is happening and what to do.</p><p><b>Power:</b> flashlights, not candles. Unplug electronics, keep fridges closed, and check on anyone who relies on powered medical equipment or refrigerated medication. Set up a warm common area and blankets in cold weather.</p><p><b>Water:</b> use stored water for drinking and hygiene. Arrange delivery if it lasts beyond 24 hours.</p><p>Call 911 for injuries or immediate danger, such as flooding or fire risk. Afterwards, inspect for damage and restock emergency supplies.</p>
+   <p class="meta">NB Power emergency 1-800-663-6272 · Environmental spills 1-800-565-1633 · WorkSafeNB 1-800-999-9775</p>`)}
+  ${C('Spills, electrical problems, equipment','Safety · Emergency Response','t-red',`<p><b>Chemical spill:</b> get the spill kit, put on its PPE, clean up, then report it to a supervisor. Large spills are reported to the Department of Environment.</p><p><b>Electrical emergency:</b> turn off the power if safe, then report it right away.</p><p><b>Equipment fault:</b> stop using it, disconnect the power, then report it and make a work order.</p><p><b>First aid:</b> make the area safe, call the designated first aider, and call 911 for anyone unconscious or seriously hurt. Never let an injured person drive themselves to hospital.</p>`)}
+  ${C('New hazardous products & SDS','Safety · WHMIS','t-red',`<p>When a new cleaning or hazardous product arrives: send its Safety Data Sheet to the Safety Committee (ask the supplier if it didn't come with the shipment), and make sure it has a WHMIS workplace label: product name, precautions and a reference to the SDS.</p><p>The site's SDS binder is in the safety zone and must stay current. Participants never keep cleaning products: staff dispense measured amounts.</p>`)}
+  ${C('Monthly safety audit','Safety · NH Safety Audit Checklist','t-red',`<p>Once a month a supervisor or designated staff member walks the whole site with the <a href="#safetyaudit">Monthly Safety Audit</a>, scoring each area Yes / No / N/A. Every No becomes an action item with an owner and a due date, and repairs also get a work order. Results go to the Safety Committee's monthly meeting.</p>`)}
+  ${C('First aid kits','Safety · Kit Contents Checklist','t-red',`<p>Check every kit weekly and after each use with the <a href="#firstaid">First Aid Kit Check</a>. Minimums include a full box of gloves, 2–3 CPR face shields, <b>2–4 naloxone kits</b>, wipes, saline, bandages and dressings, tape, eye pads and eye wash, scissors, tweezers, burn gel and ice packs. Low items can go straight to Requisitions.</p>`)}
+  ${C('Guest Unit','Guest Unit Policy','t-brown',`<p>Open <b>8:00 AM – 8:00 PM</b>. Last booking starts at <b>6:00 PM</b>, and bookings are <b>2 hours</b> at most. Book ahead when possible: the participant and their guest both sign the sheet in the yellow binder, and staff record it under <a href="#guestunit">Guest Unit Bookings</a>.</p><ul><li>The guest stays with the participant the whole time and is never in the unit alone.</li><li>Former 12 Neighbours participants can't be guests.</li><li>It is for approved visits only, not a warming space. No smoking.</li></ul><p>When the guidelines aren't followed, document what happened. A manager decides on any pause in Guest Unit privileges.</p>`)}
+  ${C('Inventory routine','Inventory SOP','t-brown',`<p><b>Weekly audit:</b> office → staff bathroom → guest unit. Update the counts with the − / + buttons, then mark the audit complete.</p><p><b>Taking supplies:</b> subtract from the room you took them from. <b>Deliveries:</b> put them away, then add them to that room.</p><p><b>Par 0</b> means on demand: never reordered automatically. Keep storage notes current when surplus moves.</p><p><b>Ordering:</b> <i>Draft restock email</i> lists out-of-stock items as Critical and low-stock items as Recommended, ready to send to the site's restock contact. Broken equipment: set its condition to Needs Repair and its status to Needs Maintenance or Required, with a note.</p>`)}
   </div>`}
 
 /* =========================================================
@@ -1513,12 +1754,12 @@ function flatFor(c,d){
   const sm=c.match(/^sites\/([^/]+)\/(staff|participants)$/);
   if(sm){const sn=S().sites[sm[1]]?.name||sm[1];return sm[2]==='staff'?{Site:sn,Name:d.name,Role:d.role,Phone:d.phone,Email:d.email,Start:d.start||'',End:d.end||'',Status:d.status}
     :{Site:sn,Participant:d.name,Status:d.status==='Active'?'Current':'Past',Unit:d.unit,'Moved in':d.moveIn,'Moved out':d.moveOut,'Exit reason':d.exitReason,'Approved appliances':d.appliances,Notes:d.notes}}
-  if(c.startsWith('inv-')){const i=invCalc(d);return {Site:S().sites[c.slice(4)]?.name||c.slice(4),'Inventory ID':i.id,Category:i.cat,Item:i.item,Type:i.type,Frequency:i.freq,'Office Qty':i.office,'Bathroom Qty':i.bath,'Guest Unit Qty':i.guest,'Total Stock':i.total,'Par Level':i.par,'Stock Status':i.status,'Qty to Order':i.order,Condition:i.cond}}
+  if(c.startsWith('inv-')){const i=invCalc(d);return {Site:S().sites[c.slice(4)]?.name||c.slice(4),'Inventory ID':i.id,Category:i.cat,Item:i.item,Type:i.type,Frequency:i.freq,'Office Qty':i.office,'Bathroom Qty':i.bath,'Guest Unit Qty':i.guest,'Total Stock':i.total,'Par Level':i.par,'Stock Status':i.type==='Persistent'?'':i.status,'Qty to Order':i.type==='Persistent'?'':i.order,'Unit Price':i.price??'','Reorder Cost':i.cost||'',Condition:i.cond,'Operational Status':i.type==='Persistent'?i.opStatus:'','Assigned Location':i.assetLoc||'','Storage Notes':i.storage||''}}
   return {}}
 const csvCell=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
 const toCsv=rows=>'﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 function exportCSV(m){download(`12N-${M[m].sheet.replace(/\W+/g,'-')}-${today()}.csv`,toCsv(flatRows(m)))}
-const invRows=k=>[['Inventory ID','Inventory Type','Category','Item','Replacement Frequency','Office Qty','Bathroom Qty','Guest Unit Qty','Total Stock','Par Level','Stock Status','Qty to Order','Condition'],...(INV[k]||[]).map(invCalc).map(i=>[i.id,i.type,i.cat,i.item,i.freq,i.office,i.bath,i.guest,i.total,i.par,i.status,i.order,i.cond])];
+const invRows=k=>[['Inventory ID','Inventory Type','Category','Item','Replacement Frequency','Office Qty','Bathroom Qty','Guest Unit Qty','Total Stock','Par Level','Stock Status','Qty to Order','Unit Price','Reorder Cost','Condition','Operational Status','Assigned Location','Storage Notes'],...(INV[k]||[]).map(invCalc).map(i=>[i.id,i.type,i.cat,i.item,i.freq,i.office,i.bath,i.guest,i.total,i.par,i.type==='Persistent'?'':i.status,i.type==='Persistent'?'':i.order,i.price??'',i.cost||'',i.cond,i.type==='Persistent'?i.opStatus:'',i.assetLoc||'',i.storage||''])];
 function exportInvCSV(){download(`12N-Inventory-${today()}.csv`,toCsv(invRows(curSite())))}
 function exportExcel(){
   if(!window.XLSX){toast('The Excel exporter did not load. Use the CSV buttons on each log instead.','err');return}

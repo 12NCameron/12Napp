@@ -26,10 +26,11 @@ var TAB_NAMES = {
   notes: 'Notes Data', handoff: 'Shift Handoff Log', patrols: 'Perimeter Check Data', incidents: 'Incident Reports',
   visitors: 'Visitor Log', roomchecks: 'Room Operations Data', wellness: 'Room Wellness Checks',
   requests: 'Participant Requests', intakes: 'Intake Data', engagement: 'Participant Engagement Data',
-  workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log'
+  workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log',
+  guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks'
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
-var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs' };
+var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs', safetyaudit: 'Safety Audits' };
 var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants|schedule))$/;
 var ID_RE = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 var REQ_EMAIL = null; // set per request from the verified Google sign-in
