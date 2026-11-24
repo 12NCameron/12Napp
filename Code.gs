@@ -32,11 +32,13 @@ var TAB_NAMES = {
   workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log',
   guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks',
   trespass: 'No-Trespass List', notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Stabilization & Improvement Plans',
-  rent: 'Rent Checks', pets: 'Pet Registrations', parking: 'Parking Concerns', entries: 'Emergency Entry Records'
+  rent: 'Rent Checks', pets: 'Pet Registrations', parking: 'Parking Concerns', entries: 'Emergency Entry Records',
+  escalations: 'Resident Escalations', foodbank: 'Foodbank Orders'
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
 var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs', safetyaudit: 'Safety Audits',
-  notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Support Plans', entries: 'Emergency Entry Records' };
+  notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Support Plans', entries: 'Emergency Entry Records',
+  escalations: 'Resident Escalations' };
 var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants|schedule))$/;
 var ID_RE = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 var REQ_EMAIL = null; // set per request from the verified Google sign-in
@@ -177,6 +179,14 @@ function checkConfigChange_(u, data) {
     if ((o.kind || 'shelter') !== (n.kind || 'shelter')) throw new Error('DENIED: Only administrators can change the type of site.');
   });
 }
+/* Resident Escalation forms: who may complete each one (NH Behaviour Escalation Framework). */
+var ESC_MIN = { 'Room Status Update': 'Supervisor', 'Community Accountability Review (CAR)': 'Supervisor', '10-Day Final Improvement Notice': 'Supervisor',
+  'Debrief & lessons learned': 'Supervisor', 'Urgent Warning (Final Written Notice)': 'Manager', 'Eviction Request': 'Manager' };
+function checkEscalation_(u, c, id, data) {
+  if (ESC_MIN[data.step]) need_(u, ESC_MIN[data.step], 'The ' + data.step + ' is completed by a ' + ESC_MIN[data.step].toLowerCase() + ' or above.');
+  var old = readRecord_(c, id) || {};
+  if ((old.decision || 'Pending') !== (data.decision || 'Pending')) need_(u, 'Manager', 'Only managers record the Program Review decision.');
+}
 /* Supervisors build drafts and submit them; publishing (what facilitators see) needs a Manager. */
 var PUBLISH_FIELDS = ['publishedDays', 'publishedAt', 'publishedBy', 'published'];
 function checkScheduleChange_(u, c, id, data) {
@@ -277,6 +287,7 @@ function put(c, id, json, flatJson) {
   var data = JSON.parse(json);
   if (c === 'config') checkConfigChange_(u, data);
   else if (/^sites\/[^/]+\/schedule$/.test(c)) checkScheduleChange_(u, c, id, data);
+  else if (c === 'log-escalations') checkEscalation_(u, c, id, data);
   else if (c.indexOf('sites/') === 0) need_(u, 'Manager', 'Only managers can change staff rosters and participants.');
   if (!siteOk_(allowedIds_(u), siteOf_(c, id, data))) throw new Error('DENIED: Your account is not set up for that site.');
   var flat = {};

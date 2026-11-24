@@ -252,7 +252,7 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
 /* =========================================================
    STORE — shared db when available, else this browser only
    ========================================================= */
-const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','requests','intakes','engagement','workorders','requisitions'];
+const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','escalations','foodbank','requests','intakes','engagement','workorders','requisitions'];
 const AUDIT_KEYS=['sz','admin','laundry','baths','units','kitchen','utility','life','house','env','bldg','sec'];
 const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object.entries(o).filter(([,x])=>x&&x.v==='No').map(([k])=>k));
 const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
@@ -292,6 +292,20 @@ function nextInspection(p){const list=siteRecs('inspections').filter(r=>forResid
   return {due:addMonthsISO(last.date,g>=2?12:6)}}
 const housingResidents=()=>pplOf(curSite()).filter(p=>p.status==='Active');
 const parkingNext=r=>r.status!=='Open'?'':!r.first?'Give the first notice':!r.second?(addDays(r.first,7)<=today()?'7 days passed: give the second notice':`Second notice from ${fmtDate(addDays(r.first,7))}`):!r.review?(addDays(r.second,3)<=today()?'72 hours passed: management review':`Review from ${fmtDate(addDays(r.second,3))}`):r.review==='Removal approved'&&!r.removed?'Arrange licensed towing':'';
+
+/* ---------- NH Behaviour Escalation Framework: the Resident Escalation forms ---------- */
+const ESC_FORMS=['Room Status Update','Written Warning','Community Accountability Review (CAR)','Urgent Warning (Final Written Notice)','10-Day Final Improvement Notice','Eviction Request','Debrief & lessons learned'];
+const ESC_MIN={'Room Status Update':'Supervisor','Community Accountability Review (CAR)':'Supervisor','10-Day Final Improvement Notice':'Supervisor','Debrief & lessons learned':'Supervisor','Urgent Warning (Final Written Notice)':'Manager','Eviction Request':'Manager'};
+const ESC_WHO={'Room Status Update':'Safety & Operations Lead or a supervisor','Written Warning':'any staff member','Community Accountability Review (CAR)':'the Safety & Operations Lead with the Site Manager','Urgent Warning (Final Written Notice)':'a Site Manager','10-Day Final Improvement Notice':'a supervisor or manager','Eviction Request':'a Site Manager, for the NH Participant Program Review','Debrief & lessons learned':'the NH Operations Review'};
+const isStep=(...s)=>r=>s.includes(r.step);
+const isRoomForm=isStep('Room Status Update','10-Day Final Improvement Notice'),isWW=isStep('Written Warning'),isUW=isStep('Urgent Warning (Final Written Notice)'),isCAR=isStep('Community Accountability Review (CAR)'),isEV=isStep('Eviction Request'),isDebrief=isStep('Debrief & lessons learned');
+const escOpenDate=r=>r.status==='Closed'?'':r.step==='10-Day Final Improvement Notice'?r.deadline:r.step==='Room Status Update'?r.nextCheck:isCAR(r)?r.carFollow:'';
+const escDetail=r=>isWW(r)?r.level:isUW(r)?r.urgentType:isCAR(r)?`${r.carForm||''}${r.outcome?' · '+r.outcome:''}`:isRoomForm(r)?r.tier:isEV(r)?`${(r.evType||'').split(' (')[0]} · ${r.decision||'Pending'}`:'';
+/* Foodbank: order dates are set per site; orders go in online 8–11 AM, pickup the Friday of that week. */
+const fbDates=()=>String(site().foodbankDates||'').split(/[,\s]+/).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
+const fbCycle=()=>{const t0=today(),ds=fbDates();return ds.find(d=>d>=addDays(t0,-4))||''};
+const fbPickup=d=>{const n=(5-dow(d)+7)%7;return addDays(d,n)};
+const fbOf=(p,d)=>siteRecs('foodbank').filter(r=>forResident(r,p)&&(r.date||'').slice(0,7)===d.slice(0,7)).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
 const toMin=s=>{const m=/^(\d\d):(\d\d)/.exec(s||'');return m?+m[1]*60+ +m[2]:null};
 let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,CAN_SCHEDULE=true,MY_UID=null;
 /* Layers, lowest to highest. CAN_ADMIN = Manager and up (kept name), CAN_ORG = Administrator. */
@@ -403,7 +417,7 @@ const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',hand
   requisitions:r=>['Received','Denied','Not approved'].includes(r.status),
   guestunit:r=>r.status!=='Booked'&&r.status!=='In use'||r.date<today(),safetyaudit:r=>r.status==='Completed'||!auditNo(r).length,firstaid:()=>true,
   notices:r=>r.status!=='Active',inspections:()=>true,plans:r=>r.outcome&&r.outcome!=='Open',rent:()=>true,pets:r=>r.status!=='Requested',
-  parking:r=>r.status!=='Open',entries:r=>r.told!=='Not yet'&&r.ir!=='Not yet',trespass:r=>r.status!=='Active'};
+  parking:r=>r.status!=='Open',escalations:r=>r.status==='Closed',foodbank:r=>r.status==='Picked up'||(r.date||'')<addDays(today(),-40),entries:r=>r.told!=='Not yet'&&r.ir!=='Not yet',trespass:r=>r.status!=='Active'};
 function archiveCandidates(months){const cutoff=addDays(today(),-Math.round(months*30.44));const ok=new Set(allowedSites());
   return Object.fromEntries(MODS.map(m=>[m,recs(m).filter(r=>ok.has(r.site)&&recDate(r)&&recDate(r)<cutoff&&IS_CLOSED[m](r))]))}
 async function archiveEntries(m,list,progress){
@@ -533,7 +547,7 @@ notes:{title:'Shift Notes',nav:'Shift Notes',sheet:'Notes Data',sop:'Guide · No
   {k:'escalationNotes',l:'Escalation notes',t:'textarea',full:1,show:r=>r.escalation==='Yes',hint:'Who was told, when and how. If this is an incident, also file an Incident Report within 12 hours.'}],
  cols:['date','time','priority','participant','type','notes','reporter',{l:'Follow-up',f:r=>r.followUp!=='Yes'?'':r.followUpStatus==='Resolved'?pill('Resolved'):followDue(r)?pill('Overdue','bad'):pill(r.followUpWho?`Open · ${r.followUpWho}`:'Open','warn')}],
  chips:[{l:'Today',f:r=>r.date===today()},{l:'Open follow-ups',f:r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'},{l:'High priority',f:r=>r.priority==='HIGH'},{l:'Escalated',f:r=>r.escalation==='Yes'}]},
-handoff:{title:'Shift Handoff',nav:'Shift Handoff',sheet:'Shift Handoff Log',sop:'NH 3.3.5',
+handoff:{title:'Shift Handoff',nav:'Shift Handoff',sheet:'Shift Handoff Log',sop:'NH 3.3.5 · Shift Change sheet',custom:'shiftChange',
  desc:'Done in the final 15 minutes of each shift, with a 10-minute in-person overlap when possible. If critical safety or tenant matters remain open, do not leave until the incoming lead accepts the handoff.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'shift',l:'Shift ending',t:'select',o:SHIFTS,def:D.shift,req:1},
@@ -542,9 +556,12 @@ handoff:{title:'Shift Handoff',nav:'Shift Handoff',sheet:'Shift Handoff Log',sop
   {k:'auto',t:'info',full:1,html:()=>autoSummaryHTML()},
   {k:'participantUpdates',l:'Participant updates',t:'textarea',full:1,hint:'Wellness concerns, conflict or notable behaviour, missed check-ins, follow-up requests.'},
   {k:'siteUpdates',l:'Site updates',t:'textarea',full:1,hint:'Maintenance issues, hazards from walkthroughs, supplies needing restock, programming notes.'},
-  {k:'incidents',l:'Incidents (reported or potential)',t:'textarea',full:1,hint:'Include low-level ones. Note if an Incident Report is still to be filed.'},
+  {k:'incidents',l:'Incidents and required follow-ups',t:'textarea',full:1,hint:'Include low-level ones. Note if an Incident Report is still to be filed.'},
+  {k:'appointments',l:'Upcoming appointments / events',t:'textarea',full:1,hint:'Participant appointments, agency visits, deliveries and other events the next shifts need to know about.'},
+  {k:'programming',l:'Planned programming / activities',t:'textarea',full:1},
   {k:'toFollowUp',l:'To follow up (for incoming staff)',t:'textarea',full:1,req:1,def:()=>autoSummaryText(),hint:'Review each pending item with incoming staff and confirm who is taking it. For incidents, reference the Incident Report and say what the incoming shift must do.'},
   {k:'verbal',l:'Verbal handoff done?',t:'seg',o:['Yes','No'],def:'Yes'},
+  {k:'signoff',l:'Handover sign-off (outgoing staff)',t:'seg',o:['Both signed off','One signed off'],req:1,hint:'Both staff on the shift sign off the handover.'},
   {k:'status',l:'Handoff status',t:'seg',o:['Pending','Acknowledged'],def:'Pending'},
   {k:'ackBy',l:'Acknowledged by',t:'staff',show:r=>r.status==='Acknowledged',req:r=>r.status==='Acknowledged'}],
  cols:['date','shift',{l:'Outgoing',f:r=>esc([r.outgoing,r.outgoing2].filter(Boolean).join(' & '))},{l:'Incoming',f:r=>esc([r.incoming,r.incoming2].filter(Boolean).join(' & '))},'toFollowUp','status'],
@@ -682,10 +699,13 @@ wellness:{kinds:['shelter'],title:'Unit Room Check',nav:'Unit Room Checks',sheet
 guestunit:{kinds:['shelter'],title:'Guest Unit Booking',nav:'Guest Unit Bookings',sheet:'Guest Unit Bookings',sop:'12N Guest Unit Policy · Guest Unit Sign-Up Sheet',
  desc:'The Guest Unit is for participants to spend time with approved guests. Open 8:00 AM – 8:00 PM, last booking starts at 6:00 PM, 2 hours maximum. The participant and their guest both sign the paper sheet (yellow binder in the office).',
  fields:[
-  {k:'policy',t:'info',full:1,html:()=>'<b>Guest Unit guidelines</b><ul style="margin:6px 0 0 18px;padding:0"><li>The guest stays with the participant who booked the unit. Guests are never in the unit alone.</li><li>Former 12 Neighbours participants can\'t be guests.</li><li>The unit is for approved visits only, not a warming space.</li><li>No smoking in the unit.</li></ul>'},
+  {k:'policy',t:'info',full:1,html:()=>'<b>Guest Unit guidelines</b><ul style="margin:6px 0 0 18px;padding:0"><li>The guest stays with the participant who booked the unit. Guests are never in the unit alone.</li><li>Former 12 Neighbours participants can\'t be guests.</li><li>The unit is for approved visits only, not a warming space.</li><li>No smoking in the unit. The door stays closed during visits.</li><li>Staff check the unit before the visit and right after it.</li></ul>'},
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'start',l:'Start time',t:'time',req:1,hint:'Between 8:00 AM and 6:00 PM.'},{k:'end',l:'End time',t:'time',req:1,hint:'No later than 8:00 PM, and at most 2 hours after the start.'},
   {k:'unit',l:'Participant (who booked)',t:'unit',req:1},{k:'guest',l:'Guest name',t:'text',req:1},
   {k:'signed',l:'Participant and guest both signed the sign-up sheet',t:'seg',o:['Yes','No'],req:1},
+  {k:'adminSignIn',l:'Guest signed in at the Admin Building',t:'seg',o:['Yes','No']},
+  {k:'preCheck',l:'Unit pre-checked before the visit',t:'seg',o:['Yes','No'],show:r=>r.status!=='Booked'},
+  {k:'afterCheck',l:'After the visit: unit checked, final sweep and checkout',t:'seg',o:['Clean and secure','Issue found (see notes)'],show:r=>r.status==='Completed',req:r=>r.status==='Completed'},
   {k:'status',l:'Status',t:'seg',o:['Booked','In use','Completed','Cancelled','Did not attend'],def:'Booked',req:1},
   {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},
   {k:'notes',l:'Notes',t:'textarea',full:1,hint:'Describe what happened if the guidelines weren\'t followed. Pausing Guest Unit privileges is a manager\'s decision.'}],
@@ -991,6 +1011,78 @@ inout:{kinds:['shelter'],title:'Participant Time In/Out',nav:'Participant In/Out
   {k:'notes',l:'Notes',t:'textarea',full:1}],
  cols:['date','shift','unit','times','facilitators','notes'],
  chips:[{l:'Today',f:r=>r.date===today()},{l:'Ended out',f:r=>((r.events||[]).slice(-1)[0]||{}).t==='Out'}]},
+escalations:{kinds:['shelter'],title:'Escalation Record',nav:'Escalation Records',sheet:'Resident Escalations',sop:'NH Behaviour Escalation Framework (NH 3.1.12) · Resident Escalation forms',copy:1,
+ desc:'Support comes first: talk with the participant and offer help at every step. Record observed facts only, never labels or guesses. Red-line items (violence, weapons, sexual assault) may go straight to an Eviction Request.',
+ fields:[
+  {k:'date',l:'Date issued',t:'date',req:1,def:D.today},{k:'unit',l:'Participant',t:'unit',req:1},
+  {k:'step',l:'Form',t:'select',o:ESC_FORMS,req:1},
+  {k:'whoInfo',t:'info',full:1,show:r=>!!r.step,html:()=>`Completed by ${esc(ESC_WHO[(draft||{}).step]||'staff')}.`},
+  {k:'issuedBy',l:'Issued by',t:'staff',def:D.me,req:1},
+  {t:'sect',l:'Room status',show:isRoomForm},
+  {k:'tier',l:'Current room status tier',t:'seg',o:['Tier 1','Tier 2 (minimum standard)','Tier 3: Critical'],show:isRoomForm,req:isRoomForm,hint:'Tier 3 — Critical: unsafe or unsanitary conditions; immediate action needed. Tier 2 is the minimum standard.'},
+  {k:'reset',l:'Room Reset checklist',t:'yntable',full:1,vals:['Achieved','To tackle'],show:isRoomForm,o:[['Floor fully walkable','No piles of clothing, bags or debris on the floor'],['Bed accessible and usable','Cleared off and made'],['Surfaces clean and usable','Desk and windowsill organized'],['Belongings fit in the 2 blue storage bags','Anything that doesn\'t fit needs approval'],['No food waste or garbage',''],['No prohibited appliances','Hot plates, kettles, toasters, microwaves'],['Door opens fully','']]},
+  {k:'recognition',l:'Recognition / staff notes',t:'textarea',full:1,show:isStep('Room Status Update'),hint:'Name what the participant has achieved.'},
+  {k:'nextCheck',l:'Next check-in date',t:'date',show:isStep('Room Status Update'),def:()=>addDays(today(),7)},
+  {k:'deadline',l:'Deadline for improvement',t:'date',show:isStep('10-Day Final Improvement Notice'),req:isStep('10-Day Final Improvement Notice'),def:()=>addDays(today(),10),hint:'10 days. The room must reach at least Tier 2 by then.'},
+  {k:'standards10',l:'Must be met within 10 days',t:'multi',full:1,show:isStep('10-Day Final Improvement Notice'),req:isStep('10-Day Final Improvement Notice'),o:['Floor fully walkable','Bed accessible and usable','Surfaces clear and usable','Door fully opens','No food waste or garbage','No prohibited appliances','Belongings fit within 2 blue storage bags']},
+  {t:'sect',l:'Written Warning',show:isWW},
+  {k:'level',l:'Warning level',t:'seg',o:['First Written Warning','Second Written Warning','Final Written Warning'],show:isWW,req:isWW},
+  {k:'concern',l:'Primary concern',t:'select',o:['Violation of program rules','Disrespect toward staff','Verbal aggression','Threatening behaviour / violence','Other'],show:isWW,req:isWW},
+  {t:'sect',l:'Urgent Warning',show:isUW},
+  {k:'urgentType',l:'Urgent concern',t:'select',o:['Aggressive or intimidating behaviour','Serious rule violation','Other'],show:isUW,req:isUW},
+  {t:'sect',l:'Community Accountability Review',show:isCAR},
+  {k:'carForm',l:'CAR form',t:'select',full:1,o:['Community Accountability Review (CAR)','Escalation Threshold Policy Review (placement review)','Housekeeping violation','Behaviour Agreement','Visitor / guest violation'],show:isCAR,req:isCAR},
+  {k:'guideline',l:'Community guideline affected',t:'multi',full:1,o:['Respect and Communication','Safety and Security','Noise/Disturbance Policy','Property Maintenance/Cleanliness'],show:isCAR},
+  {k:'placement',l:'Current placement status',t:'text',show:r=>isCAR(r)&&/Threshold/.test(r.carForm||''),hint:'e.g. Phase I, Phase II, Transitional Housing.'},
+  {k:'lastThree',l:'Last three relevant incidents (dates and a brief description)',t:'textarea',full:1,show:r=>isCAR(r)&&/Threshold/.test(r.carForm||'')},
+  {k:'rectify24',l:'Participant agrees to fix the cited items within 24 hours',t:'seg',o:['Yes','No'],show:r=>isCAR(r)&&/Housekeeping/.test(r.carForm||'')},
+  {k:'adherence',l:'Participant\'s own rating against the expected standard (1–5)',t:'seg',o:['1','2','3','4','5'],show:r=>isCAR(r)&&/Behaviour/.test(r.carForm||'')},
+  {k:'strategies',l:'Strategies agreed for meeting the standard',t:'textarea',full:1,show:r=>isCAR(r)&&/Behaviour/.test(r.carForm||'')},
+  {k:'guestName',l:'Visitor / guest (if known)',t:'text',show:r=>isCAR(r)&&/Visitor/.test(r.carForm||'')},
+  {k:'carWhere',l:'Location of the CAR meeting',t:'text',show:isCAR},
+  {k:'irRefs',l:'Incident Report number(s)',t:'text',show:isCAR},
+  {k:'summary',l:'Summary of the meeting',t:'textarea',full:1,show:isCAR,req:isCAR},
+  {k:'outcome',l:'Agreement and outcome',t:'select',o:['Verbal agreement reached','Support Plan (see attached)','No agreement reached','Escalation required (see details)','Other'],show:isCAR,req:isCAR},
+  {k:'actions',l:'Action items',t:'textarea',full:1,show:isCAR,hint:'One per line: action required, responsible person, target date.'},
+  {k:'followPlan',l:'Follow-up plan',t:'textarea',full:1,show:isCAR},
+  {k:'carFollow',l:'Follow-up date',t:'date',show:isCAR,def:()=>addDays(today(),14),hint:'Follow up in 1–2 weeks.'},
+  {t:'sect',l:'Eviction Request',show:isEV},
+  {k:'evType',l:'Type of request',t:'seg',full:1,o:['Standard (progressive / support-based)','Red-line item (immediate)'],show:isEV,req:isEV},
+  {k:'priorWarnings',l:'Three written warnings or support plans on file?',t:'seg',o:['Yes','No'],show:r=>isEV(r)&&/^Standard/.test(r.evType||'')},
+  {k:'services',l:'Emergency services contacted?',t:'seg',o:['Yes','No'],show:r=>isEV(r)&&/^Red/.test(r.evType||'')},
+  {k:'decision',l:'NH Participant Program Review decision',t:'select',o:['Pending','Approved','Not approved','Alternative plan agreed'],def:'Pending',show:r=>isEV(r)&&CAN_ADMIN},
+  {t:'sect',l:'Details'},
+  {k:'description',l:'What happened (observed facts)',t:'textarea',full:1,req:r=>!isDebrief(r),hint:'What happened, who was involved, and any relevant statements or actions. Quote words only when they matter.'},
+  {k:'impact',l:'Impact',t:'multi',full:1,show:r=>isWW(r)||isUW(r),o:['Created safety risk','Created unsafe environment for participants','Created unsafe environment for staff','Disrupted community environment','Violated program expectations','Poses risk to staff safety','Poses risk to participant safety']},
+  {k:'directive',l:'Immediate directive',t:'textarea',full:1,show:isUW,req:isUW,hint:'The behaviour that must stop now, in plain words.'},
+  {k:'expected',l:'Expected going forward',t:'multi',full:1,show:r=>isWW(r)||isUW(r),o:['Follow program rules and expectations','Maintain safe and respectful behaviour','No threats (verbal or physical)','Resolve conflict appropriately','Respect boundaries (including staff/participant boundaries)','Treat other participants with dignity and respect','Treat staff with dignity and respect','Follow all staff direction related to this issue','No further incidents of this behaviour']},
+  {k:'consequence',t:'info',full:1,warn:1,show:r=>isUW(r)||isStep('10-Day Final Improvement Notice')(r),html:()=>(draft||{}).step==='10-Day Final Improvement Notice'?'If the room does not meet at least Tier 2 by the deadline, the placement may end. Explain this clearly and offer every support.':'If this behaviour happens again, an Eviction Request will be started immediately. Explain this clearly and offer support.'},
+  {k:'support',l:'Support offered',t:'multi',full:1,show:r=>!!r.step&&!isDebrief(r),o:['Staff check-ins','Cleaning support','Help sorting belongings','Removal of excess items','Conflict mediation','Behavioural support','Referral to services','Community Liaison Team']},
+  {k:'supportNotes',l:'Agreed plan / notes',t:'textarea',full:1},
+  {k:'ack',l:'Participant acknowledgement',t:'seg',o:['Signed','Declined to sign','Not available'],show:r=>!!r.step&&!isEV(r)&&!isDebrief(r)},
+  {k:'lessons',l:'Lessons learned and gaps in our own support',t:'textarea',full:1,show:isDebrief,req:isDebrief},
+  {k:'status',l:'Status',t:'seg',o:['Open','Closed'],def:'Open',req:1}],
+ cols:['date','unit','step',{l:'Detail',f:r=>esc(escDetail(r)||'')},{l:'Next date',f:r=>{const d=escOpenDate(r);return d?pill(fmtDate(d),d<today()?'bad':d<=addDays(today(),2)?'warn':''):''}},{l:'Status',f:r=>pill(r.status,r.status==='Open'?'warn':'ok')}],
+ chips:[{l:'Open',f:r=>r.status==='Open'},{l:'Written warnings',f:isWW},{l:'CARs',f:isCAR},{l:'Eviction requests pending',f:r=>isEV(r)&&(r.decision||'Pending')==='Pending'}]},
+foodbank:{kinds:['shelter'],title:'Foodbank Order',nav:'Foodbank Orders',sheet:'Foodbank Orders',sop:'Monthly Foodbank Order Form',custom:'foodGrid',
+ desc:'Help participants who are registered with the foodbank fill out the form each month, then enter it in the foodbank\'s online order form between 8 and 11 AM on the order date. Orders are picked up on the Friday of that week. File the signed paper form in the participant\'s file: name, date of birth, phone and email stay on the paper form.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Participant',t:'unit',req:1},
+  {t:'sect',l:'Order'},
+  {k:'bread',l:'Bread (choose 1)',t:'seg',o:['White Bread','Whole Wheat','Multigrain'],req:1},
+  {k:'drink',l:'Drink (choose 1)',t:'seg',o:['Coffee','Tea'],req:1},
+  {k:'cereal',l:'Breakfast (choose 1)',t:'seg',o:['Dry Cereal','Oatmeal'],req:1},
+  {k:'protein',l:'Protein (choose 2)',t:'multi',o:['Hamburger','Chicken','Hotdogs'],req:1},
+  {k:'staple',l:'Staple (choose 1)',t:'seg',o:['Pasta','Rice','Lentils','Pancake Mix'],req:1},
+  {k:'needs',l:'Special needs (the foodbank will do its best to accommodate)',t:'textarea',full:1},
+  {k:'signed',l:'Paper form signed',t:'seg',o:['Participant and staff signed','Not yet'],def:'Not yet'},
+  {t:'sect',l:'Submission'},
+  {k:'status',l:'Status',t:'seg',o:['Form filled out','Submitted online','Picked up'],def:'Form filled out',req:1},
+  {k:'submittedOn',l:'Submitted online on',t:'date',show:r=>r.status!=='Form filled out',req:r=>r.status!=='Form filled out',def:D.today},
+  {k:'submittedBy',l:'Submitted by',t:'staff',show:r=>r.status!=='Form filled out',def:D.me},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','unit',{l:'Order',f:r=>esc([r.bread,r.drink,r.cereal,(r.protein||[]).join(' + '),r.staple].filter(Boolean).join(' · '))},{l:'Status',f:r=>pill(r.status,r.status==='Form filled out'?'warn':'ok')}],
+ chips:[{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)},{l:'Not submitted yet',f:r=>r.status==='Form filled out'}]},
 requests:{title:'Participant Requests & Appliance Approvals',nav:'Participant Requests',sheet:'Participant Requests',sop:'Guide · Room Checks · NH 3.3.4',
  desc:'Supply requests, appliance permissions and item needs. All appliance approvals need management sign-off. Only permitted items (e.g. kettle, fridge) are approved.',
  fields:[
@@ -1097,8 +1189,8 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
 /* =========================================================
    NAV & HEADER
    ========================================================= */
-const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
- ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement']]],
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['tasks','Shift Tasks'],['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
+ ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement'],['escalations'],['pathway','Escalation Pathway'],['foodbank']]],
  ['Residents',[['board','Community Dashboard'],['notices'],['inspections'],['plans'],['rent'],['pets'],['parking'],['entries']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
@@ -1112,8 +1204,8 @@ function badgeFor(id){
   if(id==='intakes')return siteRecs('intakes').filter(r=>r.status==='New Inquiry').length;
   if(id==='handoff')return siteRecs('handoff').filter(r=>r.status!=='Acknowledged').length;
   return 0}
-const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager'};
-const PAGE_KIND={board:['housing']};
+const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager',pathway:'Supervisor'};
+const PAGE_KIND={board:['housing'],pathway:['shelter'],tasks:['shelter']};
 const kindOk=id=>{const w=(M[id]&&M[id].kinds)||PAGE_KIND[id];return !w||w.includes(siteKind())};
 const pageOk=id=>kindOk(id)&&(!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]]);
 function renderNav(){let h=`<div class="logo"><img src="${LOGO}" alt="the 12 neighbours community" width="400" height="177"><small>NH Site Docs · Neighbourly Homes</small></div>`;
@@ -1163,7 +1255,7 @@ function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in scre
   renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
   if(cur==='info')return renderInfo(v);if(cur==='schedule')return renderSchedule(v);if(cur==='archive')return renderArchive(v);
-  if(cur==='sop')return renderSOP(v);if(cur==='board')return renderBoard(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
+  if(cur==='sop')return renderSOP(v);if(cur==='board')return renderBoard(v);if(cur==='pathway')return renderPathway(v);if(cur==='tasks')return renderTasks(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
 
 /* =========================================================
    LIST VIEW
@@ -1287,6 +1379,8 @@ async function saveForm(){
       if(clash){toast(`The Guest Unit is already booked ${clash.start}–${clash.end} that day.`,'err');return}}
     const norm=x=>String(x||'').toLowerCase().replace(/[^a-z]+/g,' ').trim();const past=pplOf(curSite()).filter(p=>p.status!=='Active'&&norm(p.name)&&norm(p.name)===norm(d.guest));
     if(past.length&&!await ask({title:'Check the guest',body:`“${d.guest}” matches the name of a former participant. Former 12 Neighbours participants can't be Guest Unit guests. Save only if this is a different person.`,ok:'Different person, save'}))return}
+  if(m==='escalations'&&ESC_MIN[d.step]&&(RANK[ROLE]??0)<RANK[ESC_MIN[d.step]]){toast(`The ${d.step} is completed by ${ESC_WHO[d.step]}. Talk to your supervisor, and record what happened in an Incident Report or Written Warning.`,'err');return}
+  if(m==='foodbank'&&(d.protein||[]).length!==2){toast('Choose 2 proteins.','err');return}
   if(m==='notices'){if(d.level!=='Gray'&&/^Non-urgent/.test(d.matter||'')&&d.deadline&&daysBetween(d.date,d.deadline)<7&&!await ask({title:'Short deadline',body:'Non-urgent matters need at least 7 days to comply. Use a shorter deadline only for a conduct matter.',ok:'Save anyway'}))return;
     if(d.appealOutcome==='Reversed'&&d.status!=='Reversed on appeal'){d.status='Reversed on appeal'}}
   if(m==='inspections'&&d.noticeGiven&&d.noticeGiven>=d.date&&!await ask({title:'Less than 24 hours\' notice',body:'Inspections need at least 24 hours\' written notice, unless the resident agreed otherwise.',ok:'Save anyway'}))return;
@@ -1396,6 +1490,19 @@ const CUSTOM={
   $('#ioDate').onchange=e=>{IO.date=e.target.value||today();render()};$('#ioShift').onchange=e=>{IO.shift=+e.target.value;render()};
   el.querySelectorAll('[data-io]').forEach(b=>b.onclick=()=>ioTap(units().find(u=>String(u.no)===b.dataset.io),b.dataset.t));
   el.querySelectorAll('[data-ioedit]').forEach(b=>b.onclick=()=>openForm('inout',b.dataset.ioedit))},
+ shiftChange(el){const t0=today();const order=[2,0,1],lab={2:'N',0:'D',1:'E'};
+  const row=i=>{const h=siteRecs('handoff').filter(r=>r.date===t0&&r.shift===SHIFTS[i]).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
+    const staff=h?[h.outgoing,h.outgoing2].filter(Boolean):schedFor(curSite(),t0,i);
+    return `<tr><td><b>${lab[i]}</b> <span class="meta" style="margin:0">${esc(SHIFTS[i].replace(/^\S+ /,''))}</span></td><td>${staff.length?esc(staff.join(' & ')):'<span class="meta" style="margin:0">—</span>'}</td>
+     <td>${h?`${pill(h.signoff||'Handoff logged',h.signoff==='Both signed off'?'ok':'warn')} ${h.status==='Acknowledged'?pill('Acknowledged'+(h.ackBy?' by '+h.ackBy:''),'ok'):pill('Not yet acknowledged','warn')}`:'<span class="meta" style="margin:0">No handoff yet</span>'}</td></tr>`};
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><b>Shift change: ${esc(fmtDate(t0))}</b><div class="tblwrap" style="margin-top:6px;border:0"><table><thead><tr><th>Shift</th><th>Staff on shift</th><th>Handover sign-off</th></tr></thead><tbody>${order.map(row).join('')}</tbody></table></div></div>`},
+ foodGrid(el){const d=fbCycle();const ppl=pplOf(curSite()).filter(p=>p.status==='Active').sort((a,b)=>String(a.unit).localeCompare(String(b.unit),undefined,{numeric:true}));
+  if(!d){el.innerHTML=`<div class="card" style="margin-bottom:14px">No foodbank order dates are set for this site. ${siteEditable()?'Add them under <a href="#info">Site Info &amp; Contacts</a>.':'A manager can add them under Site Info & Contacts.'}</div>`;return}
+  const st=ppl.map(p=>({p,r:fbOf(p,d)}));const sub=st.filter(x=>x.r&&x.r.status!=='Form filled out').length,filled=st.filter(x=>x.r).length;
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><b>Order date: ${esc(fmtDate(d))}${d===today()?' (today)':''}, online 8–11 AM</b> · pickup Friday ${esc(fmtDate(fbPickup(d)))}
+   <div class="meta" style="margin:2px 0 8px">${filled} form${filled===1?'':'s'} filled out · ${sub} submitted online. Only participants registered with the foodbank need an order.</div>
+   <div style="display:flex;flex-wrap:wrap;gap:6px">${st.map(({p,r})=>`<button type="button" class="chip ${r&&r.status!=='Form filled out'?'on':''}" data-fb="${esc(p.unit)}" ${r?`data-fbid="${esc(r.id)}"`:''} title="${esc(r?r.status:'No order this month')}">${esc(unitLabel(p.unit))}${r?(r.status==='Form filled out'?' · filled':' · ✓'):''}</button>`).join('')||'<span class="meta">No current participants.</span>'}</div></div>`;
+  el.querySelectorAll('[data-fb]').forEach(b=>b.onclick=()=>b.dataset.fbid?openForm('foodbank',b.dataset.fbid):openForm('foodbank',null,{unit:b.dataset.fb}))},
  quickReq(el){const Q=['WD-40','Snow Shovel','Ice Melt','Radio Batteries','Garbage Bags','Toilet Paper','Naloxone Kits','Nitrile Gloves','Light Bulbs','Winter Gloves / Hats'];
   el.innerHTML=`<div class="card" style="margin-bottom:14px"><b>Quick requisition</b><div class="qa" style="margin-top:8px">${Q.map(q=>`<button class="btn sm" type="button" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div></div>`;
   el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>openForm('requisitions',null,{item:b.dataset.q}))}};
@@ -1437,7 +1544,7 @@ function renderDash(v){
   const low=(INV[curSite()]||[]).map(invCalc).filter(i=>i.status==='Low Stock'||i.status==='Out of Stock').length;
   const newInt=siteRecs('intakes').filter(r=>r.status==='New Inquiry');const ho=siteRecs('handoff').some(r=>r.date===t&&r.shift===sh);const weekday=dow(t)>=1&&dow(t)<=5;
   const St=(ok,txt,cls)=>ok===true?pill('Done','ok'):ok===false?pill(txt||'To do',cls||'warn'):pill(txt,cls||'');
-  const Tick=k=>`<input type="checkbox" class="tick" data-chk="${k}" ${CHECKS[chkKey(k)]?'checked':''} aria-label="Mark census review done">`;
+  const Tick=k=>`<input type="checkbox" class="tick" data-chk="${k}" ${CHECKS[chkKey(k)]?'checked':''} aria-label="Mark this done">`;
   const np=pair().length;
   const tasks=[
    ['Shift start','Confirm 2 staff on shift',np?`On shift: ${esc(pair().join(' & '))}`:(schedNow().length?`Scheduled: ${esc(schedNow().join(' & '))}`:'Choose both staff at the top of the page.'),np>=2?pill('2 / 2','ok'):(schedNow().length&&CAN_WRITE?`<button class="btn sm pri" type="button" id="useSched">Use schedule</button>`:pill(`${np} / 2`,'bad')),'schedule'],
@@ -1451,6 +1558,8 @@ function renderDash(v){
    ['3:00–4:00','Supply check','Look at the restock queue and submit requisitions for low stock.'+(dow(t)===1?' <b>Monday:</b> cleaning supplies inventory check.':''),low?pill(`${low} low/out`,'warn'):pill('OK','ok'),'inventory'],
    ['by 4:00','Log participant engagement','Engagement around today\'s prompt (level 1–5) and any feedback. Aim for at least 5 logs a week.',St(engLog),'engagement'],
    ['9:30–10:00 PM','Evening Site Check','Emergency exits latched and locked, courtyard clear, bathrooms and Admin Building checked.',St(has(/Evening/)),'patrols',{checkType:'Evening Site Check (9:30–10 PM)',areas:['Emergency exits latched & locked','Courtyard & pathways','Shared bathrooms / showers / laundry','Admin Building interior']}],
+   ['Whole shift','Shift task list',(()=>{const p=taskProgress(shiftIdx());return `${p.done} of ${p.total} tasks initialled${p.signed?`; signed off by ${esc(p.signed.by)}`:''}.`})(),(()=>{const p=taskProgress(shiftIdx());return p.signed?pill('Signed off','ok'):pill(`${p.done}/${p.total}`,p.done===p.total?'ok':'warn')})(),'tasks'],
+   ['Last 20 min','Tidy the workspace','Stock rooms, gathering lounge and office clean, stocked and orderly for the next shift.',Tick('tidy'),'tasks'],
    ['Last 30 min','Shift notes review & handoff','Resolve or assign follow-ups, then complete the handoff with the incoming lead.',St(ho),'handoff']];
   const A=[];
   if(CAN_PUBLISH)(SCHED[curSite()]||[]).filter(w=>w.submitted).forEach(w=>A.push(['warn',`Schedule for the week of ${fmtDate(w.week)} is waiting for your approval${w.submittedBy?` (from ${w.submittedBy})`:''}.`,'schedule','']));
@@ -1462,6 +1571,16 @@ function renderDash(v){
   {const fa=siteRecs('firstaid').map(r=>r.date).sort().pop();if(!fa||fa<addDays(t,-7))A.push(['warn',fa?`First aid kit last checked ${fmtDate(fa)}. Kits are checked weekly.`:'No first aid kit check recorded yet. Kits are checked weekly.','firstaid',''])}
   {const nowM=toMin(nowTime());siteRecs('guestunit').filter(r=>r.date===t&&r.status==='In use'&&toMin(r.end)<nowM).forEach(r=>A.push(['warn',`Guest Unit booking for ${r.unitLabel||'a participant'} ended at ${r.end}. Check in and update the booking.`,'guestunit',r.id]));
    const next=siteRecs('guestunit').filter(r=>r.date===t&&r.status==='Booked'&&toMin(r.start)>=nowM).sort((a,b)=>a.start.localeCompare(b.start))[0];if(next)A.push(['info',`Guest Unit booked today ${next.start}–${next.end} (${next.unitLabel||''}).`,'guestunit',next.id])}
+  if(!isHousing()&&fbDates().length){const d=fbDates().find(x=>x>=t);const subd=siteRecs('foodbank').filter(r=>(r.date||'').slice(0,7)===t.slice(0,7)&&r.status!=='Form filled out').length;
+    if(d===t)A.push([nowTime()<'11:00'?'bad':'warn',`Foodbank orders go in online today, 8–11 AM (${subd} submitted so far).`,'foodbank','']);
+    else if(d&&d<=addDays(t,3))A.push(['info',`Foodbank order day ${fmtDate(d)}: help registered participants fill out their forms.`,'foodbank','']);
+    if(fbDates().some(x=>fbPickup(x)===t&&x<=t))A.push(['info','Foodbank orders are picked up today.','foodbank',''])}
+  if(!isHousing()){const esc12=siteRecs('escalations').filter(r=>r.date>=addDays(t,-365));
+    esc12.filter(r=>escOpenDate(r)&&escOpenDate(r)<=t).forEach(r=>A.push([escOpenDate(r)<t?'bad':'warn',`${r.step==='10-Day Final Improvement Notice'?'10-day review':r.step==='Room Status Update'?'Room status check-in':'CAR follow-up'} ${escOpenDate(r)<t?'overdue':'due today'}: ${r.unitLabel||''}`,'escalations',r.id]));
+    if(CAN_ADMIN)esc12.filter(r=>isEV(r)&&r.status==='Open'&&(r.decision||'Pending')==='Pending').forEach(r=>A.push(['warn',`Eviction Request waiting for a Program Review decision: ${r.unitLabel||''}`,'escalations',r.id]));
+    if(CAN_REVIEW){const by={};esc12.filter(isCAR).forEach(r=>{const key=r.unitPid||r.unit;by[key]=(by[key]||[]).concat(r)});
+      Object.values(by).filter(l=>l.length>=3&&!l.some(r=>/Threshold/.test(r.carForm||''))).forEach(l=>A.push(['bad',`${l[0].unitLabel||'A participant'} has ${l.length} CARs in 12 months: a Placement Review is required.`,'pathway','']))}}
+  if(CAN_ADMIN&&!isHousing()){const un=staffOf(curSite()).filter(s=>s.status==='Active'&&!isCleaner(s)&&!s.standards).length;if(un)A.push(['info',`${un} active staff member${un>1?'s haven\'t':' hasn\'t'} signed the Staff Standards & Commitment Agreement. Record the date on the Staff Roster.`,'staff',''])}
   if(isHousing()){const res=housingResidents();
     siteRecs('notices').filter(r=>r.status==='Active'&&r.deadline&&r.deadline<=t).forEach(r=>A.push([r.deadline<t?'bad':'warn',`Notice follow-up ${r.deadline<t?'overdue':'due today'}: ${r.unitLabel||''} (${r.pillar}, ${r.level})`,'notices',r.id]));
     siteRecs('notices').filter(r=>r.appeal&&!r.appealReplied).forEach(r=>{const due=addDays(r.appeal,14);A.push([due<=addDays(t,3)?'bad':'warn',`Written appeal response due ${fmtDate(due)}: ${r.unitLabel||''}`,'notices',r.id])});
@@ -1682,6 +1801,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
    <div class="fld"><label for="si_open">Opened</label><input id="si_open" ${ro} type="date" value="${esc(s.opened)}"></div>
    ${isHousing()?`<div class="fld"><label for="si_landlord">Landlord partner (leave blank if 12 Neighbours is the landlord)</label><input id="si_landlord" ${ro} value="${esc(s.landlord||'')}" placeholder="e.g. the property owner"><span class="hint">When set, Red notices and legal (RTA) notices are shown as coming from them, and the monthly rent reminder is turned off.</span></div>
    <div class="fld"><label for="si_prob">Returning to Green</label><select id="si_prob" ${ro}><option value="step" ${s.probation!=='straight'?'selected':''}>One level at a time (Community manual)</option><option value="straight" ${s.probation==='straight'?'selected':''}>Straight back to Green (Sunnyside manual)</option></select></div>`:''}
+   ${!isHousing()?`<div class="fld"><label for="si_fb">Foodbank order dates</label><input id="si_fb" ${ro} value="${esc(s.foodbankDates||'')}" placeholder="2026-12-15, 2027-01-19"><span class="hint">Dates as YYYY-MM-DD, separated by commas. Orders go in online 8–11 AM; pickup is the Friday of that week.</span></div>`:''}
    <div class="fld"><label for="si_restock">Restock orders go to (email)</label><input id="si_restock" ${ro} type="email" value="${esc(s.restockEmail||'')}" placeholder="manager@12neighbours.com"></div></div>
   <h2 style="font-size:18px">Contact &amp; escalation directory</h2>
   <div class="tblwrap inv"><table><thead><tr><th>Role</th><th>Contact name</th><th>Phone / email</th><th>Escalate for</th><th></th></tr></thead><tbody>
@@ -1690,7 +1810,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
   </tbody></table></div>
   <div class="toolbar" style="margin-top:10px">${ro?'':`<button class="btn" type="button" id="addContact">＋ Add contact</button>`}<span class="meta" style="margin:0">Check this directory at each monthly review.</span></div>`;
   const k=curSite();const fld=(id,f,msg)=>{const el=$(id);el.onchange=()=>cfgSave(()=>{CFG.sites[k][f]=el.value.trim()},msg||'Saved')};
-  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');if($('#si_landlord')){fld('#si_landlord','landlord','Landlord partner saved');fld('#si_prob','probation','Saved')}
+  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');if($('#si_fb'))fld('#si_fb','foodbankDates','Foodbank dates saved');if($('#si_landlord')){fld('#si_landlord','landlord','Landlord partner saved');fld('#si_prob','probation','Saved')}
   v.querySelectorAll('[data-c]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[k].contacts[+el.dataset.c][el.dataset.f]=el.value},'Contact saved'));
   v.querySelectorAll('[data-crm]').forEach(b=>b.onclick=async()=>{const c=s.contacts[+b.dataset.crm];if(await ask({title:'Remove this contact?',body:esc(`${c.role||''}${c.name?': '+c.name:''}`),ok:'Remove',danger:true}))cfgSave(()=>{CFG.sites[k].contacts.splice(+b.dataset.crm,1)},'Contact removed')});
   const ac=$('#addContact');if(ac)ac.onclick=()=>cfgSave(()=>{CFG.sites[k].contacts.push({role:'',name:'',reach:'',when:''})})}
@@ -1708,14 +1828,15 @@ function renderStaff(v){
   <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">On leave</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Former staff</div><div class="v">${n('Archived')}</div></div><div class="card kpi"><div class="l">Active cleaners</div><div class="v">${all.filter(s=>s.status==='Active'&&isCleaner(s)).length}</div><div class="meta" style="margin:0">Total active personnel: ${n('Active')}</div></div></div>
   <div class="toolbar">${ed?`<button class="btn pri" type="button" id="addStaff">＋ Add staff member</button><button class="btn" type="button" id="copyStaff">Copy staff from another site…</button>`:''}
    <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show former staff</label></div>
-  <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody>
+  <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Standards signed</th><th>Status</th></tr></thead><tbody>
    ${list.map(s=>`<tr><td><input ${ro} style="width:150px" value="${esc(s.name)}" data-s="${esc(s.id)}" data-f="name" aria-label="Name"></td>
     <td><input ${ro} style="width:170px" list="roleList" value="${esc(s.role)}" data-s="${esc(s.id)}" data-f="role" aria-label="Role, ${esc(s.name)}"></td>
     <td><input ${ro} type="tel" style="width:130px" value="${esc(s.phone)}" data-s="${esc(s.id)}" data-f="phone" aria-label="Phone, ${esc(s.name)}"></td>
     <td><input ${ro} type="email" style="width:200px" value="${esc(s.email)}" data-s="${esc(s.id)}" data-f="email" aria-label="Email, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.start||'')}" data-s="${esc(s.id)}" data-f="start" aria-label="Start date, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
-    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No staff on this site's roster yet.</td></tr>`}
+    <td><input ${ro} type="date" style="width:140px" value="${esc(s.standards||'')}" data-s="${esc(s.id)}" data-f="standards" aria-label="Date ${esc(s.name)} signed the Staff Standards & Commitment Agreement"></td>
+    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="8" class="empty">No staff on this site's roster yet.</td></tr>`}
   </tbody></table></div>
   <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Cleaner','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
@@ -1870,6 +1991,60 @@ function renderBoard(v){const res=housingResidents().slice().sort((a,b)=>String(
   <p class="meta" style="margin-top:10px">Inspections: every 6 months, or yearly after two Green inspections in a row. Yellow and above: the follow-up date set at the inspection.</p>`;
   v.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;render()});
   const nn=$('#newNotice');if(nn)nn.onclick=()=>openForm('notices');const ni=$('#newInsp');if(ni)ni.onclick=()=>openForm('inspections')}
+/* Escalation Pathway: where each participant is in the NH Behaviour Escalation Framework */
+function renderPathway(v){const yr=addDays(today(),-365);const recs=siteRecs('escalations').filter(r=>r.date>=yr);
+  const people=pplOf(curSite()).filter(p=>p.status==='Active');const rows=people.map(p=>{const l=recs.filter(r=>forResident(r,p)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const ww=l.filter(isWW),cars=l.filter(isCAR),room=l.find(isRoomForm),open=l.filter(r=>escOpenDate(r)).sort((a,b)=>escOpenDate(a).localeCompare(escOpenDate(b)))[0],ev=l.find(r=>isEV(r)&&r.status==='Open');
+    return {p,l,ww,cars,room,open,ev}}).filter(x=>x.l.length).sort((a,b)=>(b.l[0].date||'').localeCompare(a.l[0].date||''));
+  v.innerHTML=`<h1>Escalation Pathway<span class="sopref">NH 3.1.12 · Resident Escalation</span></h1>
+  <p class="sub">Participants with escalation records in the last 12 months. Each step comes with support: check-ins, mediation, cleaning help and referrals. Three CARs in 12 months means a Placement Review.</p>
+  <div class="toolbar"><button class="btn pri" type="button" id="newEsc">＋ Escalation record</button></div>
+  ${rows.length?`<div class="tblwrap"><table><thead><tr><th>Participant</th><th>Latest step</th><th>Written warnings</th><th>CARs</th><th>Room status</th><th>Next date</th><th>Eviction request</th></tr></thead><tbody>
+  ${rows.map(({p,l,ww,cars,room,open,ev})=>`<tr><td><b>${esc(p.name)}</b><div class="meta" style="margin:0">${esc(unitLabel(p.unit))}</div></td>
+   <td>${esc(l[0].step)}<div class="meta" style="margin:0">${esc(fmtDate(l[0].date))}</div></td>
+   <td>${ww.length?`${ww.length}<div class="meta" style="margin:0">latest: ${esc(ww[0].level||'')}</div>`:'—'}</td>
+   <td>${cars.length?pill(String(cars.length),cars.length>=3?'bad':'warn'):'—'}</td>
+   <td>${room?pill(room.tier||'',/3/.test(room.tier||'')?'bad':/2/.test(room.tier||'')?'warn':'ok'):'—'}</td>
+   <td>${open?pill(fmtDate(escOpenDate(open)),escOpenDate(open)<today()?'bad':'warn'):'—'}</td>
+   <td>${ev?pill(ev.decision||'Pending',(ev.decision||'Pending')==='Pending'?'warn':''):'—'}</td></tr>`).join('')}</tbody></table></div>`:`<div class="card empty">No escalation records in the last 12 months.</div>`}`;
+  $('#newEsc').onclick=()=>openForm('escalations')}
+/* Staff Shift + Task Lists: every task is initialled during the shift and the list is signed off at shift change. */
+const SHIFT_TASKS={
+ 2:[['Overview & monitoring',['Review participant notes from previous shifts','Overview sweep of courtyard, admin building and bathrooms: tidy, supplies available, garbage removed','No extra items from participant rooms in the courtyard (furniture, bins, belongings)','Shopping carts stored properly','Check the inventory room (tidy if needed)','Wipe down and prep the coffee station for morning staff','Admin deck tidy and clear']],
+    ['Participant care',['Quietly observe and make sure participants are safe','Document any unusual activity or overnight needs (no room entry unless an emergency or identified issue)']],
+    ['Office',['Desk organized','Office door locked or closed when unattended; participants don\'t enter the office']],
+    ['Admin & safety',['Check staff email once','Monitor cameras closely','Perimeter check with a flashlight where needed','Enter observations and notes promptly','Incident Reports completed if needed',['Sunday: complete and submit the inventory checklist',0],'Detailed handover to 8 AM staff']]],
+ 0:[['Participant care',['Wellness check-in with each participant: confirm wellbeing, engage briefly, look into the room for safety, cleanliness or repairs; document in notes','Follow up on maintenance or cleaning requests','Admin and courtyard bathrooms and laundry room: tidy, restock toilet paper and soap, remove garbage','Meals arrive at 12 noon: let participants know their meal has arrived (same-day, not in the communal fridge)']],
+    ['Courtyard & building',['No extra items from participant rooms in the courtyard (chairs, bins, bags, belongings)','Empty all garbage bins','Check ashtrays: empty and refill with sand','Recycling area tidy','Stock and clean the coffee station','Inspect and organize the inventory room (note needs)','Check the fridge: remove expired or old food','Water the outside plants','Admin deck cleared and tidy','Shopping carts behind the dumpsters or in the sea can']],
+    ['Memo board',['Update the memo board in each courtyard with current notices',['Wednesday: post the Horizon check-in reminder',3],['Thursday: post the Avenue B check-in reminder',4],'Post any other updates for participants (program changes, agency visit times, safety reminders)']],
+    ['Office',['Desk organized, paperwork neat','Printables binder restocked','Office door locked or closed when unattended; participants don\'t enter the office']],
+    ['Admin & safety',['Check staff email 3–4 times','Monitor cameras regularly','Enter participant notes promptly','Incident Reports submitted, and management told by email or Signal','Clear handover to 4 PM staff']]],
+ 1:[['Participant care',['Wellness check-in with each participant: confirm wellbeing, engage briefly, look into the room for safety and cleanliness; document in notes','Remind participants of next-day appointments or updates','Bathrooms: tidy, restock toilet paper and soap, remove garbage']],
+    ['Courtyard & building',['Sweep the courtyard for items from participant rooms','Replace garbage bags and tidy recycling','Clean and restock the coffee station for the morning','Spot check the inventory room; straighten shelves','Admin deck cleared of clutter','Admin building bathroom clean','Shopping carts stored properly','Quiet time from 10 PM: no loud socializing or music']],
+    ['Office',['Desk organized, paperwork neat','Binder check: printables stocked','Office door locked or closed when unattended; participants don\'t enter the office']],
+    ['Admin & safety',['Check staff email 3–4 times','Perimeter check with a flashlight where needed','Monitor cameras regularly (more often after dark)','Document participant notes promptly','Incident Reports completed if needed','Clear handover to overnight staff']]]};
+const SHIFT_TASK_NAMES={0:'Morning shift (8 AM – 4 PM)',1:'Evening shift (4 PM – 12 AM)',2:'Overnight shift (12 AM – 8 AM)'};
+let taskShift=null;
+const initials=n=>String(n||'').split(/\s+/).filter(Boolean).map(w=>w[0].toUpperCase()).join('');
+function shiftTaskList(s,ds){const d=dow(ds);return SHIFT_TASKS[s].map(([sec,items])=>[sec,items.filter(x=>!Array.isArray(x)||x[1]===d).map(x=>Array.isArray(x)?x[0]:x)])}
+function taskProgress(s){const all=shiftTaskList(s,today()).flatMap(([sec,items])=>items.map(i=>sec+'|'+i));const done=all.filter(id=>CHECKS[`${s}_task:${id}`]).length;return {done,total:all.length,signed:CHECKS[`${s}_signoff`]}}
+function renderTasks(v){const s=taskShift??shiftIdx();const ds=today();const list=shiftTaskList(s,ds);const pr=taskProgress(s);const so=pr.signed;
+  v.innerHTML=`<h1>Shift Tasks<span class="sopref">NH Staff Shift + Task Lists</span></h1>
+  <p class="sub">Tick each task as you complete it; your initials and the time are recorded. Review the list at shift change and sign off.</p>
+  <div class="toolbar">${[0,1,2].map(i=>`<button type="button" class="chip ${i===s?'on':''}" data-ts="${i}">${esc(SHIFT_TASK_NAMES[i])}${i===shiftIdx()?' · now':''}</button>`).join('')}<span style="flex:1"></span>${pill(`${pr.done} / ${pr.total} done`,pr.done===pr.total?'ok':'warn')}</div>
+  <div class="grid g2" style="align-items:start">${list.map(([sec,items])=>`<div class="card"><b>${esc(sec)}</b><div style="margin-top:6px">${items.map(it=>{const key=`task:${sec}|${it}`;const c=CHECKS[`${s}_${key}`];
+    return `<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid var(--line2)"><input type="checkbox" class="tick" data-task="${esc(key)}" ${c?'checked':''} ${CAN_WRITE&&!so?'':'disabled'} style="margin-top:3px"><span style="flex:1">${esc(it)}${c&&c.by?`<span class="meta" style="display:block;margin:0">✓ ${esc(initials(c.by))} · ${esc(c.at||'')}</span>`:''}</span></label>`}).join('')}</div></div>`).join('')}</div>
+  <div class="card" style="margin-top:14px;max-width:620px"><b>End of shift sign-off</b>${so?`<p>Signed off by <b>${esc(so.by)}</b> at ${esc(so.at)}. Notes and communication confirmed.</p>${CAN_REVIEW?'<button class="btn sm" type="button" id="unsign">Reopen the list</button>':''}`:`
+   <label style="display:flex;gap:8px;margin:8px 0"><input type="checkbox" id="commOk"> Notes and communication confirmed with the incoming staff</label>
+   <button class="btn pri" type="button" id="signoff" ${CAN_WRITE?'':'disabled'}>Sign off this shift</button>`}</div>`;
+  v.querySelectorAll('[data-ts]').forEach(b=>b.onclick=()=>{taskShift=+b.dataset.ts;render()});
+  const save=async patch=>{CHECKS=Object.assign({},CHECKS,patch,{date:today(),site:curSite()});try{await putChecks()}catch(e){writeErr(e)}};
+  v.querySelectorAll('[data-task]').forEach(c=>c.onchange=()=>{if(!me()){c.checked=!c.checked;return toast('Choose who is logging at the top first, so tasks are initialled.','err')}
+    save({[`${s}_${c.dataset.task}`]:c.checked?{by:me(),at:nowTime()}:false})});
+  const sb=$('#signoff');if(sb)sb.onclick=async()=>{if(!me())return toast('Choose who is logging at the top first.','err');if(!$('#commOk').checked)return toast('Confirm notes and communication with the incoming staff first.','err');
+    const left=pr.total-pr.done;if(left&&!await ask({title:`${left} task${left>1?'s':''} not ticked`,body:'Sign off anyway? Pass anything unfinished to the incoming staff in the handoff.',ok:'Sign off'}))return;
+    save({[`${s}_signoff`]:{by:me(),at:nowTime(),done:pr.done,total:pr.total}});toast('Shift signed off')};
+  const us=$('#unsign');if(us)us.onclick=()=>save({[`${s}_signoff`]:false})}
 function housingCards(C){const lp=lvPill;return `
   ${C('The colour system','Community 3.4 · Sunnyside 3.2','t-yellow',`<table>
    <tr><td>${lp('White')}</td><td>New resident (3 months or less), no concerns.</td></tr>
@@ -1898,7 +2073,7 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
   ${C('Emergency procedures','NH 3.1.7','t-brown',`<ol><li>Stay calm. Call <b>911</b> for imminent danger, a medical need or a crime.</li><li>Notify another staff member right away. Never respond alone if it feels unsafe.</li><li>Clear the area if needed. Give CPR or Naloxone as needed.</li><li>Give emergency services a clear, calm summary.</li><li>Afterwards: Incident Report within 12 h, debrief with the Site Supervisor, offer staff support, notify agency partners if hospitalised.</li></ol><p><b>Fire:</b> pull the alarm, evacuate to the meeting point, and don't re-enter until cleared.</p>`)}
   ${C('Shift notes: what to log','12N Note Taking Guideline','t-brown',`<p>Participants have privacy and freedom of movement in their daily lives. Write down what staff need to know to support a participant, respond to a concern, or carry work into the next shift.</p><p><b>Ask:</b> would this change what staff need to know or do?</p><p><b>Log:</b> meaningful wellness changes, missed scheduled check-ins, requests or commitments that need follow-up, safety concerns, site issues such as a leak or a supply shortage, and completed work that matters to the next shift.</p><p><b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment.</p><p><b>Each entry:</b> date and time, what happened, what staff did, and the outcome. Briefly note completed work that matters to the next shift. Use the location and approved participant identifier when needed.</p><p><b>Write what you observed:</b> for example, “Participant declined room cleaning assistance.” Attribute second-hand information to its source. Quote exact words only when they matter to the response. Leave out guesses, diagnoses and unrelated personal details.</p><p><b>Follow-up:</b> flag it, and say who will act, what they need to do, and when. Share notes only through approved channels, with staff who need the information.</p><p><b>Incidents:</b> escalate urgent concerns first, then file the Incident Report within the deadline: the sequence of events, what you observed, actions taken, and who was notified. In the shift log, briefly reference it and note what the incoming team needs to do.</p><p><b>Handoff:</b> review pending actions with incoming staff and confirm who is taking each item.</p><p class="meta" style="margin:0"><i>Example:</i> At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order. Evening shift to check the repair status by 6 p.m. and update the participant.</p><p class="meta" style="margin:4px 0 0"><i>Handoff example:</i> Incident Report filed for a fall near the main entrance. The entrance mat was removed. Incoming shift to confirm a replacement with Maintenance before reopening that entrance.</p>`)}
   ${C('Incident reporting','NH 3.1.4','t-brown',`<p><b>When:</b> injury, illness, property damage, near miss, behavioural escalation, harassment, violence, Code of Conduct breach, police/EMS on site, or any other event that needs follow-up.</p><p><b>Deadline:</b> within <b>12 hours</b>. Finish it before you leave, or hand it off.</p><p><b>Include:</b> initials or ID codes only, staff or participant for each person, date, time, location, an objective sequence of events, actions taken, and whether the Supervisor or On-Call was contacted.</p><p><b>Leave out:</b> opinions, assumptions, diagnoses, hearsay (or name who told you), blame.</p><p>Message the Site Supervisor or Manager on Signal for urgent incidents.</p>`)}
-  ${C('Behaviour Escalation Framework','NH 3.1.12','t-brown',`<ol><li>Incident Report</li><li>Room Status Update (cleanliness, runs alongside)</li><li>Written Warning (first / second / final)</li><li>Community Accountability Review (CAR) &amp; Agreement, with follow-up in 1–2 weeks</li><li>Urgent Warning (Final Written Notice)</li><li>Eviction Request Form</li><li>Program Review Committee decision</li><li>Debrief &amp; lessons learned</li></ol><p><b>Red-line items</b> (violence, weapons, sexual assault) may go straight to step 6. <b>3 CARs in 12 months</b> trigger a mandatory Placement Review.</p>`)}
+  ${C('Behaviour Escalation Framework','NH 3.1.12 · Resident Escalation','t-brown',`<ol><li><b>Incident Report</b>: any staff member.</li><li><b>Room Status Update</b> (Tier 1–3, Room Reset checklist): Safety &amp; Operations Lead. Runs alongside for cleanliness.</li><li><b>Written Warning</b> (first / second / final): any staff member, when reviewing behaviour in incident reports.</li><li><b>Community Accountability Review (CAR) &amp; Agreement</b>: S&amp;O Lead with the Site Manager; follow up in 1–2 weeks. There can be several.</li><li><b>Urgent Warning (Final Written Notice)</b>: Site Manager. The behaviour must stop immediately.</li><li><b>10-Day Final Improvement Notice</b>: mostly for room safety; at least Tier 2 within 10 days, with cleaning support and check-ins.</li><li><b>Eviction Request</b>: Site Manager, with all documents, for the NH Participant Program Review decision.</li><li><b>Debrief &amp; lessons learned</b>: NH Operations Review looks for gaps in our own support.</li></ol><p>Record each step under <a href="#escalations">Escalation Records</a>.</p><p><b>Red-line items</b> (violence, weapons, sexual assault) may go straight to step 6. <b>3 CARs in 12 months</b> trigger a mandatory Placement Review.</p>`)}
   ${C('Missing participant','NH 3.1.16','t-brown',`<p><b>Thresholds:</b> High Risk: <b>24 h</b> without confirmed contact. Non-High Risk: <b>10 days</b>. Reassess at any time.</p><p><b>Before the threshold:</b> check logs, call or text the participant, ask discreetly, and document every attempt.</p><ol><li>Facilitator: Incident Report (unit, risk level, last seen, attempts, description)</li><li>Facilitator: phone the Site Manager</li><li>Manager: partner agencies by phone, plus email within 2 h (cc Director and Safety &amp; Ops Lead)</li><li>Manager: police missing person report. Record the occurrence #</li><li>Manager: email the Safety &amp; Ops Lead and Director the same day</li></ol><p>Keep the unit secured and belongings preserved.</p>`)}
   ${C('Law enforcement arrival','NH 3.1.11','t-brown',`<ol><li>Greet them, introduce yourself, and ask for a business card and the purpose of the visit.</li><li>Warrant: ask for a copy, check the name and DOB, check it is signed by a judge, and write the warrant # on the card.</li><li>Ask the officers to wait in the office.</li><li>Tell the participant privately and let them gather belongings.</li><li>Walk them to the office.</li><li>Log it in Shift Notes and file an Incident Report with photos of the warrant and card. Notify the Supervisor or Manager.</li></ol>`)}
   ${C('Visitor disruption & trespass','Guide 2.7.3','t-white',`<p>Assess, approach calmly, explain expectations, and offer a quiet space. Never approach someone showing aggression on your own, and never make physical contact.</p><p><b>Level 1</b> verbal feedback → <b>Level 2</b> asked to leave → <b>Level 3</b> Notice of Trespass (needs Executive Director approval).</p><p>Violence or weapons: disengage, retreat and call <b>911</b>. If someone won't leave after a trespass notice: police non-emergency <b>${esc(site().nonEmergency||'—')}</b>.</p>`)}
@@ -1906,6 +2081,19 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
   ${C('Participant privacy','Guide 2.7.2','t-white',`<p>Protect names, room numbers, contact info, DOB, health and history. Share only on a need-to-know basis.</p><p><b>Inquiry script:</b> <i>“I appreciate your concern, but I cannot disclose personal details due to confidentiality policies.”</i> Offer to connect them with the Community team. Never confirm or deny that someone lives here.</p><p><b>Exception:</b> imminent harm or a medical emergency. Share only the minimum with first responders, then brief the Shift Lead and log it.</p>`)}
   ${C('Professional boundaries','Guide 2.5.3','t-white',`<p>These apply 24/7, on and off site. <b>Do not</b>: give rides, lend or borrow money, give or receive gifts, socialise outside work, use personal social media or phone numbers, or make home visits.</p><p>Financial exploitation or romantic relationships lead to immediate termination.</p>`)}
   ${C('Unit room checks','NH 3.1.6 · Form v1.0','t-brown',`<p>Every second Thursday, 2–4 PM, with notice posted 48 h ahead. Knock, wait, announce. Visual check only: trash, unsafe electrical items, odours or distress, cleanliness. No opening bins, drawers or bags without immediate risk <i>and</i> supervisor approval.</p><p>Use the official <b>Unit Room Check Form</b>: rate each item P (Pass), FU (Follow-Up) or U (Urgent). Overall status: All Clear / Needs Follow-Up / Urgent. Notify Management for anything urgent, unapproved appliances or electrical panel concerns. Test smoke detectors on the first Thursday of the month. Offer a private check-in within 48 h when follow-up is needed.</p>`)}
+  ${C('Foodbank orders','Monthly Foodbank Order Form','t-brown',`<p>Each month, help participants registered with the foodbank fill out the paper form: bread, coffee or tea, cereal or oatmeal, <b>two</b> proteins, one staple, and any special needs. The participant and staff sign it, and it goes in the participant's file.</p><p>On the order date, enter each order in the foodbank's online form between <b>8 and 11 AM</b>, then mark it submitted under <a href="#foodbank">Foodbank Orders</a>. Orders are picked up on the Friday of that week.</p>`)}
+  ${C('Staff Standards & Commitment','NH Employee Agreement','t-brown',`<ol>
+   <li><b>Engagement &amp; growth:</b> goal-focused conversation; celebrate progress; share what you learn with leadership. Never connect through cigarettes or tobacco; no smoking or vaping in the courtyard or common areas.</li>
+   <li><b>Daily environment care:</b> inside and outside sweeps, logged; flag maintenance or cleanliness issues.</li>
+   <li><b>Food &amp; wellness:</b> meals arrive at the Admin Building and go out the same day; never in the communal fridge. Staff may place a meal safely inside the unit.</li>
+   <li><b>Courtyard &amp; storage:</b> no belongings left outside units; work with participants on safe storage.</li>
+   <li><b>Guest Unit:</b> guests sign in at the Admin Building; pre-check the unit; door closed during visits; check, sweep and check out after.</li>
+   <li><b>Room Wellness Checks:</b> electrical tampering, tablet present and working, smoke detector, door handles, cleanliness and odours.</li>
+   <li><b>Reporting:</b> urgent or safety issues go to Signal and an Incident Report; reports through the portal; shred paper copies once logged.</li>
+   <li><b>Workplace care:</b> the last 20 minutes of each shift go to tidying the stock rooms, lounge and office.</li>
+   <li><b>Boundaries:</b> no socializing outside work; never give or lend money, cigarettes, vapes, food, clothing, items or rides; no personal contact details.</li>
+   <li><b>Admin Building security:</b> never left unattended; front door and office locked; tell your shift partner before you leave the area.</li></ol>
+   <p class="meta" style="margin:0">Each staff member signs the agreement. Record the date on the Staff Roster.</p>`)}
   ${C('Shift handoff','NH 3.3.5','t-brown',`<p>Final 15 minutes of the shift, with a 10-minute overlap when possible. Cover participant updates, site updates, incidents (even low-level) and the “to follow up” list.</p><p>Shifts: Day 08:00–16:00 · Evening 16:00–00:00 · Night 00:00–08:00.</p>`)}
   ${C('Safety walkthroughs','NH 3.1.5 · 3.1.8','t-brown',`<p><b>Morning</b> 8–10 AM and <b>Midday</b> 12–2 PM: courtyard and paths, social areas, shared bathrooms/showers/laundry, Admin Building, micro-home exteriors.</p><p><b>Evening</b> 9:30–10 PM: emergency exits latched and locked, courtyard clear, shared spaces, Admin restock needs. Quiet hours reminder only. Participants don't have to leave.</p><p><b>Gate alarm:</b> arm, disarm and re-arm it exactly as set out in NH SOP 3.1.9 (in the binder). Report every activation as a near miss.</p>`)}
   ${C('When to call police','Safety · Incident Response Matrix','t-red',`<table>
