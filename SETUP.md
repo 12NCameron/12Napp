@@ -65,6 +65,8 @@ Staff never need access to the sheet or the folder. The server writes to them on
 2. Save. Then **Deploy → New deployment → Web app**:
    - **Execute as:** Me
    - **Who has access:** **Anyone**. The address is reachable, but every request must carry a valid 12N Google sign-in, which the server checks against the Access tab.
+     - **Don't** choose "Anyone within 12neighbours.com" or "Anyone with a Google account". Google then puts its own sign-in page in front of the script, the app's background requests can't get through it, and the app shows "No connection". The server already refuses anyone who isn't signed in with a 12neighbours.com account (`ALLOWED_DOMAIN` in `Code.gs`) and listed on the Access tab.
+     - To change the code later, use **Manage deployments → Edit (pencil) → Version: New version**. This keeps the same address and the same access setting.
 3. Copy the **Web app URL**. It ends in `/exec`.
 
 ## Step 4: Put the app online

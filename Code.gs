@@ -11,14 +11,17 @@
  *   • moves archived entries into a yearly archive spreadsheet in each site's folder.
  * Nothing is ever erased: deletes are marked, archived entries stay searchable.
  *
- * Setup: see SETUP.md. Fill in the three settings below, run setup() once,
+ * Setup: see SETUP.md. Check the three settings below, run setup() once,
  * then Deploy > New deployment > Web app (Execute as: Me · Who has access: Anyone).
+ * "Anyone" is required: the app calls this script from its own address, and Google's
+ * own sign-in wall would block those calls. Access is enforced here instead: every
+ * request needs a Google sign-in from ALLOWED_DOMAIN plus a row on the Access tab.
  */
 
-/* ===== SETTINGS (fill these in; see SETUP.md) ===== */
-var OAUTH_CLIENT_ID = '';   // Web client ID from Google Cloud, ends in .apps.googleusercontent.com
-var ALLOWED_DOMAIN = '';    // e.g. '12neighbours.com' — only accounts from this domain may sign in
-var APP_URL = '';           // where the installed app is hosted, e.g. https://example.github.io/nh-site-docs/
+/* ===== SETTINGS (see SETUP.md). These match app/config.js, so pasting a new version keeps them. ===== */
+var OAUTH_CLIENT_ID = '451384662035-bg8i5o78qphr0ufq8lan906khdeid4c9.apps.googleusercontent.com'; // Web client ID from Google Cloud
+var ALLOWED_DOMAIN = '12neighbours.com';    // only accounts from this Google Workspace domain may use the app
+var APP_URL = 'https://12ncameron.github.io/12Napp/'; // where the installed app is hosted
 
 var FIXED = ['Collection', 'ID', 'Server Updated', 'Deleted', 'Record (JSON)', 'Saved By'];
 var DOC_COLS = ['Google Doc', 'Doc Updated'];
