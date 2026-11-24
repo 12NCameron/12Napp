@@ -1,5 +1,6 @@
 # Publishes the installable app (the app/ folder only) to GitHub Pages
 # whenever app/ changes on main. Turn on: Settings → Pages → Source: GitHub Actions.
+# To re-run a failed deploy without changing the app: Actions → this workflow → Run workflow.
 name: Publish app to GitHub Pages
 
 on:
