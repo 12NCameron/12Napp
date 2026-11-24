@@ -27,10 +27,13 @@ var TAB_NAMES = {
   visitors: 'Visitor Log', roomchecks: 'Room Operations Data', wellness: 'Room Wellness Checks',
   requests: 'Participant Requests', intakes: 'Intake Data', engagement: 'Participant Engagement Data',
   workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log',
-  guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks'
+  guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks',
+  trespass: 'No-Trespass List', notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Stabilization & Improvement Plans',
+  rent: 'Rent Checks', pets: 'Pet Registrations', parking: 'Parking Concerns', entries: 'Emergency Entry Records'
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
-var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs', safetyaudit: 'Safety Audits' };
+var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs', safetyaudit: 'Safety Audits',
+  notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Support Plans', entries: 'Emergency Entry Records' };
 var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants|schedule))$/;
 var ID_RE = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 var REQ_EMAIL = null; // set per request from the verified Google sign-in
@@ -168,6 +171,7 @@ function checkConfigChange_(u, data) {
     if (!siteOk_(allowed, k)) { if (JSON.stringify(o) !== JSON.stringify(n)) throw new Error('DENIED: Your account is not set up for that site.'); return; }
     if ((o.status || 'Active') !== (n.status || 'Active') || String(o.closed || '') !== String(n.closed || '')) throw new Error('DENIED: Only administrators can close or reopen sites.');
     if ((o.units || []).length !== (n.units || []).length) throw new Error('DENIED: Only administrators can add or remove units.');
+    if ((o.kind || 'shelter') !== (n.kind || 'shelter')) throw new Error('DENIED: Only administrators can change the type of site.');
   });
 }
 /* Supervisors build drafts and submit them; publishing (what facilitators see) needs a Manager. */

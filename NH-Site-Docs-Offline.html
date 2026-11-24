@@ -145,7 +145,7 @@ td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowra
 .catrow td{background:var(--panel2);font-weight:700;color:var(--brand)}
 .ref h3{margin:0 0 6px;font-size:16px}.ref ol,.ref ul{margin:6px 0 0 18px;padding:0}.ref li{margin:3px 0}.ref p{margin:6px 0}
 .ref .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;margin-left:6px}
-.t-red{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}.t-brown{background:var(--brandSoft);color:var(--brand)}.t-white{background:var(--line2);color:var(--ink2)}
+.t-yellow{background:color-mix(in srgb,#f6c90e 30%,transparent);color:var(--ink)}.t-red{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}.t-brown{background:var(--brandSoft);color:var(--brand)}.t-white{background:var(--line2);color:var(--ink2)}
 .toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--nav);color:var(--navInk);padding:9px 16px;border-radius:9px;z-index:60;font-size:14px;box-shadow:var(--sh);max-width:calc(100% - 32px)}
 .toast.err{background:var(--badSoft);color:var(--bad);border:1px solid var(--bad)}
 .banner{background:var(--warnSoft);color:var(--warnInk);padding-block:8px;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));font-size:13px;border-bottom:1px solid var(--line)}
@@ -239,7 +239,7 @@ const EXIT_REASONS=['Moved to permanent housing','Moved to other housing / famil
 const DEFAULT_PORTAL='https://sites.google.com/12neighbours.com/12n-staff-portal-v1-0/home';
 const mkUnits=(n,start=1)=>Array.from({length:n},(_,i)=>({no:start+i,status:'Vacant',participantId:'',notes:''}));
 const DEFAULT_CONTACTS=()=>DIRECTORY.map(([role,name,reach,when])=>({role,name,reach,when}));
-const mkSite=(name,n)=>({name,address:'',status:'Active',opened:today(),closed:'',units:mkUnits(n),contacts:DEFAULT_CONTACTS(),nonEmergency:'',sitePhone:'',setupDone:false});
+const mkSite=(name,n,kind)=>({name,kind:kind||'shelter',address:'',status:'Active',opened:today(),closed:'',units:mkUnits(n),contacts:DEFAULT_CONTACTS(),nonEmergency:'',sitePhone:'',setupDone:false});
 const DEFAULT_CFG=()=>({portalUrl:DEFAULT_PORTAL,sites:{c1:mkSite('Site 1',0)}});
 /* Older setups kept staff lists and participant names inside the config. Keep them readable here;
    a manager's device moves them into their own records the first time it loads (see migrateLegacy). */
@@ -259,10 +259,46 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
 /* =========================================================
    STORE — shared db when available, else this browser only
    ========================================================= */
-const MODS=['notes','handoff','patrols','incidents','visitors','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','requests','intakes','engagement','workorders','requisitions'];
+const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','requests','intakes','engagement','workorders','requisitions'];
 const AUDIT_KEYS=['sz','admin','laundry','baths','units','kitchen','utility','life','house','env','bldg','sec'];
 const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object.entries(o).filter(([,x])=>x&&x.v==='No').map(([k])=>k));
 const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
+
+/* ---------- Site types. Permanent housing follows the Community (Yellow) and Sunnyside SOP manuals. ---------- */
+const KINDS={shelter:'Shelter / bridge housing (Neighbourly Homes)',housing:'Permanent housing (Community / Sunnyside)'};
+const siteKind=k=>((S().sites||{})[k||curSite()]||{}).kind||'shelter';
+const isHousing=()=>siteKind()==='housing';
+const PILLARS=['Rent Payment','Home Upkeep','Guests, Occupancy & Home Stabilization','Peaceable Behaviour'];
+const OTHER_RULES=['Parking','Pets','Other community rule'];
+const LEVELS=['Yellow','Orange','Red','Gray'];
+const LV_RANK={Green:1,White:0,Yellow:2,Orange:3,Red:4,Gray:5};
+const PROB_DAYS={Red:49,Orange:42,Yellow:28},STEP_DOWN={Red:'Orange',Orange:'Yellow',Yellow:'Green'};
+const LV_STYLE={White:'background:#fff;color:#333;border:1px solid #aaa',Green:'background:#2e7d32;color:#fff',Yellow:'background:#f6c90e;color:#222',Orange:'background:#ef7d00;color:#1a1a1a',Red:'background:#c62828;color:#fff',Gray:'background:#666;color:#fff'};
+const lvPill=(s,extra)=>s?`<span class="pill" style="${LV_STYLE[s]||''}">${esc(s)}${extra||''}</span>`:'';
+const daysBetween=(a,b)=>Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5);
+const addMonthsISO=(ds,n)=>{const d=new Date(ds+'T12:00');d.setMonth(d.getMonth()+n);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const forResident=(r,p)=>r.unitPid?r.unitPid===p.id:String(r.unit)===String(p.unit);
+/* One notice's effect on a pillar today: stays at its level until resolved, then steps back toward Green after each probation period. */
+function noticeEffect(n,pillar,asOf){
+  if(n.status==='Reversed on appeal'||!LEVELS.includes(n.level))return {s:'Green'};
+  if(n.status!=='Resolved')return {s:n.level,why:n.deadline?`deadline ${fmtDate(n.deadline)}`:''};
+  if(n.level==='Gray'||pillar==='Home Upkeep')return {s:'Green'};
+  let lv=n.level,from=n.resolvedDate||n.date;const straight=site().probation==='straight';
+  while(lv!=='Green'){const d=PROB_DAYS[lv];const until=addDays(from,d);if(asOf<until)return {s:lv,next:until,to:straight?'Green':STEP_DOWN[lv]};
+    if(straight)return {s:'Green'};lv=STEP_DOWN[lv];from=until}
+  return {s:'Green'}}
+function pillarStatus(p,pillar,asOf){asOf=asOf||today();let best={s:'Green'};
+  for(const n of siteRecs('notices').filter(r=>r.pillar===pillar&&forResident(r,p))){const e=noticeEffect(n,pillar,asOf);if(LV_RANK[e.s]>LV_RANK[best.s]||(LV_RANK[e.s]===LV_RANK[best.s]&&e.next&&best.next&&e.next>best.next))best=e}
+  return best}
+function residentStatus(p){const per=PILLARS.map(x=>pillarStatus(p,x));let o=per.reduce((a,b)=>LV_RANK[b.s]>LV_RANK[a]?b.s:a,'Green');
+  if(o==='Green'&&p.moveIn&&daysBetween(p.moveIn,today())<=92)o='White';return {per,overall:o}}
+function nextInspection(p){const list=siteRecs('inspections').filter(r=>forResident(r,p)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!list.length)return {due:p.moveIn?addMonthsISO(p.moveIn,6):'',first:true};
+  const last=list[0];if(!/^Green/.test(last.result||''))return {due:last.followUp||last.date,followUp:true};
+  let g=0;for(const r of list){if(/^Green/.test(r.result||''))g++;else break}
+  return {due:addMonthsISO(last.date,g>=2?12:6)}}
+const housingResidents=()=>pplOf(curSite()).filter(p=>p.status==='Active');
+const parkingNext=r=>r.status!=='Open'?'':!r.first?'Give the first notice':!r.second?(addDays(r.first,7)<=today()?'7 days passed: give the second notice':`Second notice from ${fmtDate(addDays(r.first,7))}`):!r.review?(addDays(r.second,3)<=today()?'72 hours passed: management review':`Review from ${fmtDate(addDays(r.second,3))}`):r.review==='Removal approved'&&!r.removed?'Arrange licensed towing':'';
 const toMin=s=>{const m=/^(\d\d):(\d\d)/.exec(s||'');return m?+m[1]*60+ +m[2]:null};
 let DBX=null,USER=null,DL=null,SHARED=false,CAN_WRITE=true,CAN_ADMIN=true,CAN_SCHEDULE=true,MY_UID=null;
 /* Layers, lowest to highest. CAN_ADMIN = Manager and up (kept name), CAN_ORG = Administrator. */
@@ -371,7 +407,9 @@ const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',hand
   incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!roomFollow(r)||r.checkInDone==='Yes',inout:()=>true,
   requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
   requisitions:r=>['Received','Denied','Not approved'].includes(r.status),
-  guestunit:r=>r.status!=='Booked'&&r.status!=='In use'||r.date<today(),safetyaudit:r=>r.status==='Completed'||!auditNo(r).length,firstaid:()=>true};
+  guestunit:r=>r.status!=='Booked'&&r.status!=='In use'||r.date<today(),safetyaudit:r=>r.status==='Completed'||!auditNo(r).length,firstaid:()=>true,
+  notices:r=>r.status!=='Active',inspections:()=>true,plans:r=>r.outcome&&r.outcome!=='Open',rent:()=>true,pets:r=>r.status!=='Requested',
+  parking:r=>r.status!=='Open',entries:r=>r.told!=='Not yet'&&r.ir!=='Not yet',trespass:r=>r.status!=='Active'};
 function archiveCandidates(months){const cutoff=addDays(today(),-Math.round(months*30.44));const ok=new Set(allowedSites());
   return Object.fromEntries(MODS.map(m=>[m,recs(m).filter(r=>ok.has(r.site)&&recDate(r)&&recDate(r)<cutoff&&IS_CLOSED[m](r))]))}
 async function archiveEntries(m,list,progress){
@@ -586,7 +624,7 @@ visitors:{title:'Guest & Contractor Sign-In/Out Log',nav:'Guest & Contractor Log
  cols:['date','name','agency','purpose','timeIn','timeOut',{l:'Status',f:r=>pill(r.timeOut?'Signed out':'On site')}],
  rowAction:{l:'Sign out',show:r=>!r.timeOut,run:r=>{r.timeOut=nowTime()}},
  chips:[{l:'On site now',f:r=>!r.timeOut},{l:'Today',f:r=>r.date===today()}]},
-roomchecks:{title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations Data',sop:'Guide · Room Checks',custom:'roomGrid',
+roomchecks:{kinds:['shelter'],title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations Data',sop:'Guide · Room Checks',custom:'roomGrid',
  desc:'Weekday checks (Mon–Fri, 10 AM–2 PM): knock, announce, do a wellness and room check, then record it here. Every unit must be accounted for (checked or exempt) before the shift ends.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Unit',t:'unit',req:1},
@@ -600,7 +638,7 @@ roomchecks:{title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations D
   {k:'comments',l:'Comments',t:'textarea',full:1,req:r=>rcFollow(r.status),hint:'Required when follow-up is needed: describe what you saw and what support was offered. Report any unapproved appliances (heating elements, hot plates) to the Site Supervisor right away.'}],
  cols:['date','unit','status','staff','checkStatus','followUp','comments'],
  chips:[{l:'Today',f:r=>r.date===today()},{l:'Needs follow-up',f:r=>rcFollow(r.status)},{l:'Follow-ups',f:r=>r.followUp==='Yes'}]},
-wellness:{title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Checks',sop:'Unit Room Check Form v1.0 (Phase 2) · NH 3.1.6',copy:1,
+wellness:{kinds:['shelter'],title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Checks',sop:'Unit Room Check Form v1.0 (Phase 2, April 2026) · NH 3.1.6 · 3.1.10–3.1.13 · 3.2.3 · 3.2.6',copy:1,
  desc:'The official Unit Room Check Form. Rate each item P = Pass, FU = Follow-Up, U = Urgent. Knock, wait and announce before entering. The check is supportive, not disciplinary: do not open bins, drawers or bags unless safety is at immediate risk and a supervisor approves.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
@@ -647,7 +685,7 @@ wellness:{title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Ch
   {k:'checkInDone',l:'Check-in completed?',t:'seg',o:['No','Yes'],def:'No',show:r=>roomFollow(r)}],
  cols:['date','unit','staff','roomStatus',{l:'Flagged items',f:r=>esc(roomFlags(r).map(x=>`${x.item} (${x.v})`).join(', '))},{l:'Check-in',f:r=>roomFollow(r)?(r.checkInDone==='Yes'?pill('Completed'):pill('Due '+fmtDate(r.checkInDue),r.checkInDue<today()?'bad':'warn')):''}],
  chips:[{l:'Needs follow-up',f:r=>roomFollow(r)&&r.checkInDone!=='Yes'},{l:'Urgent',f:r=>r.roomStatus==='Urgent'},{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)}]},
-guestunit:{title:'Guest Unit Booking',nav:'Guest Unit Bookings',sheet:'Guest Unit Bookings',sop:'12N Guest Unit Policy · Guest Unit Sign-Up Sheet',
+guestunit:{kinds:['shelter'],title:'Guest Unit Booking',nav:'Guest Unit Bookings',sheet:'Guest Unit Bookings',sop:'12N Guest Unit Policy · Guest Unit Sign-Up Sheet',
  desc:'The Guest Unit is for participants to spend time with approved guests. Open 8:00 AM – 8:00 PM, last booking starts at 6:00 PM, 2 hours maximum. The participant and their guest both sign the paper sheet (yellow binder in the office).',
  fields:[
   {k:'policy',t:'info',full:1,html:()=>'<b>Guest Unit guidelines</b><ul style="margin:6px 0 0 18px;padding:0"><li>The guest stays with the participant who booked the unit. Guests are never in the unit alone.</li><li>Former 12 Neighbours participants can\'t be guests.</li><li>The unit is for approved visits only, not a warming space.</li><li>No smoking in the unit.</li></ul>'},
@@ -805,7 +843,151 @@ firstaid:{title:'First Aid Kit Check',nav:'First Aid Kit Checks',sheet:'First Ai
   {k:'notes',l:'Notes',t:'textarea',full:1}],
  cols:['date','kit','staff','reason',{l:'Needs restock',f:r=>{const n=faLow(r).length;return n?pill(n+' item'+(n>1?'s':''),'warn'):pill('All stocked','ok')}}],
  chips:[{l:'Needs restock',f:r=>faLow(r).length>0}]},
-inout:{title:'Participant Time In/Out',nav:'Participant In/Out',sheet:'Participant In-Out Log',sop:'Participant Time In/Out Sheet',custom:'inoutGrid',
+notices:{title:'Community Notice',nav:'Community Notices',sheet:'Community Notices',sop:'Community SOP (Yellow) 3.3–3.6 · Sunnyside SOP 3.2',kinds:['housing'],copy:1,
+ desc:'Start with a conversation and support. A written notice comes when that hasn\'t resolved the concern, or straight away for a serious conduct matter. Notices contain observed facts only, never anything a resident shared in a support conversation.',
+ fields:[
+  {k:'date',l:'Date of notice',t:'date',req:1,def:D.today},{k:'unit',l:'Resident',t:'unit',req:1},
+  {k:'pillar',l:'Policy area',t:'select',o:[...PILLARS,...OTHER_RULES],req:1},
+  {k:'level',l:'Notice level',t:'seg',o:LEVELS,req:1,hint:'Yellow: Notice of Policy Violation · Orange: Urgent Notice · Red: Second Urgent Notice · Gray: formal Residential Tenancies Act stage.'},
+  {k:'pathway',l:'Gray pathway',t:'select',o:['Gray A: Application for Assistance','Gray B: Form 3 serious-case application','Gray C: Rent, Notice to Vacate','Gray C: Rent, Final Notice to Vacate'],show:r=>r.level==='Gray',req:r=>r.level==='Gray'},
+  {k:'partnerInfo',t:'info',full:1,warn:1,show:r=>(r.level==='Red'||r.level==='Gray')&&!!site().landlord,html:()=>`At this site, Red notices and all legal (RTA) notices come from <b>${esc(site().landlord)}</b>. Record the referral and their decision here.`},
+  {k:'matter',l:'Type of concern',t:'seg',o:['Non-urgent (7+ days to fix)','Conduct (immediate)'],show:r=>r.level!=='Gray',req:r=>r.level!=='Gray',hint:'Conduct: threats, harassment, violence, weapons, illegal activity, serious disturbance. If unsure, treat it as conduct and consult the Community Manager.'},
+  {k:'concern',l:'What was observed',t:'textarea',full:1,req:1,hint:'Facts only: what was seen or reported, when and where. No conclusions or labels.'},
+  {k:'required',l:'What the resident needs to do to resolve it',t:'textarea',full:1,req:1},
+  {k:'amount',l:'Rent outstanding ($)',t:'number',show:r=>/Rent/.test(r.pathway||'')},
+  {k:'deadline',l:'Deadline',t:'date',req:1,def:()=>addDays(today(),7),hint:'At least 7 days for non-urgent matters. Conduct matters: immediate.'},
+  {k:'issuedBy',l:'Issued by',t:'staff',def:D.me,req:1},
+  {k:'approvedBy',l:'Approved by',t:'text',req:1,hint:'Yellow: Site Supervisor · Orange: Site Manager · Red and Gray: Community Manager or the landlord partner.'},
+  {k:'served',l:'How it was served',t:'seg',o:['Hand-delivered','Posted on door','Other (describe in notes)'],req:1,hint:'Hand-delivery is preferred: it is a chance for a short, supportive conversation.'},
+  {k:'servedAt',l:'Date and time served',t:'datetime-local',req:1,def:()=>today()+'T'+nowTime()},
+  {k:'talk',l:'Conversation with the resident',t:'seg',o:['Held','Attempted','Not safe right now']},
+  {k:'support',l:'Support offered',t:'textarea',full:1},
+  {k:'tribunal',l:'Copy sent to the Residential Tenancies Tribunal on',t:'date',show:r=>/Notice to Vacate/.test(r.pathway||''),hint:'Required within 7 days of serving a Notice to Vacate, even if the rent is then paid.'},
+  {k:'filed',l:'Application filed on',t:'date',show:r=>/Gray A|Gray B/.test(r.pathway||'')},
+  {t:'sect',l:'Outcome'},
+  {k:'status',l:'Status',t:'seg',o:['Active','Resolved','Reversed on appeal'],def:'Active',req:1,hint:'Mark Resolved when the concern is fixed. The back-to-Green period starts from that date.'},
+  {k:'resolvedDate',l:'Resolved on',t:'date',show:r=>r.status==='Resolved',req:r=>r.status==='Resolved',def:D.today},
+  {k:'appeal',l:'Written appeal received on',t:'date',hint:'Appeals are answered in writing within 14 days, by someone not involved in the notice.'},
+  {k:'appealOutcome',l:'Appeal outcome',t:'select',o:['','Upheld','Modified','Reversed'],show:r=>!!r.appeal},
+  {k:'appealReplied',l:'Written response sent on',t:'date',show:r=>!!r.appeal},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','unit','pillar',{l:'Level',f:r=>lvPill(r.level)},'deadline',{l:'Status',f:r=>pill(r.status,r.status==='Active'?'warn':r.status==='Resolved'?'ok':'')}],
+ chips:[{l:'Active',f:r=>r.status==='Active'},{l:'Deadline passed',f:r=>r.status==='Active'&&r.deadline&&r.deadline<today()},{l:'Appeals open',f:r=>r.appeal&&!r.appealReplied},{l:'Gray',f:r=>r.level==='Gray'}]},
+inspections:{title:'Home Inspection',nav:'Home Inspections',sheet:'Home Inspections',sop:'Community SOP (Yellow) 4.3',kinds:['housing'],copy:1,
+ desc:'Give at least 24 hours\' written notice and encourage the resident to be there. Be respectful and non-judgemental: this checks the home\'s condition, not the resident\'s lifestyle. Repairs that are the landlord\'s responsibility go to a work order and aren\'t part of the result.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Resident',t:'unit',req:1},
+  {k:'noticeGiven',l:'Written notice given on',t:'date',req:1},
+  {k:'itype',l:'Inspection type',t:'seg',o:['Scheduled','Follow-up','Move-in','Move-out'],def:'Scheduled'},
+  {k:'present',l:'Resident present',t:'seg',o:['Yes','No']},
+  {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},{k:'staff2',l:'Second staff',t:'staff',def:D.other},
+  {t:'sect',l:'Condition of the home'},
+  {k:'cond',l:'Condition of the home',t:'yntable',full:1,vals:['OK','Concern'],o:[
+   ['Interior clean and tidy','Kitchen, bathroom, floors and surfaces'],['Exterior and deck','Deck and outdoor areas that belong to the home'],
+   ['No smoking inside',''],['No unauthorized modifications','Inside or outside'],['No damage beyond normal wear and tear',''],
+   ['No prohibited items stored','Weapons, flammable materials, drug paraphernalia'],['No pests or significant odour',''],
+   ['Smoke detectors working',''],['Air exchanger working',''],['Maintenance needed (any cause)','Landlord repairs go to a work order']]},
+  {t:'sect',l:'Result'},
+  {k:'result',l:'Result',t:'seg',full:1,o:['Green: no concerns','Yellow: minor concerns','Orange: significant concerns','Red: serious or urgent concerns'],req:1},
+  {k:'photos',l:'Photos taken of concerns',t:'seg',o:['Yes','No','No concerns']},
+  {k:'plan',l:'Improvement plan (agreed with the resident)',t:'textarea',full:1,show:r=>/^(Orange|Red)/.test(r.result||''),req:r=>/^(Orange|Red)/.test(r.result||''),hint:'Each concern, the steps the resident agrees to, the support 12N will give, and a timeline. Give the resident a copy.'},
+  {k:'followUp',l:'Follow-up inspection date',t:'date',show:r=>!!r.result&&!/^Green/.test(r.result),req:r=>!!r.result&&!/^Green/.test(r.result)},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','unit','itype',{l:'Result',f:r=>lvPill((r.result||'').split(':')[0])},'followUp'],
+ chips:[{l:'Follow-ups ahead',f:r=>r.followUp&&r.followUp>=today()},{l:'Concerns',f:r=>!!r.result&&!/^Green/.test(r.result)}]},
+plans:{title:'Support Plan',nav:'Support Plans',sheet:'Stabilization & Improvement Plans',sop:'Community SOP (Yellow) 4.3.4 · 4.4.6 · Sunnyside SOP 3.2',kinds:['housing'],copy:1,
+ desc:'Home Stabilization and Improvement Plans are practical, time-limited supports, not penalties. Write them with the resident wherever possible, give them a copy, and keep in close contact during the plan.',
+ fields:[
+  {k:'date',l:'Date of issue',t:'date',req:1,def:D.today},{k:'unit',l:'Resident',t:'unit',req:1},
+  {k:'ptype',l:'Plan type',t:'seg',o:['Home Stabilization Plan','Improvement Plan (home upkeep)'],req:1},
+  {k:'pillar',l:'Policy area',t:'select',o:PILLARS,def:'Guests, Occupancy & Home Stabilization'},
+  {k:'concerns',l:'What has been observed',t:'textarea',full:1,req:1,hint:'Facts only.'},
+  {k:'steps',l:'Steps the resident will take',t:'textarea',full:1,req:1},
+  {k:'support',l:'Support 12 Neighbours will give',t:'textarea',full:1},
+  {k:'measures',l:'Temporary measures',t:'multi',full:1,show:r=>r.ptype==='Home Stabilization Plan',o:['Limit overnight guests for a set period','Guests accompanied by the resident on the property','Reset or remove guest access codes','Named people not permitted on the property','Non-residents\' belongings removed','Help securing the home (latches, screens, locks)','More staff check-ins or support meetings']},
+  {k:'accom',l:'Disability or support needs: accommodation considered',t:'seg',o:['Yes','Not applicable']},
+  {k:'approvedBy',l:'Approved by',t:'text',req:1,hint:'A Home Stabilization Plan needs Community Manager approval before it is issued.'},
+  {k:'served',l:'How it was given',t:'seg',o:['In a meeting','Hand-delivered','Posted on door']},
+  {k:'review',l:'Review date',t:'date',req:1,def:()=>addDays(today(),14),hint:'Usually 7–21 days from issue.'},
+  {k:'staff',l:'Staff',t:'staff',def:D.me,req:1},
+  {t:'sect',l:'Review'},
+  {k:'outcome',l:'Outcome',t:'seg',o:['Open','Met: plan closed','Extended','Not met: manager consulted'],def:'Open',req:1},
+  {k:'outcomeNotes',l:'Review notes',t:'textarea',full:1,show:r=>r.outcome&&r.outcome!=='Open'}],
+ cols:['date','unit','ptype','review',{l:'Outcome',f:r=>pill(r.outcome,r.outcome==='Open'?(r.review<today()?'bad':'warn'):'ok')}],
+ chips:[{l:'Open',f:r=>r.outcome==='Open'},{l:'Review due',f:r=>r.outcome==='Open'&&r.review<=today()}]},
+rent:{title:'Rent Check',nav:'Rent Checks',sheet:'Rent Checks',sop:'Community SOP (Yellow) 4.2',kinds:['housing'],
+ desc:'Rent is due on the 1st. Confirm every resident\'s payment by the morning of the 2nd. If a payment is in process but not confirmed, try to reach the resident before any notice. Pass any discrepancy to the Community Support Team.',
+ fields:[
+  {k:'month',l:'Rent month',t:'month',req:1,def:()=>today().slice(0,7)},{k:'unit',l:'Resident',t:'unit',req:1},
+  {k:'method',l:'Payment method',t:'select',o:['Social Development','Pre-authorized debit','E-transfer','Cash','Other'],req:1},
+  {k:'expected',l:'Rent expected ($)',t:'number'},{k:'received',l:'Amount received ($)',t:'number'},{k:'receivedDate',l:'Date received',t:'date'},
+  {k:'status',l:'Status',t:'seg',o:['Paid in full','In process','Partial','Not received'],req:1},
+  {k:'contacted',l:'Resident contacted',t:'seg',o:['Yes','No','Not needed'],show:r=>r.status&&r.status!=='Paid in full'},
+  {k:'staff',l:'Checked by',t:'staff',def:D.me,req:1},{k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['month','unit','method','received',{l:'Status',f:r=>pill(r.status,r.status==='Paid in full'?'ok':r.status==='In process'?'info':'bad')}],
+ chips:[{l:'This month',f:r=>r.month===today().slice(0,7)},{l:'Not paid in full',f:r=>r.status!=='Paid in full'}]},
+pets:{title:'Pet Registration',nav:'Pet Registrations',sheet:'Pet Registrations',sop:'Community SOP (Yellow) 4.7',kinds:['housing'],
+ desc:'No pet comes into the community without written approval first.',
+ fields:[
+  {k:'date',l:'Request received',t:'date',req:1,def:D.today},{k:'unit',l:'Resident',t:'unit',req:1},
+  {k:'petName',l:'Pet\'s name',t:'text',req:1},{k:'petType',l:'Type of animal',t:'text',req:1},{k:'petAge',l:'Age',t:'text'},
+  {k:'vet',l:'Veterinarian (name, phone, address)',t:'textarea',full:1},
+  {k:'photo',l:'Photo of the pet',t:'seg',o:['Received','Not yet'],def:'Not yet'},{k:'vaccines',l:'Vaccination records',t:'seg',o:['Received','Not yet'],def:'Not yet'},
+  {k:'formD',l:'Pet Agreement (Form D) signed',t:'seg',o:['Signed','Not yet'],def:'Not yet'},
+  {k:'status',l:'Status',t:'seg',o:['Requested','Approved','Not approved','Approval withdrawn'],def:'Requested',req:1},
+  {k:'approvedBy',l:'Decision by',t:'text',show:r=>r.status!=='Requested'},{k:'decided',l:'Decision date',t:'date',show:r=>r.status!=='Requested'},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','unit','petName','petType',{l:'Status',f:r=>pill(r.status,r.status==='Approved'?'ok':r.status==='Requested'?'warn':'')}],
+ chips:[{l:'Waiting for a decision',f:r=>r.status==='Requested'},{l:'Approved',f:r=>r.status==='Approved'}]},
+parking:{title:'Parking Concern',nav:'Parking Concerns',sheet:'Parking Concerns',sop:'Community SOP (Yellow) 4.6',kinds:['housing'],
+ desc:'First notice: 7 days to act. Second notice: 72 hours. Then a management review before any removal. Photograph the vehicle at each step and try to identify the owner first.',
+ fields:[
+  {k:'date',l:'Date observed',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
+  {k:'where',l:'Where on the property',t:'text',req:1},{k:'vehicle',l:'Vehicle (make, model, colour, plate)',t:'text',req:1},
+  {k:'concern',l:'Concern',t:'multi',full:1,req:1,o:['Not in a designated spot','Appears not to run','Expired plates','Flat tires','Visible deterioration','Hasn\'t moved in a long time']},
+  {k:'unit',l:'Owner (resident), if known',t:'unit'},{k:'photos',l:'Photos taken',t:'seg',o:['Yes','No']},
+  {k:'first',l:'First notice given on',t:'date',hint:'On the vehicle and to the resident in writing. 7-day deadline.'},
+  {k:'second',l:'Second notice given on',t:'date',show:r=>!!r.first,hint:'72-hour deadline. Re-photograph the vehicle and try to reach the resident in person or by phone.'},
+  {k:'review',l:'Management review',t:'seg',o:['Requested','Removal approved','Removal not approved'],show:r=>!!r.second,hint:'The Community Manager confirms the steps were followed, the bylaw requirements, and a licensed towing service.'},
+  {k:'removed',l:'Vehicle removed on',t:'date',show:r=>r.review==='Removal approved'},
+  {k:'status',l:'Status',t:'seg',o:['Open','Resolved','Vehicle removed'],def:'Open',req:1},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','where','vehicle','unit',{l:'Next step',f:r=>esc(parkingNext(r)||'—')},'status'],
+ chips:[{l:'Open',f:r=>r.status==='Open'}]},
+entries:{title:'Emergency Entry Record',nav:'Emergency Entries',sheet:'Emergency Entry Records',sop:'Sunnyside SOP 7.9',kinds:['housing'],copy:1,
+ desc:'Only when someone\'s life or safety is at serious risk right now, or serious damage is happening. NOT an emergency: not seeing a resident for a while, a smell or mess, a suspected rule being broken, a guest who may be inside, or a request from police to open a home. Never delay a life-safety response to get approval.',
+ fields:[
+  {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',req:1,def:D.now},{k:'unit',l:'Home',t:'unit',req:1},
+  {k:'why',l:'Why it was an emergency',t:'textarea',full:1,req:1},
+  {k:'called911',l:'911 called',t:'seg',o:['Yes','No'],req:1},
+  {k:'staff',l:'Staff who entered',t:'staff',def:D.me,req:1},{k:'staff2',l:'Second staff',t:'staff',def:D.other,hint:'Two staff where possible. One only if waiting would put a life at risk.'},
+  {k:'knocked',l:'Knocked and called out first',t:'seg',o:['Yes','Not safe to wait']},
+  {k:'done',l:'What was done',t:'textarea',full:1,req:1,hint:'Only what the emergency needed: first aid, naloxone, helping someone out, stopping water. No searching or moving belongings.'},
+  {k:'called',l:'Who was called',t:'text'},
+  {k:'leftAs',l:'How the home was left',t:'seg',o:['Closed and locked','Staff stayed','Landlord on-call arranged'],req:1},
+  {k:'told',l:'Resident told what happened and why',t:'seg',o:['In person','Note at the door','Not yet'],req:1},
+  {k:'landlordTold',l:'Landlord partner notified',t:'seg',o:['Yes','Not yet','Not applicable']},
+  {k:'ir',l:'Incident Report',t:'seg',o:['Filed','Not yet'],req:1},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['date','time','unit','staff',{l:'Resident told',f:r=>pill(r.told,r.told==='Not yet'?'bad':'ok')}],
+ chips:[{l:'Follow-up needed',f:r=>r.told==='Not yet'||r.ir==='Not yet'}]},
+trespass:{title:'No-Trespass Notice',nav:'No-Trespass List',sheet:'No-Trespass List',sop:'Sunnyside SOP 3.6 · Guide 2.7.3 · Incident Response Matrix',
+ desc:'For a non-resident who is violent or disruptive on site. A ban never applies to a resident and is never used to keep a resident from their home. A Site Supervisor or above decides, and the notice is given in person by two staff or with police.',
+ fields:[
+  {k:'date',l:'Date issued',t:'date',req:1,def:D.today},{k:'name',l:'Person\'s name',t:'text',req:1},
+  {k:'desc',l:'Description (to help staff recognise them)',t:'textarea',full:1},
+  {k:'reason',l:'What happened',t:'textarea',full:1,req:1,hint:'Facts only. Link the Incident Report date.'},
+  {k:'length',l:'Length',t:'seg',o:['6 months','Permanent','Other'],def:'6 months',req:1,hint:'Standard is 6 months; violence may mean a permanent ban.'},
+  {k:'expires',l:'Ends on',t:'date',show:r=>r.length!=='Permanent',req:r=>r.length!=='Permanent',def:()=>addMonthsISO(today(),6)},
+  {k:'decidedBy',l:'Decided by',t:'text',req:1},{k:'servedHow',l:'Given',t:'seg',o:['In person (two staff)','With police'],req:1},
+  {k:'host',l:'Resident host, if any',t:'unit'},{k:'hostSupport',l:'Resident host offered support',t:'seg',o:['Yes','No','No host'],show:r=>true},
+  {k:'codes',l:'Linked guest codes cancelled',t:'seg',o:['Yes','None linked'],show:()=>isHousing()},
+  {k:'partnerTold',l:'Landlord partner told',t:'seg',o:['Yes','Not yet','Not applicable'],show:()=>isHousing()},
+  {k:'status',l:'Status',t:'seg',o:['Active','Lifted','Expired'],def:'Active',req:1},
+  {k:'reviewNotes',l:'Review notes',t:'textarea',full:1,hint:'At the end of the term, or when asked, a Site Manager lifts, extends or confirms the ban.'}],
+ cols:['date','name',{l:'Ends',f:r=>r.length==='Permanent'?'Permanent':esc(fmtDate(r.expires))},{l:'Status',f:r=>pill(r.status,r.status==='Active'?'bad':'')}],
+ chips:[{l:'Active',f:r=>r.status==='Active'},{l:'Review soon',f:r=>r.status==='Active'&&r.expires&&r.expires<=addDays(today(),14)}]},
+inout:{kinds:['shelter'],title:'Participant Time In/Out',nav:'Participant In/Out',sheet:'Participant In-Out Log',sop:'Participant Time In/Out Sheet',custom:'inoutGrid',
  desc:'One sheet per shift, like the paper form. Tap Out when a participant leaves the site and In when they come back. The two facilitators on shift are recorded with each sheet. Anyone out for more than 24 hours is flagged on the dashboard (Missing Participant protocol, NH 3.1.16).',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'shift',l:'Shift',t:'select',o:SHIFTS,req:1,def:D.shift},
@@ -827,7 +1009,7 @@ requests:{title:'Participant Requests & Appliance Approvals',nav:'Participant Re
   {k:'staff',l:'Logged by',t:'staff',def:D.me}],
  cols:['date','unit','category','item','approval','staff'],
  chips:[{l:'Pending',f:r=>r.approval==='Pending'},{l:'Appliances',f:r=>r.category==='Appliance Approval'}]},
-intakes:{title:'Intakes',nav:'Intakes',sheet:'Intake Data',sop:'Guide · Intakes · NH 3.2.1',
+intakes:{kinds:['shelter'],title:'Intakes',nav:'Intakes',sheet:'Intake Data',sop:'Guide · Intakes · NH 3.2.1',
  desc:'Review new inquiries daily so none waits more than 24 hours. Check HIFIS for each applicant. Escalate any referral with no contact for 48+ hours to the Senior Intake Coordinator. Flag urgent shelter needs to Case Management.',
  fields:[
   {k:'date',l:'Date received',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
@@ -920,8 +1102,9 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
 /* =========================================================
    NAV & HEADER
    ========================================================= */
-const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['safetyaudit'],['firstaid']]],
- ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
+ ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement']]],
+ ['Residents',[['board','Community Dashboard'],['notices'],['inspections'],['plans'],['rent'],['pets'],['parking'],['entries']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
 let cur=(location.hash||'').slice(1)||'dash';const chipState={},searchState={};
@@ -935,10 +1118,12 @@ function badgeFor(id){
   if(id==='handoff')return siteRecs('handoff').filter(r=>r.status!=='Acknowledged').length;
   return 0}
 const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager'};
-const pageOk=id=>!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]];
+const PAGE_KIND={board:['housing']};
+const kindOk=id=>{const w=(M[id]&&M[id].kinds)||PAGE_KIND[id];return !w||w.includes(siteKind())};
+const pageOk=id=>kindOk(id)&&(!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]]);
 function renderNav(){let h=`<div class="logo"><img src="${LOGO}" alt="the 12 neighbours community" width="400" height="177"><small>NH Site Docs · Neighbourly Homes</small></div>`;
-  for(const [g,items0] of NAV){const items=items0.filter(([id])=>pageOk(id));if(!items.length)continue;h+=`<div class="ngrp">${g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
-    h+=`<button class="nitem ${cur===id?'on':''}" type="button" data-go="${id}"><span>${esc(lab||M[id].nav)}</span>${b?`<span class="cnt">${b}</span>`:''}</button>`}}
+  for(const [g,items0] of NAV){const items=items0.filter(([id])=>pageOk(id));if(!items.length)continue;h+=`<div class="ngrp">${g==='Participants'&&isHousing()?'Community':g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
+    h+=`<button class="nitem ${cur===id?'on':''}" type="button" data-go="${id}"><span>${esc((id==='site'&&isHousing()?'Residents & Homes':lab)||M[id].nav)}</span>${b?`<span class="cnt">${b}</span>`:''}</button>`}}
   const portal=CFG&&CFG.portalUrl;
   if(portal&&/^https:\/\//.test(portal))h+=`<div class="ngrp">12 Neighbours</div><a class="nitem" href="${esc(portal)}" target="_blank" rel="noopener" style="text-decoration:none"><span>12N Staff Portal ↗</span></a>`;
   $('#side').innerHTML=h}
@@ -983,7 +1168,7 @@ function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in scre
   renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
   if(cur==='info')return renderInfo(v);if(cur==='schedule')return renderSchedule(v);if(cur==='archive')return renderArchive(v);
-  if(cur==='sop')return renderSOP(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
+  if(cur==='sop')return renderSOP(v);if(cur==='board')return renderBoard(v);if(cur==='setup')return renderSetup(v);if(M[cur])return renderList(v,cur);cur='dash';renderDash(v)}
 
 /* =========================================================
    LIST VIEW
@@ -1053,7 +1238,7 @@ function buildFields(){
       case 'info':h+=`<div class="infob ${f.warn?'warn':''}" data-i="${i}" data-info="1"></div>`;return;
       case 'text':inp=`<input id="${id}" type="text" value="${esc(val)}" placeholder="${esc(f.ph||'')}" ${f.list?`list="${id}l"`:''}>${f.list?`<datalist id="${id}l">${f.list().map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`:''}`;break;
       case 'number':inp=`<input id="${id}" type="number" min="0" inputmode="numeric" value="${esc(val)}">`;break;
-      case 'date':case 'time':case 'datetime-local':inp=`<input id="${id}" type="${f.t}" value="${esc(val)}">`;break;
+      case 'date':case 'time':case 'month':case 'datetime-local':inp=`<input id="${id}" type="${f.t}" value="${esc(val)}">`;break;
       case 'textarea':inp=`<textarea id="${id}" placeholder="${esc(f.ph||'')}">${esc(val)}</textarea>`;break;
       case 'select':inp=`<select id="${id}"><option value=""></option>${f.o.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}${val&&!f.o.includes(val)?`<option selected>${esc(val)}</option>`:''}</select>`;break;
       case 'staff':inp=`<select id="${id}">${staffOpts(val)}</select>`;break;
@@ -1107,6 +1292,13 @@ async function saveForm(){
       if(clash){toast(`The Guest Unit is already booked ${clash.start}–${clash.end} that day.`,'err');return}}
     const norm=x=>String(x||'').toLowerCase().replace(/[^a-z]+/g,' ').trim();const past=pplOf(curSite()).filter(p=>p.status!=='Active'&&norm(p.name)&&norm(p.name)===norm(d.guest));
     if(past.length&&!await ask({title:'Check the guest',body:`“${d.guest}” matches the name of a former participant. Former 12 Neighbours participants can't be Guest Unit guests. Save only if this is a different person.`,ok:'Different person, save'}))return}
+  if(m==='notices'){if(d.level!=='Gray'&&/^Non-urgent/.test(d.matter||'')&&d.deadline&&daysBetween(d.date,d.deadline)<7&&!await ask({title:'Short deadline',body:'Non-urgent matters need at least 7 days to comply. Use a shorter deadline only for a conduct matter.',ok:'Save anyway'}))return;
+    if(d.appealOutcome==='Reversed'&&d.status!=='Reversed on appeal'){d.status='Reversed on appeal'}}
+  if(m==='inspections'&&d.noticeGiven&&d.noticeGiven>=d.date&&!await ask({title:'Less than 24 hours\' notice',body:'Inspections need at least 24 hours\' written notice, unless the resident agreed otherwise.',ok:'Save anyway'}))return;
+  if(m==='rent'&&isNew){const dup=siteRecs('rent').find(r=>r.month===d.month&&String(r.unit)===String(d.unit));if(dup&&!await ask({title:'Already recorded',body:`${unitLabel(d.unit)} already has a rent check for ${d.month}. Edit that one instead?`,ok:'Add another'}))return}
+  if(m==='pets'&&d.status==='Approved'&&(d.photo!=='Received'||d.vaccines!=='Received'||d.formD!=='Signed')&&!await ask({title:'Approval is missing paperwork',body:'Approval needs a photo, vaccination records and a signed Pet Agreement (Form D).',ok:'Save anyway'}))return;
+  if(m==='guestunit'){const norm=x=>String(x||'').toLowerCase().replace(/[^a-z]+/g,' ').trim();const ban=siteRecs('trespass').find(r=>r.status==='Active'&&norm(r.name)&&norm(r.name)===norm(d.guest));
+    if(ban&&!await ask({title:'Name is on the no-trespass list',body:`“${d.guest}” matches an active no-trespass notice from ${fmtDate(ban.date)}. Save only if this is a different person.`,ok:'Different person, save'}))return}
   if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
     if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
   delete d._statusSet;
@@ -1123,6 +1315,14 @@ async function saveForm(){
     openForm('notes',null,{type:'Incident Report filed',irStatus:'Filed',location:d.location,priority:/Violence|Medical|Missing|Police/.test(d.reportType)?'HIGH':'MEDIUM',participant:'Neighbourly Homes (general)',
       notes:`Incident Report filed: ${d.reportType} at ${d.location}${d.locationDetail?' ('+d.locationDetail+')':''}, ${fmtDate(d.date)} ${d.time}.`});
   if(m==='firstaid')await offerFaReq(d);
+  if(m==='inspections'){const lvl=(d.result||'').split(':')[0];
+    if(/^Green/.test(d.result||'')){const open=siteRecs('notices').filter(r=>r.pillar==='Home Upkeep'&&r.status==='Active'&&(d.unitPid?r.unitPid===d.unitPid:String(r.unit)===String(d.unit)));
+      if(open.length&&await ask({title:'Close the Home Upkeep notice?',body:`This inspection found no concerns. Mark ${open.length>1?'the '+open.length+' open Home Upkeep notices':'the open Home Upkeep notice'} resolved? Home Upkeep returns to Green right away.`,ok:'Mark resolved',cancel:'Not now'}))
+        try{for(const r of open)await putRec('notices',Object.assign(clone(r),{status:'Resolved',resolvedDate:d.date,updatedAt:new Date().toISOString(),updatedBy:me()}));toast('Home Upkeep back to Green')}catch(e){writeErr(e)}}
+    else if(isNew&&LEVELS.includes(lvl)&&await ask({title:`Issue ${lvl==='Orange'?'an':'a'} ${lvl} notice?`,body:'Inspection results of Yellow or above come with a written notice and a follow-up inspection.',ok:'Write the notice',cancel:'Not now'}))
+      openForm('notices',null,{unit:d.unit,pillar:'Home Upkeep',level:lvl,matter:'Non-urgent (7+ days to fix)',deadline:d.followUp||addDays(today(),7),concern:Object.entries(d.cond||{}).filter(([,x])=>x&&x.v==='Concern').map(([k,x])=>k+(x.n?': '+x.n:'')).join('\n')});
+    if(isNew&&((d.cond||{})['Maintenance needed (any cause)']||{}).v==='Concern')offerWO({unit:d.unit,notes:((d.cond||{})['Maintenance needed (any cause)']||{}).n||''},'Home Inspection')}
+  if(m==='entries'&&isNew&&d.ir==='Not yet'&&await ask({title:'Write the Incident Report now?',body:'An emergency entry needs an Incident Report as well, completed this shift.',ok:'Open Incident Report',cancel:'Later'}))openForm('incidents');
   if(m==='safetyaudit'&&isNew){const b=[...Object.keys(d.bldg||{}),...Object.keys(d.utility||{})].filter(i=>((d.bldg||{})[i]||(d.utility||{})[i]).v==='No');
     if(b.length)offerWO({notes:b.map(i=>{const x=(d.bldg||{})[i]||(d.utility||{})[i];return i+(x.n?' – '+x.n:'')}).join('\n')},'Monthly Safety Audit')}
   if(m==='patrols'&&isNew&&((d.observed||[]).includes('Maintenance needed')||(d.observed||[]).includes('Damage, leaks or pests')))offerWO(d,'Daily Safety Walkthrough');
@@ -1266,6 +1466,18 @@ function renderDash(v){
   {const fa=siteRecs('firstaid').map(r=>r.date).sort().pop();if(!fa||fa<addDays(t,-7))A.push(['warn',fa?`First aid kit last checked ${fmtDate(fa)}. Kits are checked weekly.`:'No first aid kit check recorded yet. Kits are checked weekly.','firstaid',''])}
   {const nowM=toMin(nowTime());siteRecs('guestunit').filter(r=>r.date===t&&r.status==='In use'&&toMin(r.end)<nowM).forEach(r=>A.push(['warn',`Guest Unit booking for ${r.unitLabel||'a participant'} ended at ${r.end}. Check in and update the booking.`,'guestunit',r.id]));
    const next=siteRecs('guestunit').filter(r=>r.date===t&&r.status==='Booked'&&toMin(r.start)>=nowM).sort((a,b)=>a.start.localeCompare(b.start))[0];if(next)A.push(['info',`Guest Unit booked today ${next.start}–${next.end} (${next.unitLabel||''}).`,'guestunit',next.id])}
+  if(isHousing()){const res=housingResidents();
+    siteRecs('notices').filter(r=>r.status==='Active'&&r.deadline&&r.deadline<=t).forEach(r=>A.push([r.deadline<t?'bad':'warn',`Notice follow-up ${r.deadline<t?'overdue':'due today'}: ${r.unitLabel||''} (${r.pillar}, ${r.level})`,'notices',r.id]));
+    siteRecs('notices').filter(r=>r.appeal&&!r.appealReplied).forEach(r=>{const due=addDays(r.appeal,14);A.push([due<=addDays(t,3)?'bad':'warn',`Written appeal response due ${fmtDate(due)}: ${r.unitLabel||''}`,'notices',r.id])});
+    siteRecs('notices').filter(r=>/Notice to Vacate/.test(r.pathway||'')&&!r.tribunal).forEach(r=>{const due=addDays((r.servedAt||r.date).slice(0,10),7);A.push(['bad',`Send the Notice to Vacate copy to the Residential Tenancies Tribunal by ${fmtDate(due)}: ${r.unitLabel||''}`,'notices',r.id])});
+    if(!site().landlord&&+t.slice(8)>=2){const paid=new Set(siteRecs('rent').filter(r=>r.month===t.slice(0,7)&&r.status==='Paid in full').map(r=>r.unitPid||String(r.unit)));
+      const miss=res.filter(p=>!paid.has(p.id)&&!paid.has(String(p.unit))).length;if(miss)A.push([+t.slice(8)>=2?'bad':'warn',`Rent not yet confirmed for ${miss} resident${miss>1?'s':''} this month. Confirm by the morning of the 2nd.`,'rent',''])}
+    {const due=res.map(p=>({p,n:nextInspection(p)})).filter(x=>x.n.due&&x.n.due<=addDays(t,14));if(due.length)A.push([due.some(x=>x.n.due<t)?'bad':'warn',`${due.length} home inspection${due.length>1?'s':''} due in the next 2 weeks or overdue. Give 24 hours' written notice.`,'board',''])}
+    siteRecs('plans').filter(r=>r.outcome==='Open'&&r.review<=t).forEach(r=>A.push(['warn',`Support plan review due ${fmtDate(r.review)}: ${r.unitLabel||''}`,'plans',r.id]));
+    siteRecs('parking').filter(r=>/passed/.test(parkingNext(r))).forEach(r=>A.push(['warn',`Parking: ${parkingNext(r)} (${r.vehicle})`,'parking',r.id]));
+    siteRecs('entries').filter(r=>r.told==='Not yet'||r.ir==='Not yet').forEach(r=>A.push(['bad',`Emergency entry ${fmtDate(r.date)}: ${r.told==='Not yet'?'tell the resident what happened':'Incident Report still needed'} (${r.unitLabel||''})`,'entries',r.id]));
+    siteRecs('pets').filter(r=>r.status==='Requested'&&daysBetween(r.date,t)>14).forEach(r=>A.push(['info',`Pet request waiting over 2 weeks: ${r.unitLabel||''}`,'pets',r.id]))}
+  siteRecs('trespass').filter(r=>r.status==='Active'&&r.length!=='Permanent'&&r.expires&&r.expires<=addDays(t,14)).forEach(r=>A.push(['info',`No-trespass notice for ${r.name} ends ${fmtDate(r.expires)}: review it.`,'trespass',r.id]));
   if(np<2)A.push(['bad',np?`Only ${pair()[0]} is recorded on this shift. Shifts are staffed by two.`:'No staff recorded on this shift yet. Choose both staff at the top.','dash','']);
   if(CAN_REVIEW)siteRecs('incidents').filter(r=>r.review==='Submitted').forEach(r=>A.push(['warn',`Incident awaiting supervisor review: ${r.reportType} (${fmtDate(r.date)})`,'incidents',r.id]));
   siteRecs('incidents').filter(r=>r.reportType==='Missing Participant'&&r.review!=='Closed').forEach(r=>A.push(['bad',`Missing participant file open (${r.risk||'risk not set'}): daily leadership update required`,'incidents',r.id]));
@@ -1464,6 +1676,8 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
    <div class="fld"><label for="si_phone">Site phone</label><input id="si_phone" ${ro} type="tel" value="${esc(s.sitePhone)}"></div>
    <div class="fld"><label for="si_police">Police non-emergency</label><input id="si_police" ${ro} type="tel" value="${esc(s.nonEmergency)}"></div>
    <div class="fld"><label for="si_open">Opened</label><input id="si_open" ${ro} type="date" value="${esc(s.opened)}"></div>
+   ${isHousing()?`<div class="fld"><label for="si_landlord">Landlord partner (leave blank if 12 Neighbours is the landlord)</label><input id="si_landlord" ${ro} value="${esc(s.landlord||'')}" placeholder="e.g. the property owner"><span class="hint">When set, Red notices and legal (RTA) notices are shown as coming from them, and the monthly rent reminder is turned off.</span></div>
+   <div class="fld"><label for="si_prob">Returning to Green</label><select id="si_prob" ${ro}><option value="step" ${s.probation!=='straight'?'selected':''}>One level at a time (Community manual)</option><option value="straight" ${s.probation==='straight'?'selected':''}>Straight back to Green (Sunnyside manual)</option></select></div>`:''}
    <div class="fld"><label for="si_restock">Restock orders go to (email)</label><input id="si_restock" ${ro} type="email" value="${esc(s.restockEmail||'')}" placeholder="manager@12neighbours.com"></div></div>
   <h2 style="font-size:18px">Contact &amp; escalation directory</h2>
   <div class="tblwrap inv"><table><thead><tr><th>Role</th><th>Contact name</th><th>Phone / email</th><th>Escalate for</th><th></th></tr></thead><tbody>
@@ -1472,7 +1686,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
   </tbody></table></div>
   <div class="toolbar" style="margin-top:10px">${ro?'':`<button class="btn" type="button" id="addContact">＋ Add contact</button>`}<span class="meta" style="margin:0">Check this directory at each monthly review.</span></div>`;
   const k=curSite();const fld=(id,f,msg)=>{const el=$(id);el.onchange=()=>cfgSave(()=>{CFG.sites[k][f]=el.value.trim()},msg||'Saved')};
-  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');
+  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');if($('#si_landlord')){fld('#si_landlord','landlord','Landlord partner saved');fld('#si_prob','probation','Saved')}
   v.querySelectorAll('[data-c]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[k].contacts[+el.dataset.c][el.dataset.f]=el.value},'Contact saved'));
   v.querySelectorAll('[data-crm]').forEach(b=>b.onclick=async()=>{const c=s.contacts[+b.dataset.crm];if(await ask({title:'Remove this contact?',body:esc(`${c.role||''}${c.name?': '+c.name:''}`),ok:'Remove',danger:true}))cfgSave(()=>{CFG.sites[k].contacts.splice(+b.dataset.crm,1)},'Contact removed')});
   const ac=$('#addContact');if(ac)ac.onclick=()=>cfgSave(()=>{CFG.sites[k].contacts.push({role:'',name:'',reach:'',when:''})})}
@@ -1631,11 +1845,54 @@ function renderSchedule(v){
     save(d=>{d.publishedDays=null;d.published=false},'Schedule unpublished')};
   const nt=$('#wkNotes');if(nt)nt.onchange=()=>save(d=>{d.notes=nt.value})}
 
+/* =========================================================
+   COMMUNITY DASHBOARD (permanent housing): each resident's status in every policy area
+   ========================================================= */
+let boardFilter='all';
+function renderBoard(v){const res=housingResidents().slice().sort((a,b)=>String(a.unit).localeCompare(String(b.unit),undefined,{numeric:true}));
+  const rows=res.map(p=>({p,st:residentStatus(p),ins:nextInspection(p)}));
+  const count=s=>rows.filter(r=>r.st.overall===s).length;
+  let show=rows;if(boardFilter!=='all')show=rows.filter(r=>boardFilter==='attention'?LV_RANK[r.st.overall]>=2:boardFilter==='inspect'?(r.ins.due&&r.ins.due<=addDays(today(),30)):r.st.overall===boardFilter);
+  const cell=e=>`${lvPill(e.s)}${e.next?`<div class="meta" style="margin:2px 0 0">→ ${esc(e.to)} on ${esc(fmtDate(e.next))}</div>`:e.why?`<div class="meta" style="margin:2px 0 0">${esc(e.why)}</div>`:''}`;
+  v.innerHTML=`<h1>Community Dashboard<span class="sopref">Community SOP (Yellow) 3.4 · Sunnyside SOP 3.2</span></h1>
+  <p class="sub">Each resident's status in every policy area, worked out from their Community Notices. A status stays until the concern is resolved, then returns toward Green after ${site().probation==='straight'?'4 weeks (Yellow), 6 weeks (Orange) or 7 weeks (Red) with no new concerns':'each probation period without new concerns: Red → Orange after 7 weeks, Orange → Yellow after 6, Yellow → Green after 4'}. Home Upkeep returns to Green as soon as a follow-up inspection confirms it's resolved. White means a new resident (3 months or less) with no concerns.</p>
+  <div class="toolbar">${[['all',`All (${rows.length})`],['attention',`Yellow or above (${rows.filter(r=>LV_RANK[r.st.overall]>=2).length})`],['Gray',`Gray (${count('Gray')})`],['inspect','Inspection due within 30 days']].map(([k2,l])=>`<button type="button" class="chip ${boardFilter===k2?'on':''}" data-bf="${k2}">${l}</button>`).join('')}
+   <span style="flex:1"></span>${CAN_WRITE?'<button class="btn pri" type="button" id="newNotice">＋ Community notice</button><button class="btn" type="button" id="newInsp">＋ Home inspection</button>':''}</div>
+  ${!res.length?`<div class="card empty">No current residents yet. Add residents under <a href="#site">Residents &amp; Homes</a>.</div>`:`
+  <div class="tblwrap"><table><thead><tr><th>Resident</th>${PILLARS.map(x=>`<th>${esc(x)}</th>`).join('')}<th>Overall</th><th>Next inspection</th></tr></thead><tbody>
+  ${show.map(({p,st,ins})=>`<tr><td><b>${esc(p.name)}</b><div class="meta" style="margin:0">${esc(unitLabel(p.unit))}</div></td>${st.per.map(e=>`<td>${cell(e)}</td>`).join('')}<td>${lvPill(st.overall)}</td>
+    <td>${ins.due?`${pill(fmtDate(ins.due),ins.due<today()?'bad':ins.due<=addDays(today(),30)?'warn':'')}${ins.followUp?'<div class="meta" style="margin:2px 0 0">Follow-up</div>':ins.first?'<div class="meta" style="margin:2px 0 0">First inspection</div>':''}`:'<span class="meta" style="margin:0">Not set</span>'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No residents match this filter.</td></tr>'}
+  </tbody></table></div>`}
+  <p class="meta" style="margin-top:10px">Inspections: every 6 months, or yearly after two Green inspections in a row. Yellow and above: the follow-up date set at the inspection.</p>`;
+  v.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;render()});
+  const nn=$('#newNotice');if(nn)nn.onclick=()=>openForm('notices');const ni=$('#newInsp');if(ni)ni.onclick=()=>openForm('inspections')}
+function housingCards(C){const lp=lvPill;return `
+  ${C('The colour system','Community 3.4 · Sunnyside 3.2','t-yellow',`<table>
+   <tr><td>${lp('White')}</td><td>New resident (3 months or less), no concerns.</td></tr>
+   <tr><td>${lp('Green')}</td><td>Good standing.</td></tr>
+   <tr><td>${lp('Yellow')}</td><td>First or minor concern. <b>Notice of Policy Violation.</b> Back after 4 weeks with no new concerns.</td></tr>
+   <tr><td>${lp('Orange')}</td><td>Repeated or more serious concern. <b>Urgent Notice.</b> 6 weeks.</td></tr>
+   <tr><td>${lp('Red')}</td><td>Serious or unresolved concerns. <b>Second Urgent Notice.</b> 7 weeks.</td></tr>
+   <tr><td>${lp('Gray')}</td><td>Formal Residential Tenancies Act stage.</td></tr></table>
+   <p>Each policy area has its own colour; the overall status is the most serious one. The waiting period starts once the concern is fixed. Home Upkeep goes back to Green as soon as a follow-up inspection confirms it. Serious matters don't have to start at Yellow.</p>`)}
+  ${C('Writing and serving a notice','Community 3.3 · 9.0.2','t-yellow',`<p><b>Start with a conversation and support</b>, and give a fair chance to fix it. Consider disability, trauma and other barriers.</p><p><b>Every notice includes:</b> date; resident's name and home; a clear, factual description; what they need to do; the deadline; who issued it; and the date, time and method of service.</p><p><b>Deadlines:</b> non-urgent matters get at least 7 days. Conduct matters (threats, harassment, violence, weapons, illegal activity, serious disturbance) need immediate compliance.</p><p><b>Serving:</b> by hand (preferred) or posted on the door, recorded at the time. <b>Never include</b> anything a resident shared in a support conversation without their consent.</p>`)}
+  ${C('When a resident contests a notice','Community 3.5','t-yellow',`<ol><li>Ask for the appeal in writing, with their reasons. Log the date it was received.</li><li>Someone not involved in the original notice reviews it: the facts, whether the level was right, and the resident's information.</li><li>Answer in writing within <b>14 days</b>: upheld, modified or reversed, with reasons and any next steps.</li><li>If reversed, the dashboard updates right away (mark the notice “Reversed on appeal”).</li></ol>`)}
+  ${C('Gray: the formal RTA stage','Community 3.6 · Sunnyside 3.5','t-yellow',`<p><b>Before Gray, confirm:</b> a complete written notice was served, its deadline has passed, the concern is unresolved, and the file is complete.</p><table><tr><td><b>Gray A</b></td><td>Application for Assistance to the Residential Tenancies Tribunal: noise, guests or occupancy, housekeeping, damage or modifications not fixed.</td></tr><tr><td><b>Gray B</b></td><td>Form 3 serious-case application: extensive damage, health or safety risk, illegal activity.</td></tr><tr><td><b>Gray C</b></td><td>Rent: Notice to Vacate, copy to the Tribunal within 7 days, then Final Notice to Vacate.</td></tr></table><p>Where a landlord partner owns the site, only they give legal (RTA) notices. 12N refers the concern with the file.</p>`)}
+  ${C('Rent timeline','Community 4.2','t-yellow',`<table><tr><td><b>1st</b></td><td>Rent due. Confirm every payment (by the morning of the 2nd).</td></tr><tr><td><b>2nd</b></td><td>Not paid in full: Notice to Vacate (Gray). Try to reach the resident. Copy to the Tribunal <b>within 7 days</b>, even if they then pay.</td></tr><tr><td><b>2nd–8th</b></td><td>Paid in full: back to Green; the notice stays on file.</td></tr><tr><td><b>9th</b></td><td>Still unpaid: Final Notice to Vacate.</td></tr><tr><td><b>16th</b></td><td>Not vacated: eviction steps under the RTA.</td></tr></table><p>A pattern of late payment means a support conversation first (is the payment method working?), then the Community Manager.</p>`)}
+  ${C('Home inspections','Community 4.3','t-yellow',`<p><b>How often:</b> every 6 months; yearly after two Green inspections in a row; follow-ups as set. Give <b>24 hours' written notice</b> and invite the resident to be there.</p><p><b>Look at:</b> cleanliness, exterior and deck, smoking inside, modifications, damage, prohibited items, pests or odour, smoke detectors and air exchanger, maintenance needs.</p><p><b>Results:</b> Green, no action · Yellow, notice and follow-up · Orange or Red, notice, an improvement plan made with the resident, and follow-up. Landlord repairs go to a work order. Photograph concerns.</p>`)}
+  ${C('Home Stabilization Plan','Community 4.4.6 · Sunnyside 3.2','t-yellow',`<p>A written, time-limited plan when guests or occupancy are affecting a home's stability. It is not a penalty. A Community Manager approves it before it's issued, ideally in a meeting with the resident.</p><p><b>Includes:</b> what was observed, the steps the resident will take, the support offered, and a review date (usually 7–21 days).</p><p><b>Temporary measures can include:</b> limiting overnight guests, guests accompanied on the property, resetting guest codes, naming people who can't enter, removing non-residents' belongings, help securing the home, more check-ins. Consider accommodation for disability or support needs.</p>`)}
+  ${C('Parking','Community 4.6','t-yellow',`<ol><li>Document the location, vehicle, plate and concern, with photos. Identify the owner.</li><li><b>First notice</b> on the vehicle and to the resident: <b>7 days</b> to move it, repair it or contact the office.</li><li><b>Second notice:</b> <b>72 hours</b>. Re-photograph the vehicle and contact the resident directly.</li><li><b>Management review</b> before any removal: steps followed, local bylaws checked, licensed towing.</li></ol>`)}
+  ${C('Pets','Community 4.7','t-yellow',`<p>No pet comes on the property without written approval first. Collect a photo; the pet's name, type and age; the veterinarian's details; vaccination records; and the signed Pet Agreement (Form D). Pet concerns follow the usual notice levels, and approval can be withdrawn.</p>`)}
+  ${C('Visitor bans','Sunnyside 3.6','t-yellow',`<ol><li>Ask the person to leave. Call police if they refuse or there's a threat. Write an Incident Report.</li><li>A Site Supervisor or above decides on a ban (overnight: leadership on-call).</li><li>Give the written Notice of Trespass in person (two staff) or with police: 6 months standard, permanent for violence.</li><li>Tell the resident host and offer support, especially if they were under pressure.</li><li>Add the person to the <a href="#trespass">No-Trespass List</a>, cancel linked guest codes, and tell the landlord partner.</li></ol><p>A ban never applies to a resident.</p>`)}
+  ${C('When a resident can\'t be reached','Sunnyside 7.8','t-yellow',`<p>Residents come and go as they please. Being away is never a concern in itself.</p><p><b>Start right away</b> if there's information they may be in danger. <b>After 24 hours</b> without contact for someone at higher risk (recent overdose or crisis, serious health concern, talk of self-harm). Otherwise there's no timer.</p><p>Check the logs, call or text, knock and identify yourself (don't go in), and ask colleagues discreetly. Then write an Incident Report, phone the Site Supervisor, contact agencies they've consented to, and request a police wellness check.</p><p><b>When they're found safe:</b> welcome them back without questions about where they were, and offer a check-in.</p>`)}
+  ${C('Emergency entry to a home','Sunnyside 7.9','t-yellow',`<p><b>Only</b> when a life or safety is at serious risk right now, or serious damage is happening. For fire or a gas smell, don't go in.</p><ol><li>Call 911 if needed. Phone the supervisor only if it won't delay help.</li><li>Knock and say who you are. Wait seconds, not minutes.</li><li>Two staff where possible. Do only what the emergency needs; no searching.</li><li>Lock up afterwards, or stay until it's secured.</li><li>Complete the <a href="#entries">Emergency Entry Record</a> and an Incident Report this shift. Tell the resident what happened and why, and offer support.</li></ol>`)}
+`}
 function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>${title}<span class="tag ${tagc}">${tag}</span></h3>${body}</div>`;
   v.innerHTML=`<h1>SOP Quick Reference</h1><p class="sub">Summaries of the SOPs used most on shift. The binders are the official source: Brown (NH), Red (Safety), White (All-Employees Handbook), Yellow (Community), Green (G&amp;A), Blue (Neighbourly Ventures), Pink (Neighbourly Coffee), plus the Inventory SOP and Guest Unit Policy.</p>
   <div class="grid g2">
+  ${isHousing()?housingCards(C):''}
   ${C('Emergency procedures','NH 3.1.7','t-brown',`<ol><li>Stay calm. Call <b>911</b> for imminent danger, a medical need or a crime.</li><li>Notify another staff member right away. Never respond alone if it feels unsafe.</li><li>Clear the area if needed. Give CPR or Naloxone as needed.</li><li>Give emergency services a clear, calm summary.</li><li>Afterwards: Incident Report within 12 h, debrief with the Site Supervisor, offer staff support, notify agency partners if hospitalised.</li></ol><p><b>Fire:</b> pull the alarm, evacuate to the meeting point, and don't re-enter until cleared.</p>`)}
-  ${C('Shift notes: what to log','12N Note Taking Guideline','t-brown',`<p><b>Ask:</b> would this change what staff need to know or do?</p><p><b>Log:</b> meaningful wellness changes, missed scheduled check-ins, requests or commitments that need follow-up, safety concerns, site issues such as a leak or a supply shortage, and completed work that matters to the next shift.</p><p><b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment.</p><p><b>Each entry:</b> date and time, what happened, what staff did, and the outcome. Briefly note completed work that matters to the next shift. Use the location and approved participant identifier when needed.</p><p><b>Write what you observed:</b> for example, “Participant declined room cleaning assistance.” Attribute second-hand information to its source. Quote exact words only when they matter to the response. Leave out guesses, diagnoses and unrelated personal details.</p><p><b>Follow-up:</b> say who will act, what they need to do, and when.</p><p><b>Incidents:</b> escalate urgent concerns first, then file the Incident Report. In the shift log, briefly reference it and note what the incoming team needs to do.</p><p class="meta" style="margin:0"><i>Example:</i> At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order. Evening shift to check the repair status by 6 p.m. and update the participant.</p>`)}
+  ${C('Shift notes: what to log','12N Note Taking Guideline','t-brown',`<p>Participants have privacy and freedom of movement in their daily lives. Write down what staff need to know to support a participant, respond to a concern, or carry work into the next shift.</p><p><b>Ask:</b> would this change what staff need to know or do?</p><p><b>Log:</b> meaningful wellness changes, missed scheduled check-ins, requests or commitments that need follow-up, safety concerns, site issues such as a leak or a supply shortage, and completed work that matters to the next shift.</p><p><b>Leave out:</b> routine comings and goings, trips off site, vehicle movements, greetings, casual conversation, and minor disagreements resolved in the moment.</p><p><b>Each entry:</b> date and time, what happened, what staff did, and the outcome. Briefly note completed work that matters to the next shift. Use the location and approved participant identifier when needed.</p><p><b>Write what you observed:</b> for example, “Participant declined room cleaning assistance.” Attribute second-hand information to its source. Quote exact words only when they matter to the response. Leave out guesses, diagnoses and unrelated personal details.</p><p><b>Follow-up:</b> flag it, and say who will act, what they need to do, and when. Share notes only through approved channels, with staff who need the information.</p><p><b>Incidents:</b> escalate urgent concerns first, then file the Incident Report within the deadline: the sequence of events, what you observed, actions taken, and who was notified. In the shift log, briefly reference it and note what the incoming team needs to do.</p><p><b>Handoff:</b> review pending actions with incoming staff and confirm who is taking each item.</p><p class="meta" style="margin:0"><i>Example:</i> At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order. Evening shift to check the repair status by 6 p.m. and update the participant.</p><p class="meta" style="margin:4px 0 0"><i>Handoff example:</i> Incident Report filed for a fall near the main entrance. The entrance mat was removed. Incoming shift to confirm a replacement with Maintenance before reopening that entrance.</p>`)}
   ${C('Incident reporting','NH 3.1.4','t-brown',`<p><b>When:</b> injury, illness, property damage, near miss, behavioural escalation, harassment, violence, Code of Conduct breach, police/EMS on site, or any other event that needs follow-up.</p><p><b>Deadline:</b> within <b>12 hours</b>. Finish it before you leave, or hand it off.</p><p><b>Include:</b> initials or ID codes only, staff or participant for each person, date, time, location, an objective sequence of events, actions taken, and whether the Supervisor or On-Call was contacted.</p><p><b>Leave out:</b> opinions, assumptions, diagnoses, hearsay (or name who told you), blame.</p><p>Message the Site Supervisor or Manager on Signal for urgent incidents.</p>`)}
   ${C('Behaviour Escalation Framework','NH 3.1.12','t-brown',`<ol><li>Incident Report</li><li>Room Status Update (cleanliness, runs alongside)</li><li>Written Warning (first / second / final)</li><li>Community Accountability Review (CAR) &amp; Agreement, with follow-up in 1–2 weeks</li><li>Urgent Warning (Final Written Notice)</li><li>Eviction Request Form</li><li>Program Review Committee decision</li><li>Debrief &amp; lessons learned</li></ol><p><b>Red-line items</b> (violence, weapons, sexual assault) may go straight to step 6. <b>3 CARs in 12 months</b> trigger a mandatory Placement Review.</p>`)}
   ${C('Missing participant','NH 3.1.16','t-brown',`<p><b>Thresholds:</b> High Risk: <b>24 h</b> without confirmed contact. Non-High Risk: <b>10 days</b>. Reassess at any time.</p><p><b>Before the threshold:</b> check logs, call or text the participant, ask discreetly, and document every attempt.</p><ol><li>Facilitator: Incident Report (unit, risk level, last seen, attempts, description)</li><li>Facilitator: phone the Site Manager</li><li>Manager: partner agencies by phone, plus email within 2 h (cc Director and Safety &amp; Ops Lead)</li><li>Manager: police missing person report. Record the occurrence #</li><li>Manager: email the Safety &amp; Ops Lead and Director the same day</li></ol><p>Keep the unit secured and belongings preserved.</p>`)}
@@ -1670,6 +1927,7 @@ function renderSOP(v){const C=(title,tag,tagc,body)=>`<div class="card ref"><h3>
   ${C('First aid kits','Safety · Kit Contents Checklist','t-red',`<p>Check every kit weekly and after each use with the <a href="#firstaid">First Aid Kit Check</a>. Minimums include a full box of gloves, 2–3 CPR face shields, <b>2–4 naloxone kits</b>, wipes, saline, bandages and dressings, tape, eye pads and eye wash, scissors, tweezers, burn gel and ice packs. Low items can go straight to Requisitions.</p>`)}
   ${C('Guest Unit','Guest Unit Policy','t-brown',`<p>Open <b>8:00 AM – 8:00 PM</b>. Last booking starts at <b>6:00 PM</b>, and bookings are <b>2 hours</b> at most. Book ahead when possible: the participant and their guest both sign the sheet in the yellow binder, and staff record it under <a href="#guestunit">Guest Unit Bookings</a>.</p><ul><li>The guest stays with the participant the whole time and is never in the unit alone.</li><li>Former 12 Neighbours participants can't be guests.</li><li>It is for approved visits only, not a warming space. No smoking.</li></ul><p>When the guidelines aren't followed, document what happened. A manager decides on any pause in Guest Unit privileges.</p>`)}
   ${C('Inventory routine','Inventory SOP','t-brown',`<p><b>Weekly audit:</b> office → staff bathroom → guest unit. Update the counts with the − / + buttons, then mark the audit complete.</p><p><b>Taking supplies:</b> subtract from the room you took them from. <b>Deliveries:</b> put them away, then add them to that room.</p><p><b>Par 0</b> means on demand: never reordered automatically. Keep storage notes current when surplus moves.</p><p><b>Ordering:</b> <i>Draft restock email</i> lists out-of-stock items as Critical and low-stock items as Recommended, ready to send to the site's restock contact. Broken equipment: set its condition to Needs Repair and its status to Needs Maintenance or Required, with a note.</p>`)}
+  ${!isHousing()?housingCards(C):''}
   </div>`}
 
 /* =========================================================
@@ -1682,8 +1940,9 @@ function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disa
   v.innerHTML=`<h1>Sites &amp; Export</h1><p class="sub">${MODE==='api'?'Entries save on this device first, then sync to the NH Site Docs Google Sheet. Formal reports are also kept as Google Docs in each site\'s Drive folder.':MODE==='gas'?'Entries save to the NH Site Docs Google Sheet, and every device sees them within about 20 seconds.':SHARED?'Entries save to this page\'s shared log, and everyone it\'s shared with sees them live.':'Entries are saved in this browser only.'} ${CAN_ORG?'Administrators open and close sites here.':'Only administrators can open or close sites, change units or change organization settings.'}</p>
   <div class="grid g2" style="align-items:start">
    <div class="card" style="grid-column:1/-1"><b style="font-size:16px">Sites</b><p class="meta" style="margin-top:2px">Each site keeps its own staff, participants, contacts, logs and inventory. Closing a site keeps every record, hides it from the site picker and stops new entries being expected.${SERVER()?' A site\'s <b>launch link</b> opens the app straight to that site: open it on that site\'s computer, tablet or phone, then install the app.':''}</p>
-    <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
+    <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Type</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
     ${keys.map(k=>{const s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;return `<tr><td><b>${esc(s.name)}</b><div class="meta" style="margin:0">${esc(s.address||'')}</div></td>
+     <td>${ad?`<select data-kind="${esc(k)}" aria-label="Type of site for ${esc(s.name)}">${Object.entries(KINDS).map(([kk,l])=>`<option value="${kk}" ${(s.kind||'shelter')===kk?'selected':''}>${esc(l)}</option>`).join('')}</select>`:esc(KINDS[s.kind||'shelter'])}</td>
      <td>${s.status==='Archived'?pill(`Closed ${fmtDate(s.closed)}`,''):pill('Open','ok')}</td>
      <td style="white-space:nowrap">${s.units.length} ${ad&&s.status!=='Archived'?`<button class="btn sm" type="button" data-addu="${esc(k)}" aria-label="Add a unit to ${esc(s.name)}">＋</button><button class="btn sm" type="button" data-rmu="${esc(k)}" aria-label="Remove the last unit from ${esc(s.name)}">−</button>`:''}</td>
      <td>${act}</td><td>${staffOf(k).filter(x=>x.status==='Active').length}</td>
@@ -1722,10 +1981,11 @@ function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disa
   v.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const k=b.dataset.close,s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;
     const a=await ask({title:`Close ${s.name}?`,body:`${act?`<b>${act} participant${act>1?'s are':' is'} still active.</b> Move them out first if they have left.\n\n`:''}The site and all its records are kept. It disappears from the site picker, and you can reopen it at any time.`,ok:'Close site',danger:true,fields:[{l:'Closing date',t:'date',v:today()}]});
     if(a)cfgSave(()=>{Object.assign(CFG.sites[k],{status:'Archived',closed:a[0]||today()})},`${s.name} closed`)});
+  v.querySelectorAll('[data-kind]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[el.dataset.kind].kind=el.value},'Site type changed'));
   v.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=()=>cfgSave(()=>{Object.assign(CFG.sites[b.dataset.reopen],{status:'Active',closed:''})},'Site reopened'));
   v.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{SHOW_CLOSED=true;PREF.site=b.dataset.view;subscribeSite();go('dash')});
-  const as=$('#addSite');if(as)as.onclick=async()=>{const a=await ask({title:'Open a new site',ok:'Create site',fields:[{l:'Site name',req:1},{l:'Address',v:''},{l:'Number of units',t:'number',v:0},{l:'Opening date',t:'date',v:today()}]});if(!a)return;
-    const k='s'+uid();await cfgSave(()=>{const s=mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[2]||0)));s.address=a[1].trim();s.opened=a[3]||today();CFG.sites[k]=s},'Site created');
+  const as=$('#addSite');if(as)as.onclick=async()=>{const a=await ask({title:'Open a new site',ok:'Create site',fields:[{l:'Site name',req:1},{l:'Type of site',o:Object.values(KINDS),v:KINDS.shelter},{l:'Address',v:''},{l:'Number of units / homes',t:'number',v:0},{l:'Opening date',t:'date',v:today()}]});if(!a)return;
+    const k='s'+uid();await cfgSave(()=>{const s=mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[3]||0)),Object.keys(KINDS).find(kk=>KINDS[kk]===a[1])||'shelter');s.address=a[2].trim();s.opened=a[4]||today();CFG.sites[k]=s},'Site created');
     if(CFG.sites[k]){PREF.site=k;savePref();subscribeSite();go('dash')}}}
 
 async function download(name,data){
