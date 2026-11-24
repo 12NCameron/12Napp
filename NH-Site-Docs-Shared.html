@@ -258,7 +258,11 @@ const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object
 const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
 
 /* ---------- Site types. Permanent housing follows the Community (Yellow) and Sunnyside SOP manuals. ---------- */
-const KINDS={shelter:'Shelter / bridge housing (Neighbourly Homes)',housing:'Permanent housing (Community / Sunnyside)'};
+const KINDS={shelter:'Transitional / Bridge Housing (Neighbourly Homes)',housing:'Full-Time Housing (Community / Sunnyside)'};
+/* Programs: Transitional and Bridge Housing use the Neighbourly Homes pages; Full-Time Housing uses the Community / Sunnyside pages. */
+const PROGRAMS={transitional:{l:'Transitional Housing',kind:'shelter'},bridge:{l:'Bridge Housing',kind:'shelter'},fulltime:{l:'Full-Time Housing',kind:'housing'}};
+const siteProgram=k=>{const s=(S().sites||{})[k||curSite()]||{};return PROGRAMS[s.program]&&PROGRAMS[s.program].kind===(s.kind||'shelter')?s.program:(s.kind==='housing'?'fulltime':'')};
+const programLabel=k=>{const p=siteProgram(k);return p?PROGRAMS[p].l:'Transitional or Bridge Housing'};
 const siteKind=k=>((S().sites||{})[k||curSite()]||{}).kind||'shelter';
 const isHousing=()=>siteKind()==='housing';
 const PILLARS=['Rent Payment','Home Upkeep','Guests, Occupancy & Home Stabilization','Peaceable Behaviour'];
@@ -1807,7 +1811,7 @@ function renderParticipants(v){
    SITE INFO & CONTACTS
    ========================================================= */
 function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
-  v.innerHTML=`<h1>Site Info &amp; Contacts<span class="sopref">${esc(s.name)}</span></h1>
+  v.innerHTML=`<h1>Site Info &amp; Contacts<span class="sopref">${esc(s.name)} · ${esc(programLabel())}</span></h1>
   <p class="sub">Details, emergency numbers and the contact directory for this site.${ro?' Only managers can change them.':''}</p>
   <div class="grid g2" style="margin-bottom:18px;max-width:820px">
    <div class="fld"><label for="si_name">Site name</label><input id="si_name" ${ro} value="${esc(s.name)}"></div>
@@ -2154,9 +2158,9 @@ function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disa
   v.innerHTML=`<h1>Sites &amp; Export</h1><p class="sub">${MODE==='api'?'Entries save on this device first, then sync to the NH Site Docs Google Sheet. Formal reports are also kept as Google Docs in each site\'s Drive folder.':MODE==='gas'?'Entries save to the NH Site Docs Google Sheet, and every device sees them within about 20 seconds.':SHARED?'Entries save to this page\'s shared log, and everyone it\'s shared with sees them live.':'Entries are saved in this browser only.'} ${CAN_ORG?'Administrators open and close sites here.':'Only administrators can open or close sites, change units or change organization settings.'}</p>
   <div class="grid g2" style="align-items:start">
    <div class="card" style="grid-column:1/-1"><b style="font-size:16px">Sites</b><p class="meta" style="margin-top:2px">Each site keeps its own staff, participants, contacts, logs and inventory. Closing a site keeps every record, hides it from the site picker and stops new entries being expected.${SERVER()?' A site\'s <b>launch link</b> opens the app straight to that site: open it on that site\'s computer, tablet or phone, then install the app.':''}</p>
-    <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Type</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
+    <div class="tblwrap" style="margin-top:8px"><table><thead><tr><th>Site</th><th>Program</th><th>Status</th><th>Units</th><th>Participants</th><th>Staff</th>${SERVER()?'<th>Launch link</th>':''}<th></th></tr></thead><tbody>
     ${keys.map(k=>{const s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;return `<tr><td><b>${esc(s.name)}</b><div class="meta" style="margin:0">${esc(s.address||'')}</div></td>
-     <td>${ad?`<select data-kind="${esc(k)}" aria-label="Type of site for ${esc(s.name)}">${Object.entries(KINDS).map(([kk,l])=>`<option value="${kk}" ${(s.kind||'shelter')===kk?'selected':''}>${esc(l)}</option>`).join('')}</select>`:esc(KINDS[s.kind||'shelter'])}</td>
+     <td>${ad?`<select data-kind="${esc(k)}" aria-label="Program for ${esc(s.name)}">${siteProgram(k)?'':'<option value="" selected>Choose: Transitional or Bridge</option>'}${Object.entries(PROGRAMS).map(([kk,o])=>`<option value="${kk}" ${siteProgram(k)===kk?'selected':''}>${esc(o.l)}</option>`).join('')}</select>`:esc(programLabel(k))}</td>
      <td>${s.status==='Archived'?pill(`Closed ${fmtDate(s.closed)}`,''):pill('Open','ok')}</td>
      <td style="white-space:nowrap">${s.units.length} ${ad&&s.status!=='Archived'?`<button class="btn sm" type="button" data-addu="${esc(k)}" aria-label="Add a unit to ${esc(s.name)}">＋</button><button class="btn sm" type="button" data-rmu="${esc(k)}" aria-label="Remove the last unit from ${esc(s.name)}">−</button>`:''}</td>
      <td>${act}</td><td>${staffOf(k).filter(x=>x.status==='Active').length}</td>
@@ -2195,11 +2199,11 @@ function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disa
   v.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{const k=b.dataset.close,s=S().sites[k];const act=pplOf(k).filter(p=>p.status==='Active').length;
     const a=await ask({title:`Close ${s.name}?`,body:`${act?`<b>${act} participant${act>1?'s are':' is'} still active.</b> Move them out first if they have left.\n\n`:''}The site and all its records are kept. It disappears from the site picker, and you can reopen it at any time.`,ok:'Close site',danger:true,fields:[{l:'Closing date',t:'date',v:today()}]});
     if(a)cfgSave(()=>{Object.assign(CFG.sites[k],{status:'Archived',closed:a[0]||today()})},`${s.name} closed`)});
-  v.querySelectorAll('[data-kind]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[el.dataset.kind].kind=el.value},'Site type changed'));
+  v.querySelectorAll('[data-kind]').forEach(el=>el.onchange=()=>{const pr=PROGRAMS[el.value];if(!pr)return;cfgSave(()=>{Object.assign(CFG.sites[el.dataset.kind],{program:el.value,kind:pr.kind})},`Program set to ${pr.l}`)});
   v.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=()=>cfgSave(()=>{Object.assign(CFG.sites[b.dataset.reopen],{status:'Active',closed:''})},'Site reopened'));
   v.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{SHOW_CLOSED=true;PREF.site=b.dataset.view;subscribeSite();go('dash')});
-  const as=$('#addSite');if(as)as.onclick=async()=>{const a=await ask({title:'Open a new site',ok:'Create site',fields:[{l:'Site name',req:1},{l:'Type of site',o:Object.values(KINDS),v:KINDS.shelter},{l:'Address',v:''},{l:'Number of units / homes',t:'number',v:0},{l:'Opening date',t:'date',v:today()}]});if(!a)return;
-    const k='s'+uid();await cfgSave(()=>{const s=mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[3]||0)),Object.keys(KINDS).find(kk=>KINDS[kk]===a[1])||'shelter');s.address=a[2].trim();s.opened=a[4]||today();CFG.sites[k]=s},'Site created');
+  const as=$('#addSite');if(as)as.onclick=async()=>{const a=await ask({title:'Open a new site',ok:'Create site',fields:[{l:'Site name',req:1},{l:'Program',o:Object.values(PROGRAMS).map(o=>o.l),v:PROGRAMS.transitional.l},{l:'Address',v:''},{l:'Number of units / homes',t:'number',v:0},{l:'Opening date',t:'date',v:today()}]});if(!a)return;
+    const k='s'+uid();const pk=Object.keys(PROGRAMS).find(kk=>PROGRAMS[kk].l===a[1])||'transitional';await cfgSave(()=>{const s=mkSite(a[0].trim(),Math.max(0,Math.min(200,+a[3]||0)),PROGRAMS[pk].kind);s.program=pk;s.address=a[2].trim();s.opened=a[4]||today();CFG.sites[k]=s},'Site created');
     if(CFG.sites[k]){PREF.site=k;savePref();subscribeSite();go('dash')}}}
 
 async function download(name,data){

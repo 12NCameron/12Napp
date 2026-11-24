@@ -176,7 +176,7 @@ function checkConfigChange_(u, data) {
     if (!siteOk_(allowed, k)) { if (JSON.stringify(o) !== JSON.stringify(n)) throw new Error('DENIED: Your account is not set up for that site.'); return; }
     if ((o.status || 'Active') !== (n.status || 'Active') || String(o.closed || '') !== String(n.closed || '')) throw new Error('DENIED: Only administrators can close or reopen sites.');
     if ((o.units || []).length !== (n.units || []).length) throw new Error('DENIED: Only administrators can add or remove units.');
-    if ((o.kind || 'shelter') !== (n.kind || 'shelter')) throw new Error('DENIED: Only administrators can change the type of site.');
+    if ((o.kind || 'shelter') !== (n.kind || 'shelter') || String(o.program || '') !== String(n.program || '')) throw new Error('DENIED: Only administrators can change a site\'s program.');
   });
 }
 /* Resident Escalation forms: who may complete each one (NH Behaviour Escalation Framework). */
