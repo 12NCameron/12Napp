@@ -338,7 +338,8 @@ const site=()=>S().sites[curSite()]||{name:'—',units:[],contacts:[],nonEmergen
 function staffOf(k){const s=S().sites[k]||{};if((STAFF[k]||[]).length||!Array.isArray(s.staff))return STAFF[k]||[];
   return s.staff.map((x,i)=>({id:'legacy-'+i,name:x.name,role:x.role||'',phone:x.phone||'',email:x.email||'',status:x.active===false?'Inactive':'Active',legacy:true}))}
 const pplOf=k=>PPL[k]||[];
-const staffNames=()=>staffOf(curSite()).filter(s=>s.status==='Active'&&s.name).map(s=>s.name);
+const isCleaner=s=>/clean/i.test(s.role||'');
+const staffNames=()=>staffOf(curSite()).filter(s=>s.status==='Active'&&s.name&&!isCleaner(s)).map(s=>s.name); /* cleaners don't staff shifts or sign logs */
 const personById=(id,k=curSite())=>pplOf(k).find(p=>p.id===id);
 const me=()=>(PREF.meBy||{})[curSite()]||'';
 /* Two staff work each shift. The pair is shared (stored with today's shift checks) so every device sees who is on. */
@@ -497,7 +498,7 @@ const PILL={HIGH:'bad',High:'bad',MEDIUM:'warn',Medium:'warn',LOW:'info',Low:'in
  Submitted:'info','Under Review':'warn','Follow-up Required':'bad','CAR Recommended':'purple',Closed:'ok',
  'Awaiting Review':'warn',Assigned:'info','In Progress':'acc',Completed:'ok',
  '1 — Critical':'bad','2 — Urgent':'warn','3 — Routine':'info','4 — Low':'',
- Stocked:'ok','Low Stock':'warn','Out of Stock':'bad','Not Stocked':'',Surplus:'info',
+ Stocked:'ok','In Stock':'ok','Low Stock':'warn','Out of Stock':'bad','Not Stocked':'',Surplus:'info',
  Requested:'warn',Ordered:'info',Received:'ok','New Inquiry':'warn','Contact Logged':'info','Card Active':'acc','Referred to Case Management':'purple',Admitted:'ok',
  'In HIFIS':'ok','Not in HIFIS':'bad',Unsure:'warn','On site':'warn','Signed out':'ok',
  'Needs Follow-Up':'warn',Urgent:'bad',Booked:'info','In use':'acc','Did not attend':'','On demand':'',Operational:'ok','Needs Maintenance':'warn',Required:'bad','Needs Repair':'warn',Missing:'bad',New:'info',Low:'warn',P:'ok',FU:'warn',U:'bad',In:'ok',Out:'warn',
@@ -1033,7 +1034,7 @@ engagement:{title:'Participant Engagement',nav:'Engagement',sheet:'Participant E
   {k:'focus',l:'Target focus',t:'select',o:['Reflection & Morale','Positive Mindset','Community Building','Social Inclusion','Social Recreation','Mental Health','Coping Strategies','Stress Reduction','Physical Wellness','Creative Expression','Cognitive Engagement','Life Skills','Financial Literacy','Employment Readiness','Housing Stability','Individual Support']},
   {k:'facilitator',l:'Staff facilitator',t:'staff',def:D.me},
   {k:'attendance',l:'Attendance',t:'number'},
-  {k:'rating',l:'Engagement rating',t:'seg',o:['High','Medium','Low']},
+  {k:'rating',l:'Engagement level (1–5)',t:'seg',o:['1','2','3','4','5'],hint:'1 = minimal reaction · 5 = deep discussion or several participants involved.'},
   {k:'location',l:'Location',t:'select',o:['Admin Building','Courtyard','Guest space','Off-site']},
   {k:'notes',l:'Feedback / follow-up notes',t:'textarea',full:1}],
  cols:['date','category','activity','facilitator','attendance','rating'],
@@ -1064,6 +1065,7 @@ requisitions:{title:'Supply Requisitions',nav:'Requisitions',sheet:'Requisitions
   {k:'reason',l:'Reason',t:'textarea',full:1},
   {k:'priority',l:'Priority',t:'seg',o:['High','Medium','Low'],def:'Medium'},
   {k:'status',l:'Status',t:'select',o:['Requested','Approved','Ordered','Received','Not approved'],def:'Requested'},
+  {k:'followUpNote',l:'Request follow-up',t:'text',full:1,hint:'e.g. checked with the Operations Lead on Tuesday; delivery expected Friday.'},
   {k:'notes',l:'Approval / order notes',t:'textarea',full:1}],
  cols:['date','item','qty','priority','status','by'],
  chips:[{l:'Open',f:r=>!['Received','Denied','Not approved'].includes(r.status)},{l:'High priority',f:r=>r.priority==='High'}]},
@@ -1299,6 +1301,7 @@ async function saveForm(){
   if(m==='pets'&&d.status==='Approved'&&(d.photo!=='Received'||d.vaccines!=='Received'||d.formD!=='Signed')&&!await ask({title:'Approval is missing paperwork',body:'Approval needs a photo, vaccination records and a signed Pet Agreement (Form D).',ok:'Save anyway'}))return;
   if(m==='guestunit'){const norm=x=>String(x||'').toLowerCase().replace(/[^a-z]+/g,' ').trim();const ban=siteRecs('trespass').find(r=>r.status==='Active'&&norm(r.name)&&norm(r.name)===norm(d.guest));
     if(ban&&!await ask({title:'Name is on the no-trespass list',body:`“${d.guest}” matches an active no-trespass notice from ${fmtDate(ban.date)}. Save only if this is a different person.`,ok:'Different person, save'}))return}
+  if(m==='requisitions'){const inv=(INV[curSite()]||[]).find(i=>String(i.item).toLowerCase()===String(d.item||'').trim().toLowerCase());d.invId=inv?inv.id:(d.invId||'')}
   if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
     if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
   delete d._statusSet;
@@ -1378,10 +1381,10 @@ const CUSTOM={
     <p class="meta">Tap a unit to record or edit its check. Weekends: see the Exemption Policy (usually 13 exempt, 1 required). When follow-up is needed, note what you saw and the support offered.</p></div>`;
   $('#gridDate').onchange=e=>{gridDate=e.target.value||today();render()};$('#bulkEx').onclick=bulkExempt;
   el.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>b.dataset.rid?openForm('roomchecks',b.dataset.rid):openForm('roomchecks',null,{unit:b.dataset.unit,date:gridDate}))},
- engStats(el){const l=siteRecs('engagement');const att=l.reduce((a,r)=>a+(+r.attendance||0),0);const rated=l.filter(r=>r.rating);const hi=rated.filter(r=>r.rating==='High').length;
+ engStats(el){const l=siteRecs('engagement');const att=l.reduce((a,r)=>a+(+r.attendance||0),0);const rated=l.filter(r=>r.rating);const hi=rated.filter(r=>r.rating==='High'||+r.rating>=4).length;
   const wb=l.find(r=>r.category==='Daily Whiteboard'&&r.date===today());const wk=l.filter(r=>r.date>=addDays(today(),-6)&&r.category!=='Daily Whiteboard').length;
   el.innerHTML=`<div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Total sessions</div><div class="v">${l.length}</div></div>
-   <div class="card kpi"><div class="l">Cumulative attendance</div><div class="v">${att}</div></div><div class="card kpi"><div class="l">Engagement rate (High)</div><div class="v">${rated.length?Math.round(hi/rated.length*100):0}%</div></div>
+   <div class="card kpi"><div class="l">Cumulative attendance</div><div class="v">${att}</div></div><div class="card kpi"><div class="l">Strong engagement (4–5)</div><div class="v">${rated.length?Math.round(hi/rated.length*100):0}%</div></div>
    <div class="card kpi"><div class="l">Logs this week (goal 5)</div><div class="v" style="color:${wk>=5?'var(--ok)':'var(--warn)'}">${wk}</div></div></div>
    <div class="card" style="margin-bottom:14px">${wb?`<b>Today's whiteboard:</b> “${esc(wb.quote)}” <span class="meta">by ${esc(wb.facilitator)}</span>`:`<b>Today's whiteboard hasn't been logged yet.</b> <button class="btn sm acc" type="button" id="logWb">Log today's quote</button>`}</div>`;
   const b=$('#logWb');if(b)b.onclick=()=>openForm('engagement',null,WB_PRESET)},
@@ -1453,7 +1456,7 @@ function renderDash(v){
    ['Every 60–90 min','Perimeter patrol',lastP?`Last patrol ${esc(lastP.time)} (${fmtDate(lastP.date)}) by ${esc(lastP.staff)}`:'No patrols logged yet.',mins==null?pill('None yet','warn'):mins>90?pill(`${mins} min ago`,'bad'):pill(`${mins} min ago`,'ok'),'patrols',{checkType:'Hourly Patrol'}],
    ['1:00–2:00','Intake triage','Cross-check HIFIS and update contact records.',newInt.length?pill(`${newInt.length} new`,'warn'):pill('Clear','ok'),'intakes'],
    ['3:00–4:00','Supply check','Look at the restock queue and submit requisitions for low stock.'+(dow(t)===1?' <b>Monday:</b> cleaning supplies inventory check.':''),low?pill(`${low} low/out`,'warn'):pill('OK','ok'),'inventory'],
-   ['by 4:00','Log participant engagement','Engagement around today\'s prompt (High / Medium / Low) and any feedback.',St(engLog),'engagement'],
+   ['by 4:00','Log participant engagement','Engagement around today\'s prompt (level 1–5) and any feedback. Aim for at least 5 logs a week.',St(engLog),'engagement'],
    ['9:30–10:00 PM','Evening Site Check','Emergency exits latched and locked, courtyard clear, bathrooms and Admin Building checked.',St(has(/Evening/)),'patrols',{checkType:'Evening Site Check (9:30–10 PM)',areas:['Emergency exits latched & locked','Courtyard & pathways','Shared bathrooms / showers / laundry','Admin Building interior']}],
    ['Last 30 min','Shift notes review & handoff','Resolve or assign follow-ups, then complete the handoff with the incoming lead.',St(ho),'handoff']];
   const A=[];
@@ -1486,6 +1489,8 @@ function renderDash(v){
   siteRecs('notes').filter(followDue).forEach(r=>A.push(['bad',`Follow-up overdue (${r.followUpWho||'unassigned'}, due ${fmtWhen(r.followUpBy)}): ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
   siteRecs('notes').filter(r=>r.followUp==='Yes'&&r.followUpStatus!=='Resolved'&&r.priority==='HIGH'&&!followDue(r)).forEach(r=>A.push(['bad',`High-priority follow-up: ${r.participantLabel||''}: ${String(r.followUpDetails||r.notes).slice(0,70)}`,'notes',r.id]));
   siteRecs('wellness').filter(r=>roomFollow(r)&&r.checkInDone!=='Yes'&&r.checkInDue<=t).forEach(r=>A.push([r.checkInDue<t?'bad':'warn',`Private check-in ${r.checkInDue<t?'overdue':'due today'}: ${r.unitLabel}`,'wellness',r.id]));
+  siteRecs('intakes').filter(r=>['Contact Logged','Card Active'].includes(r.status)&&(r.lastContact||r.date)<addDays(t,-2)).forEach(r=>A.push(['warn',`Referral without contact for over 48 hours: ${r.name}. Escalate to the Senior Intake Coordinator.`,'intakes',r.id]));
+  if(CAN_REVIEW&&!isHousing()&&dow(t)>=4){const wk=siteRecs('engagement').filter(r=>r.date>=addDays(t,-6)&&r.category!=='Daily Whiteboard').length;if(wk<5)A.push(['info',`${wk} engagement log${wk===1?'':'s'} in the last 7 days. The goal is at least 5 a week.`,'engagement',''])}
   newInt.filter(r=>hoursSince(r.createdAt)>24).forEach(r=>A.push(['warn',`Intake unreviewed >24h: ${r.name}`,'intakes',r.id]));
   siteRecs('intakes').filter(r=>r.urgent==='Yes'&&!['Admitted','Closed','Referred to Case Management'].includes(r.status)).forEach(r=>A.push(['bad',`Urgent shelter need: ${r.name}. Flag to Case Management`,'intakes',r.id]));
   siteRecs('visitors').filter(r=>!r.timeOut).forEach(r=>A.push(['info',`On site: ${r.name} (${r.agency}) since ${r.timeIn}`,'visitors',r.id]));
@@ -1519,7 +1524,7 @@ function renderDash(v){
    INVENTORY
    ========================================================= */
 function invCalc(i){const total=(+i.office||0)+(+i.bath||0)+(+i.guest||0);const par=+i.par||0;
-  const asset=i.type==='Persistent';const status=par===0?'On demand':total===0?'Out of Stock':total<=par?'Low Stock':'Stocked';
+  const asset=i.type==='Persistent';const status=par===0?'On demand':total===0?'Out of Stock':total<=par?'Low Stock':'In Stock';
   const cond=i.cond==='Fair'?'Good':i.cond==='Maintenance'?'Needs Repair':(i.cond||'Good');const op=i.opStatus||(cond==='Needs Repair'?'Needs Maintenance':cond==='Missing'?'Required':'Operational');
   const order=par>total?par-total:0;return {...i,total,status,order,cond,opStatus:op,cost:order*(+i.price||0),maint:asset&&op!=='Operational'}}
 const money=n=>'$'+(Math.round((+n||0)*100)/100).toFixed(2);
@@ -1538,7 +1543,7 @@ function renderInventory(v){
   else if(invFilter==='assets')show=show.filter(i=>i.type==='Persistent');else if(invFilter!=='all')show=show.filter(i=>i.cat===invFilter);
   const kpi=(l,val,c,f)=>`<button type="button" class="card kpi" data-kf="${f}" style="text-align:left;cursor:pointer;border:1px solid var(--line)"><div class="l">${l}</div><div class="v" ${c?`style="color:var(--${c})"`:''}>${val}</div></button>`;
   h+=`<div class="grid g4" style="margin-bottom:14px">${kpi('Out of stock',out,'bad','restock')}${kpi('Low stock',low,'warn','restock')}
-   ${kpi('Reorder now',`${due.length}<div class="meta" style="margin:0">${cost?money(cost)+' estimated':'add prices for a cost'}</div>`,'','restock')}${kpi('Assets needing attention',maint,maint?'warn':'','maint')}</div>
+   ${kpi('Reorder now',`${due.length}<div class="meta" style="margin:0">${cost?money(cost)+' estimated':'add prices for a cost'}</div>`,'','restock')}${kpi('Assets needing attention',`${maint}${calc.some(i=>i.type==='Persistent'&&+i.assetValue)?`<div class="meta" style="margin:0">assets worth ${money(calc.filter(i=>i.type==='Persistent').reduce((s,i)=>s+(+i.assetValue||0),0))}</div>`:''}`,maint?'warn':'','maint')}</div>
   <p class="meta" style="margin:-6px 0 10px">${calc.length} items · ${od} on demand (par 0) · Last weekly audit: ${AUDIT?esc(fmtDate(AUDIT.date))+' by '+esc(AUDIT.by):'not yet'}</p>
   <div class="toolbar"><button class="btn pri" type="button" id="audit">✓ Mark weekly audit complete</button><button class="btn" type="button" id="addInv">＋ Add item</button>
    <button class="btn" type="button" id="draftMail">✉ Draft restock email</button><button class="btn" type="button" id="toReq">Send restock queue to Requisitions</button>
@@ -1552,7 +1557,7 @@ function renderInventory(v){
     const n=f=>`<span style="display:inline-flex;align-items:center;gap:2px;white-space:nowrap">${ro?'':`<button type="button" class="btn sm ghost" data-step="-1" data-sid="${esc(i.id)}" data-f="${f}" aria-label="One fewer ${esc(i.item)} (${f})" style="padding:2px 6px">−</button>`}<input type="number" ${ro} min="0" inputmode="numeric" value="${esc(i[f])}" data-inv="${esc(i.id)}" data-f="${f}" aria-label="${f} count for ${esc(i.item)}" style="width:52px">${ro?'':`<button type="button" class="btn sm ghost" data-step="1" data-sid="${esc(i.id)}" data-f="${f}" aria-label="One more ${esc(i.item)} (${f})" style="padding:2px 6px">+</button>`}</span>`;
     const asset=i.type==='Persistent';
     const sel=(f,opts,val,lab)=>`<select ${ro} data-inv="${esc(i.id)}" data-f="${f}" aria-label="${lab} of ${esc(i.item)}">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`;
-    h+=`<tr><td><b style="font-weight:600">${esc(i.item)}</b><div class="meta" style="margin:0">${esc(i.id)} · ${esc(i.type)}${asset&&i.assetLoc?' · '+esc(i.assetLoc):''}</div>
+    h+=`<tr><td><b style="font-weight:600">${esc(i.item)}</b>${CAN_WRITE?` <button type="button" class="btn sm ghost" data-edit="${esc(i.id)}" aria-label="Edit details of ${esc(i.item)}" style="padding:0 6px">✎</button>`:''}<div class="meta" style="margin:0">${esc(i.id)} · ${esc(i.type)}${i.model?' · '+esc(i.model):''}${asset&&i.assetLoc?' · '+esc(i.assetLoc):''}${asset&&i.assetValue?' · value '+money(i.assetValue):''}</div>${i.details?`<div class="meta" style="margin:0">${esc(i.details)}</div>`:''}
       ${invGuide?`<input ${ro} data-inv="${esc(i.id)}" data-f="storage" value="${esc(i.storage||'')}" placeholder="Where is it kept? Where is surplus stored?" aria-label="Storage location for ${esc(i.item)}" style="width:100%;min-width:200px;margin-top:4px">`:''}</td>
      <td>${esc(i.freq)}</td><td>${n('office')}</td><td>${n('bath')}</td><td>${n('guest')}</td><td><b>${i.total}</b></td><td><input type="number" ${ro} min="0" value="${esc(i.par)}" data-inv="${esc(i.id)}" data-f="par" aria-label="Par level for ${esc(i.item)}" style="width:52px"></td>
      <td>${asset?'<span class="meta" style="margin:0">Asset</span>':pill(i.status)}</td><td>${!asset&&i.order?i.order:''}</td>
@@ -1563,6 +1568,12 @@ function renderInventory(v){
   $('#invFilt').onchange=e=>{invFilter=e.target.value;render()};$('#invCsv').onclick=exportInvCSV;$('#audit').onclick=markAudit;$('#addInv').onclick=addInvItem;$('#toReq').onclick=restockToReq;$('#draftMail').onclick=draftRestockEmail;
   $('#invGuide').onchange=e=>{invGuide=e.target.checked;try{localStorage.setItem('nh_invGuide',invGuide?'1':'0')}catch(x){}render()};
   v.querySelectorAll('[data-kf]').forEach(b=>b.onclick=()=>{invFilter=b.dataset.kf;render()});
+  v.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{const it=items.find(x=>x.id===b.dataset.edit);
+    const a=await ask({title:`Edit ${it.item}`,ok:'Save',fields:[{l:'Item name',v:it.item,req:1},{l:'Model / brand',v:it.model||''},{l:'Category',o:INV_CATS.includes(it.cat)?INV_CATS:[it.cat,...INV_CATS],v:it.cat},{l:'Type',o:['Consumable','Persistent'],v:it.type},
+      {l:'Replacement frequency',o:['Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually'].includes(it.freq)?['Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually']:[it.freq,'Weekly','Bi-weekly','Monthly','Quarterly','As Needed','Annually'],v:it.freq},
+      {l:'Unit price',t:'number',v:it.price??''},{l:'Asset value (persistent items)',t:'number',v:it.assetValue??''},{l:'Storage location / surplus notes',v:it.storage||''},{l:'Notes / details',v:it.details||''}]});
+    if(!a)return;const n2=x=>x===''?'':Math.max(0,+x||0);const q=Object.assign(clone(it),{item:a[0].trim(),model:a[1].trim(),cat:a[2],type:a[3],freq:a[4],price:n2(a[5]),assetValue:n2(a[6]),storage:a[7].trim(),details:a[8].trim(),updatedAt:new Date().toISOString(),updatedBy:me()});
+    if(q.type==='Persistent'&&!q.opStatus)q.opStatus='Operational';try{await putInv(k,q);toast('Item updated')}catch(e){writeErr(e)}});
   const save=async(id,f,val)=>{const it=clone(items.find(x=>x.id===id));it[f]=val;if(f==='cond'&&it.type==='Persistent'&&!items.find(x=>x.id===id).opStatus)it.opStatus=val==='Needs Repair'?'Needs Maintenance':val==='Missing'?'Required':'Operational';
     it.updatedAt=new Date().toISOString();it.updatedBy=me();try{await putInv(k,it)}catch(e){writeErr(e)}};
   const TXT=['cond','opStatus','assetLoc','storage'];
@@ -1589,7 +1600,7 @@ async function restockToReq(){if(!me())return toast('Choose your name in “Staf
   const q=(INV[curSite()]||[]).map(invCalc).filter(i=>i.order>0&&i.type!=='Persistent');const open=new Set(siteRecs('requisitions').filter(r=>!['Received','Denied','Not approved'].includes(r.status)).map(r=>r.item));
   const add=q.filter(i=>!open.has(i.item));if(!add.length)return toast('The restock queue is already in Requisitions.');
   if(!await ask({title:`Create ${add.length} requisition(s)?`,body:'One for each item at or below par that does not already have an open requisition.',ok:'Create'}))return;
-  const now=new Date().toISOString();try{for(const i of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:i.item,qty:i.order,reason:`Restock to par (${i.total}/${i.par})`,priority:i.status==='Out of Stock'&&/Safety/.test(i.cat)?'High':'Medium',status:'Requested'});
+  const now=new Date().toISOString();try{for(const i of add)await putRec('requisitions',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:today(),by:me(),item:i.item,invId:i.id,qty:i.order,reason:`Restock to par (${i.total}/${i.par})`,priority:i.status==='Out of Stock'&&/Safety/.test(i.cat)?'High':'Medium',status:'Requested'});
   toast(`${add.length} requisition(s) created`);go('requisitions')}catch(e){writeErr(e)}}
 
 /* =========================================================
@@ -1701,7 +1712,7 @@ function renderStaff(v){
   const n=st=>all.filter(s=>s.status===st).length;
   v.innerHTML=`<h1>Staff Roster<span class="sopref">${esc(site().name)}</span></h1>
   <p class="sub">The staff who work at <b>${esc(site().name)}</b>. Active staff appear in “On shift” and in the reporter and facilitator fields. Set someone to <b>On leave</b> while they're away, and <b>Former staff</b> when they leave the site. Their past entries keep their name either way.${ed?'':legacy?' This roster is from an earlier version. It moves into staff records the next time a manager opens the app.':' Only managers can change the roster.'}</p>
-  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">On leave</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Former staff</div><div class="v">${n('Archived')}</div></div></div>
+  <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">On leave</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Former staff</div><div class="v">${n('Archived')}</div></div><div class="card kpi"><div class="l">Active cleaners</div><div class="v">${all.filter(s=>s.status==='Active'&&isCleaner(s)).length}</div><div class="meta" style="margin:0">Total active personnel: ${n('Active')}</div></div></div>
   <div class="toolbar">${ed?`<button class="btn pri" type="button" id="addStaff">＋ Add staff member</button><button class="btn" type="button" id="copyStaff">Copy staff from another site…</button>`:''}
    <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show former staff</label></div>
   <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Status</th></tr></thead><tbody>
@@ -1713,7 +1724,7 @@ function renderStaff(v){
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
     <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="7" class="empty">No staff on this site's roster yet.</td></tr>`}
   </tbody></table></div>
-  <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
+  <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Cleaner','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
   v.querySelectorAll('[data-s]').forEach(el=>el.onchange=async()=>{const s=clone(all.find(x=>x.id===el.dataset.s));const f=el.dataset.f;s[f]=el.value.trim();
     if(f==='status'&&s.status==='Archived'&&!s.end)s.end=today();if(f==='status'&&s.status==='Active')s.end='';
@@ -2006,12 +2017,12 @@ function flatFor(c,d){
   const sm=c.match(/^sites\/([^/]+)\/(staff|participants)$/);
   if(sm){const sn=S().sites[sm[1]]?.name||sm[1];return sm[2]==='staff'?{Site:sn,Name:d.name,Role:d.role,Phone:d.phone,Email:d.email,Start:d.start||'',End:d.end||'',Status:d.status}
     :{Site:sn,Participant:d.name,Status:d.status==='Active'?'Current':'Past',Unit:d.unit,'Moved in':d.moveIn,'Moved out':d.moveOut,'Exit reason':d.exitReason,'Approved appliances':d.appliances,Notes:d.notes}}
-  if(c.startsWith('inv-')){const i=invCalc(d);return {Site:S().sites[c.slice(4)]?.name||c.slice(4),'Inventory ID':i.id,Category:i.cat,Item:i.item,Type:i.type,Frequency:i.freq,'Office Qty':i.office,'Bathroom Qty':i.bath,'Guest Unit Qty':i.guest,'Total Stock':i.total,'Par Level':i.par,'Stock Status':i.type==='Persistent'?'':i.status,'Qty to Order':i.type==='Persistent'?'':i.order,'Unit Price':i.price??'','Reorder Cost':i.cost||'',Condition:i.cond,'Operational Status':i.type==='Persistent'?i.opStatus:'','Assigned Location':i.assetLoc||'','Storage Notes':i.storage||''}}
+  if(c.startsWith('inv-')){const i=invCalc(d);return {Site:S().sites[c.slice(4)]?.name||c.slice(4),'Inventory ID':i.id,Category:i.cat,Item:i.item,Type:i.type,Frequency:i.freq,'Office Qty':i.office,'Bathroom Qty':i.bath,'Guest Unit Qty':i.guest,'Total Stock':i.total,'Par Level':i.par,'Stock Status':i.type==='Persistent'?'':i.status,'Qty to Order':i.type==='Persistent'?'':i.order,'Unit Price':i.price??'','Reorder Cost':i.cost||'',Condition:i.cond,'Operational Status':i.type==='Persistent'?i.opStatus:'','Assigned Location':i.assetLoc||'','Asset Value':i.assetValue??'','Item Name / Model':i.model||'','Storage Notes':i.storage||'','Notes / Details':i.details||''}}
   return {}}
 const csvCell=v=>{v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
 const toCsv=rows=>'﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
 function exportCSV(m){download(`12N-${M[m].sheet.replace(/\W+/g,'-')}-${today()}.csv`,toCsv(flatRows(m)))}
-const invRows=k=>[['Inventory ID','Inventory Type','Category','Item','Replacement Frequency','Office Qty','Bathroom Qty','Guest Unit Qty','Total Stock','Par Level','Stock Status','Qty to Order','Unit Price','Reorder Cost','Condition','Operational Status','Assigned Location','Storage Notes'],...(INV[k]||[]).map(invCalc).map(i=>[i.id,i.type,i.cat,i.item,i.freq,i.office,i.bath,i.guest,i.total,i.par,i.type==='Persistent'?'':i.status,i.type==='Persistent'?'':i.order,i.price??'',i.cost||'',i.cond,i.type==='Persistent'?i.opStatus:'',i.assetLoc||'',i.storage||''])];
+const invRows=k=>[['Inventory ID','Inventory Type','Category','Item','Replacement Frequency','Office Qty','Bathroom Qty','Guest Unit Qty','Total Stock','Par Level','Stock Status','Qty to Order','Unit Price','Reorder Cost','Condition','Operational Status','Assigned Location','Asset Value','Item Name / Model','Storage Notes','Notes / Details'],...(INV[k]||[]).map(invCalc).map(i=>[i.id,i.type,i.cat,i.item,i.freq,i.office,i.bath,i.guest,i.total,i.par,i.type==='Persistent'?'':i.status,i.type==='Persistent'?'':i.order,i.price??'',i.cost||'',i.cond,i.type==='Persistent'?i.opStatus:'',i.assetLoc||'',i.assetValue??'',i.model||'',i.storage||'',i.details||''])];
 function exportInvCSV(){download(`12N-Inventory-${today()}.csv`,toCsv(invRows(curSite())))}
 function exportExcel(){
   if(!window.XLSX){toast('The Excel exporter did not load. Use the CSV buttons on each log instead.','err');return}
