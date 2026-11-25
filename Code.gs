@@ -179,6 +179,16 @@ function checkConfigChange_(u, data) {
     if ((o.kind || 'shelter') !== (n.kind || 'shelter') || String(o.program || '') !== String(n.program || '')) throw new Error('DENIED: Only administrators can change a site\'s program.');
   });
 }
+/* Fields only Managers and Administrators may see. They are removed from everything sent to other roles,
+   and kept as they were when someone below Manager saves the entry. Keys are the log name; values are
+   [field key in the record, column heading in the Sheet]. */
+var RESTRICTED = { intakes: [['hifisNo', 'HIFIS number']] };
+function restrictedFor_(c) { var m = String(c).replace(/^(log|arch)-/, ''); return /^(log|arch)-/.test(c) ? (RESTRICTED[m] || []) : []; }
+function stripRestricted_(u, c, d) {
+  if (!d || atLeast_(u, 'Manager')) return d;
+  restrictedFor_(c).forEach(function (f) { delete d[f[0]]; });
+  return d;
+}
 /* Resident Escalation forms: who may complete each one (NH Behaviour Escalation Framework). */
 var ESC_MIN = { 'Room Status Update': 'Supervisor', 'Community Accountability Review (CAR)': 'Supervisor', '10-Day Final Improvement Notice': 'Supervisor',
   'Debrief & lessons learned': 'Supervisor', 'Urgent Warning (Final Written Notice)': 'Manager', 'Eviction Request': 'Manager' };
@@ -272,7 +282,7 @@ function changes(since) {
       var d = null;
       if (!del) { try { d = JSON.parse(r[4]); } catch (e) { continue; } }
       if (!del && !siteOk_(allowed, siteOf_(c, id, d))) continue;
-      docs.push({ c: c, id: id, del: del, d: d });
+      docs.push({ c: c, id: id, del: del, d: stripRestricted_(u, c, d) });
     }
   });
   return { ts: lastTs, docs: docs };
@@ -293,12 +303,19 @@ function put(c, id, json, flatJson) {
   var flat = {};
   try { flat = flatJson ? JSON.parse(flatJson) : {}; } catch (e) { flat = {}; }
   DOC_COLS.forEach(function (k) { delete flat[k]; });
+  var hidden = atLeast_(u, 'Manager') ? [] : restrictedFor_(c);
+  if (hidden.length) {
+    var prev = readRecord_(c, id) || {};
+    hidden.forEach(function (f) { delete data[f[0]]; if (prev[f[0]] !== undefined) data[f[0]] = prev[f[0]]; delete flat[f[1]]; });
+    json = JSON.stringify(data);
+  }
+  var keepCols = DOC_COLS.concat(hidden.map(function (f) { return f[1]; }));
   return withLock_(function () {
     var sh = tab_(c), ts = nextTs_(sh.getName());
     var headers = ensureHeaders_(sh, Object.keys(flat));
     var row = findRow_(sh, c, id);
     var old = row ? sh.getRange(row, 1, 1, headers.length).getValues()[0] : null;
-    var vals = headers.map(function (h, i) { return old && DOC_COLS.indexOf(h) >= 0 ? old[i] : ''; });
+    var vals = headers.map(function (h, i) { return old && keepCols.indexOf(h) >= 0 ? old[i] : ''; });
     vals[0] = c; vals[1] = id; vals[2] = ts; vals[3] = false; vals[4] = json; vals[5] = u.email;
     Object.keys(flat).forEach(function (k) {
       var i = headers.indexOf(k);
@@ -401,7 +418,7 @@ function archiveQuery(m, site, from, to) {
       if (String(d.site) !== String(site)) return;
       var date = d.date || String(d.createdAt || '').slice(0, 10);
       if ((from && date < from) || (to && date > to)) return;
-      out.push(d);
+      out.push(stripRestricted_(u, 'arch-' + m, d));
     });
   });
   return out;

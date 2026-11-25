@@ -132,7 +132,7 @@ td.clip{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowra
 .rtile b{display:block;font-size:13px}.rtile small{display:block;color:var(--ink3);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtile .pill{margin-top:5px}
 .rtile.Pass,.rtile.Exempt{border-color:var(--ok);background:var(--okSoft)}.rtile.Fail,.rtile.Follow-up{border-color:var(--warn);background:var(--warnSoft)}
-.rtile.Day-Off{border-color:var(--purple);background:var(--purpleSoft)}.rtile.Due{border-color:var(--pink);background:var(--pinkSoft)}
+.rtile.Urgent{border-color:var(--bad);background:var(--badSoft)}.rtile.Day-Off{border-color:var(--purple);background:var(--purpleSoft)}.rtile.Due{border-color:var(--pink);background:var(--pinkSoft)}
 .inv input,.inv select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:var(--panel)}
 .inv input[type=number]{width:64px;text-align:right}
 .catrow td{background:var(--panel2);font-weight:700;color:var(--brand)}
@@ -653,7 +653,7 @@ visitors:{title:'Guest & Contractor Sign-In/Out Log',nav:'Guest & Contractor Log
  cols:['date','name','agency','purpose','timeIn','timeOut',{l:'Status',f:r=>pill(r.timeOut?'Signed out':'On site')}],
  rowAction:{l:'Sign out',show:r=>!r.timeOut,run:r=>{r.timeOut=nowTime()}},
  chips:[{l:'On site now',f:r=>!r.timeOut},{l:'Today',f:r=>r.date===today()}]},
-roomchecks:{kinds:['shelter'],title:'Daily Room Checks',nav:'Room Checks',sheet:'Room Operations Data',sop:'Guide · Room Checks',custom:'roomGrid',
+roomchecks:{kinds:['shelter'],title:'Daily Room Checks (before Nov 2026)',nav:'Daily Room Checks (old)',sheet:'Room Operations Data',sop:'Guide · Room Checks',custom:'roomGrid',
  desc:'Weekday checks (Mon–Fri, 10 AM–2 PM): knock, announce, do a wellness and room check, then record it here. Every unit must be accounted for (checked or exempt) before the shift ends.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'unit',l:'Unit',t:'unit',req:1},
@@ -667,11 +667,13 @@ roomchecks:{kinds:['shelter'],title:'Daily Room Checks',nav:'Room Checks',sheet:
   {k:'comments',l:'Comments',t:'textarea',full:1,req:r=>rcFollow(r.status),hint:'Required when follow-up is needed: describe what you saw and what support was offered. Report any unapproved appliances (heating elements, hot plates) to the Site Supervisor right away.'}],
  cols:['date','unit','status','staff','checkStatus','followUp','comments'],
  chips:[{l:'Today',f:r=>r.date===today()},{l:'Needs follow-up',f:r=>rcFollow(r.status)},{l:'Follow-ups',f:r=>r.followUp==='Yes'}]},
-wellness:{kinds:['shelter'],title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Checks',sop:'Unit Room Check Form v1.0 (Phase 2, April 2026) · NH 3.1.6 · 3.1.10–3.1.13 · 3.2.3 · 3.2.6',copy:1,
- get desc(){return `The official Unit Room Check Form, done ${unitFreqText()} at this site. `+this.desc0},desc0:'Rate each item P = Pass, FU = Follow-Up, U = Urgent. Knock, wait and announce before entering. The check is supportive, not disciplinary: do not open bins, drawers or bags unless safety is at immediate risk and a supervisor approves.',
+wellness:{kinds:['shelter'],title:'Unit Room Check',nav:'Unit Room Checks',sheet:'Room Wellness Checks',custom:'roomGrid',sop:'Unit Room Check Form v1.0 (Phase 2, April 2026) · NH 3.1.6 · 3.1.10–3.1.13 · 3.2.3 · 3.2.6',copy:1,
+ get desc(){return `The official Unit Room Check Form, done ${unitFreqText()} at this site. `+this.desc0},desc0:'Tap a unit below to fill in its check, or mark units Exempt (holiday, participant away, pre-approved). Rate each item P = Pass, FU = Follow-Up, U = Urgent. Knock, wait and announce before entering. The check is supportive, not disciplinary: do not open bins, drawers or bags unless safety is at immediate risk and a supervisor approves.',
  fields:[
   {k:'date',l:'Date',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
   {k:'unit',l:'Unit / name',t:'unit',req:1},{k:'staff',l:'Staff name',t:'staff',def:D.me,req:1},{k:'staff2',l:'Second staff',t:'staff',def:D.other},
+  {k:'result',l:'Check',t:'seg',o:['Completed','Exempt'],def:'Completed',req:1},
+  {k:'exemptReason',l:'Exemption reason',t:'select',o:['Pre-approved Exemption','Participant Away','Medical / Hospital','Holiday','Staff Meeting'],show:r=>r.result==='Exempt',req:r=>r.result==='Exempt'},
   {k:'present',l:'Participant present',t:'seg',o:['Yes','No']},
   {t:'sect',l:'1 · General unit condition'},
   {k:'general',l:'General unit condition',t:'yntable',full:1,vals:['P','FU','U'],o:[
@@ -712,7 +714,7 @@ wellness:{kinds:['shelter'],title:'Unit Room Check',nav:'Unit Room Checks',sheet
   {k:'support',l:'Support offered / needed',t:'multi',full:1,o:['Hygiene supplies','Mental health','Physical health','Emotional support / check-in','Laundry support','Room cleaning support','Clothing / weather gear','Maintenance / repairs','Income support / Social Development','Budgeting support','Legal support','Other']},
   {k:'checkInDue',l:'Private check-in due (within 48 h)',t:'date',show:r=>roomFollow(r),def:()=>addDays(today(),2)},
   {k:'checkInDone',l:'Check-in completed?',t:'seg',o:['No','Yes'],def:'No',show:r=>roomFollow(r)}],
- cols:['date','unit','staff','roomStatus',{l:'Flagged items',f:r=>esc(roomFlags(r).map(x=>`${x.item} (${x.v})`).join(', '))},{l:'Check-in',f:r=>roomFollow(r)?(r.checkInDone==='Yes'?pill('Completed'):pill('Due '+fmtDate(r.checkInDue),r.checkInDue<today()?'bad':'warn')):''}],
+ cols:['date','unit','staff',{l:'Overall status',f:r=>r.result==='Exempt'?pill('Exempt'+(r.exemptReason?' · '+r.exemptReason:''),''):esc(r.roomStatus||'')},{l:'Flagged items',f:r=>esc(roomFlags(r).map(x=>`${x.item} (${x.v})`).join(', '))},{l:'Check-in',f:r=>roomFollow(r)?(r.checkInDone==='Yes'?pill('Completed'):pill('Due '+fmtDate(r.checkInDue),r.checkInDue<today()?'bad':'warn')):''}],
  chips:[{l:'Needs follow-up',f:r=>roomFollow(r)&&r.checkInDone!=='Yes'},{l:'Urgent',f:r=>r.roomStatus==='Urgent'},{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)}]},
 guestunit:{kinds:['shelter'],title:'Guest Unit Booking',nav:'Guest Unit Bookings',sheet:'Guest Unit Bookings',sop:'12N Guest Unit Policy · Guest Unit Sign-Up Sheet',
  desc:'The Guest Unit is for participants to spend time with approved guests. Open 8:00 AM – 8:00 PM, last booking starts at 6:00 PM, 2 hours maximum. The participant and their guest both sign the paper sheet (yellow binder in the office).',
@@ -1119,6 +1121,7 @@ intakes:{kinds:['shelter'],title:'Intakes',nav:'Intakes',sheet:'Intake Data',sop
   {k:'date',l:'Date received',t:'date',req:1,def:D.today},{k:'time',l:'Time',t:'time',def:D.now},
   {k:'name',l:'Applicant name',t:'text',req:1},{k:'contact',l:'Contact info',t:'text',hint:'Verify before the intake interview'},
   {k:'dob',l:'Date of birth',t:'date'},{k:'hifis',l:'HIFIS',t:'seg',o:['Yes','No','Unsure'],req:1},
+  {k:'hifisNo',l:'HIFIS number',t:'text',restricted:1,show:()=>CAN_ADMIN,hint:'Only Managers and Administrators can see or change this.'},
   {k:'referral',l:'Referring agency / worker',t:'text'},
   {k:'status',l:'Status',t:'select',o:['New Inquiry','Contact Logged','Card Active','Referred to Case Management','Admitted','Closed'],def:'New Inquiry'},
   {k:'urgent',l:'Urgent shelter need?',t:'seg',o:['No','Yes'],def:'No'},
@@ -1181,7 +1184,7 @@ const ROOM_TABLES=['general','sleeping','appliances','plumbing','cords','exitPat
 function roomFlags(r){const out=[];for(const k of ROOM_TABLES)for(const [item,x] of Object.entries(r[k]||{}))if(x&&(x.v==='FU'||x.v==='U'))out.push({table:k,item,v:x.v,n:x.n||''});return out}
 function roomAutoStatus(r){const f=roomFlags(r);if(f.some(x=>x.v==='U')||r.smokeResult==='Fail')return 'Urgent';
   if(f.length||r.unapproved==='Found'||r.panelOk==='No'||r.smokeResult==='Low Bat.'||r.bedding==='Yes')return 'Needs Follow-Up';return 'All Clear'}
-const roomFollow=r=>!!r.roomStatus&&!['Clean','All Clear'].includes(r.roomStatus);
+const roomFollow=r=>r.result!=='Exempt'&&!!r.roomStatus&&!['Clean','All Clear'].includes(r.roomStatus);
 /* Participant Time In/Out: one record per unit per shift, holding that shift's Out/In events. */
 const ioId=(k,d,s,u)=>`io-${k}-${d}-${s}-${u}`;
 const ioTimes=ev=>(ev||[]).map(e=>`${e.t} ${e.time}`).join(', ');
@@ -1208,7 +1211,7 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
    NAV & HEADER
    ========================================================= */
 const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['tasks','Shift Tasks'],['notes'],['handoff'],['schedule','Schedule']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
- ['Participants',[['roomchecks'],['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement'],['escalations'],['pathway','Escalation Pathway'],['foodbank']]],
+ ['Participants',[['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement'],['escalations'],['pathway','Escalation Pathway'],['foodbank']]],
  ['Residents',[['board','Community Dashboard'],['notices'],['inspections'],['plans'],['rent'],['pets'],['parking'],['entries']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
@@ -1224,6 +1227,9 @@ function badgeFor(id){
   return 0}
 const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager',pathway:'Supervisor'};
 const PAGE_KIND={board:['housing'],pathway:['shelter'],tasks:['shelter']};
+(()=>{const keep=new Set(['date','time','unit','staff','staff2','result','exemptReason','notes']);
+  for(const f of M.wellness.fields){if(keep.has(f.k))continue;const s=f.show,q=f.req;f.show=r=>r.result!=='Exempt'&&(!s||s(r));
+    if(q)f.req=typeof q==='function'?(r=>r.result!=='Exempt'&&q(r)):(r=>r.result!=='Exempt')}})();
 const kindOk=id=>{const w=(M[id]&&M[id].kinds)||PAGE_KIND[id];return !w||w.includes(siteKind())};
 const pageOk=id=>kindOk(id)&&(!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]]);
 function renderNav(){let h=`<div class="logo"><img src="${LOGO}" alt="the 12 neighbours community" width="400" height="177"><small>NH Site Docs · Neighbourly Homes</small></div>`;
@@ -1269,6 +1275,7 @@ function renderBanner(){let h='';
 
 let API_STARTED=false;
 function render(){if(MODE==='api'&&!API_STARTED)return; /* keep the sign-in screen until the app has started */
+  if(cur==='roomchecks')cur='wellness';
   if(!pageOk(cur)){cur='dash';try{location.hash='dash'}catch(e){}}
   renderHeader();renderNav();renderBanner();const v=$('#view');
   if(cur==='dash')return renderDash(v);if(cur==='inventory')return renderInventory(v);if(cur==='site')return renderParticipants(v);if(cur==='staff')return renderStaff(v);
@@ -1462,7 +1469,6 @@ function openItems(){const t=today();const out=[];
   siteRecs('incidents').filter(r=>r.review!=='Closed'&&r.date>=addDays(t,-2)).forEach(r=>out.push(['Incident',`${r.reportType} at ${r.location} (${fmtDate(r.date)} ${r.time}), ${r.review}`]));
   siteRecs('workorders').filter(r=>r.stage!=='Completed'&&/^1|^2/.test(r.severity)).forEach(r=>out.push(['Work order',`${r.severity}: ${r.where}: ${r.description}`]));
   siteRecs('visitors').filter(r=>!r.timeOut).forEach(r=>out.push(['Visitor on site',`${r.name} (${r.agency}) since ${r.timeIn}`]));
-  siteRecs('roomchecks').filter(r=>r.date===t&&rcFollow(r.status)).forEach(r=>out.push(['Room check follow-up',`${r.unitLabel}: ${r.comments}`]));
   siteRecs('patrols').filter(r=>r.date===t&&r.classification!=='All-Clear').forEach(r=>out.push(['Patrol',`${r.time} ${r.classification}: ${[r.internal,r.external].filter(Boolean).join(' / ')}`]));
   siteRecs('wellness').filter(r=>roomFollow(r)&&r.checkInDone!=='Yes').forEach(r=>out.push(['Wellness check-in',`${r.unitLabel} due ${fmtDate(r.checkInDue)}`]));
   siteRecs('requisitions').filter(r=>r.priority==='High'&&!['Received','Denied','Not approved'].includes(r.status)).forEach(r=>out.push(['Supply',`${r.item} ×${r.qty} (${r.status})`]));
@@ -1475,17 +1481,18 @@ function autoSummaryHTML(){const o=openItems();return o.length?`<b>${o.length} o
    ========================================================= */
 let gridDate=today();
 const CUSTOM={
- roomGrid(el){const by={};siteRecs('roomchecks').filter(r=>r.date===gridDate).forEach(r=>{by[r.unit]=r});
-  const occ=units().filter(u=>u.status==='Occupied');const done=occ.filter(u=>by[u.no]&&by[u.no].status!=='Due').length;const wk=dow(gridDate)===0||dow(gridDate)===6;
+ roomGrid(el){const by={};sorted(siteRecs('wellness').filter(r=>r.date===gridDate)).reverse().forEach(r=>{by[r.unit]=r});
+  const tag=r=>!r?null:r.result==='Exempt'?['Exempt','Exempt']:r.roomStatus==='Urgent'?['Urgent','Urgent']:roomFollow(r)?['Follow-up','Needs Follow-Up']:['Pass','All Clear'];
+  const occ=units().filter(u=>u.status==='Occupied');const done=occ.filter(u=>by[u.no]).length;const due=unitCheckDue(gridDate);
   el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="toolbar" style="margin-bottom:10px">
     <label for="gridDate"><b style="font-size:15px">Units for</b></label><input id="gridDate" type="date" value="${gridDate}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--panel)">
-    <span class="pill ${done===occ.length?'p-ok':'p-warn'}">${done}/${occ.length} accounted for</span>${wk?'<span class="pill p-purple">Weekend: most units exempt</span>':''}
+    <span class="pill ${done===occ.length?'p-ok':'p-warn'}">${done}/${occ.length} accounted for</span>${due?'':`<span class="pill p-purple">Not a check day here (${esc(unitFreqText())})</span>`}
     <span style="flex:1"></span><button class="btn sm" type="button" id="bulkEx">Mark the rest Exempt…</button></div>
-    <div class="rgrid">${units().map(u=>{const r=by[u.no];const st=r?r.status:(u.status==='Occupied'?'Not checked':'');
-      return `<button class="rtile ${r?r.status.replace(' ','-'):''}" type="button" data-unit="${u.no}" data-rid="${r?esc(r.id):''}"><b>Unit ${u.no}</b><small>${esc(unitName(u)||'—')}${u.status!=='Occupied'?' · '+esc(u.status):''}</small>${st?pill(st,r?undefined:''):''}</button>`}).join('')}</div>
-    <p class="meta">Tap a unit to record or edit its check. Weekends: see the Exemption Policy (usually 13 exempt, 1 required). When follow-up is needed, note what you saw and the support offered.</p></div>`;
+    <div class="rgrid">${units().map(u=>{const r=by[u.no],g=tag(r);const st=g?g[1]:(u.status==='Occupied'?'Not checked':'');
+      return `<button class="rtile ${g?g[0]:''}" type="button" data-unit="${u.no}" data-rid="${r?esc(r.id):''}"><b>Unit ${u.no}</b><small>${esc(unitName(u)||'—')}${u.status!=='Occupied'?' · '+esc(u.status):''}</small>${st?pill(st,g?(g[0]==='Urgent'?'bad':g[0]==='Follow-up'?'warn':'ok'):''):''}</button>`}).join('')}</div>
+    <p class="meta">Tap a unit to fill in or open its Unit Room Check. This site checks units ${esc(unitFreqText())} (set under Site Info &amp; Contacts). Units not being checked (holiday, participant away, pre-approved) can be marked Exempt.</p></div>`;
   $('#gridDate').onchange=e=>{gridDate=e.target.value||today();render()};$('#bulkEx').onclick=bulkExempt;
-  el.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>b.dataset.rid?openForm('roomchecks',b.dataset.rid):openForm('roomchecks',null,{unit:b.dataset.unit,date:gridDate}))},
+  el.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>b.dataset.rid?openForm('wellness',b.dataset.rid):openForm('wellness',null,{unit:b.dataset.unit,date:gridDate}))},
  engStats(el){const l=siteRecs('engagement');const att=l.reduce((a,r)=>a+(+r.attendance||0),0);const rated=l.filter(r=>r.rating);const hi=rated.filter(r=>r.rating==='High'||+r.rating>=4).length;
   const wb=l.find(r=>r.category==='Daily Whiteboard'&&r.date===today());const wk=l.filter(r=>r.date>=addDays(today(),-6)&&r.category!=='Daily Whiteboard').length;
   el.innerHTML=`<div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Total sessions</div><div class="v">${l.length}</div></div>
@@ -1542,11 +1549,11 @@ async function ioRemove(id,i){const ex=recs('inout').find(x=>x.id===id);const e=
   try{if(!r.events.length&&CAN_ADMIN&&CAN_WRITE){await removeRec('inout',id)}else await putRec('inout',r);toast(`Removed ${e.t} ${e.time}`)}catch(err){writeErr(err)}}
 const WB_PRESET={category:'Daily Whiteboard',activity:'Daily Whiteboard',boardType:'Quote',focus:'Reflection & Morale',location:'Admin Building'};
 async function bulkExempt(){
-  const has=new Set(siteRecs('roomchecks').filter(r=>r.date===gridDate).map(r=>String(r.unit)));const rest=units().filter(u=>u.status==='Occupied'&&!has.has(String(u.no)));
+  const has=new Set(siteRecs('wellness').filter(r=>r.date===gridDate).map(r=>String(r.unit)));const rest=units().filter(u=>u.status==='Occupied'&&!has.has(String(u.no)));
   if(!rest.length)return toast('Every unit already has an entry for this date.');if(!me())return toast('Choose your name in “Staff on shift” first.','err');
   const a=await ask({title:`Mark ${rest.length} unit(s) Exempt?`,body:`Units without an entry for ${fmtDate(gridDate)}: ${rest.map(u=>u.no).join(', ')}`,ok:'Mark Exempt',fields:[{l:'Reason',o:['Pre-approved Exemption','Holiday','Staff Meeting','Medical / Hospital','Participant Away'],v:'Pre-approved Exemption'}]});
   if(!a)return;const now=new Date().toISOString();
-  try{for(const u of rest)await putRec('roomchecks',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:gridDate,unit:String(u.no),unitLabel:unitLabel(u.no),status:'Exempt',exemptReason:a[0],staff:me(),checkStatus:'Excused',priority:'Low',followUp:'No'});toast(`${rest.length} unit(s) marked Exempt`)}catch(e){writeErr(e)}}
+  try{for(const u of rest)await putRec('wellness',{id:uid(),site:curSite(),createdAt:now,createdBy:me(),date:gridDate,unit:String(u.no),unitLabel:unitLabel(u.no),result:'Exempt',exemptReason:a[0],staff:me(),shiftStaff:pair()});toast(`${rest.length} unit(s) marked Exempt`)}catch(e){writeErr(e)}}
 
 /* =========================================================
    DASHBOARD
@@ -1577,7 +1584,6 @@ function renderDash(v){
    ['8:00–10:00','Morning Safety Walkthrough','Courtyard, shared bathrooms/laundry, Admin Building, micro-home exteriors.',St(has(/Morning/)),'patrols',{checkType:'Morning Safety Walkthrough (8–10 AM)'}],
    ['by 8:30','Post the daily whiteboard','Check it hasn\'t run in the last 60 days. Use trauma-informed language.',St(wb),'engagement',WB_PRESET],
    ...(unitCheckDue(t)?[['Today','Unit Room Checks',`This site does Unit Room Checks ${unitFreqText()}. Knock, wait and announce; visual check only.`,(()=>{const n=new Set(siteRecs('wellness').filter(r=>r.date===t).map(r=>String(r.unit))).size;return St(occ&&n>=occ?true:n?null:false,`${n}/${occ}`,'warn')})(),'wellness']]:[]),
-   ['10:00–2:00','Daily room checks',weekday?'Knock, announce, check in; record Pass / Follow-up / Exempt.':'Weekend: apply the exemption policy.',St(occ&&rcDone>=occ?true:rcDone?null:false,`${rcDone}/${occ}`,'warn'),'roomchecks'],
    ['12:00–2:00','Midday Spot Check','Second walkthrough of the day.',St(has(/Midday/)),'patrols',{checkType:'Midday Spot Check (12–2 PM)'}],
    ['Every 60–90 min','Perimeter patrol',lastP?`Last patrol ${esc(lastP.time)} (${fmtDate(lastP.date)}) by ${esc(lastP.staff)}`:'No patrols logged yet.',mins==null?pill('None yet','warn'):mins>90?pill(`${mins} min ago`,'bad'):pill(`${mins} min ago`,'ok'),'patrols',{checkType:'Hourly Patrol'}],
    ['1:00–2:00','Intake triage','Cross-check HIFIS and update contact records.',newInt.length?pill(`${newInt.length} new`,'warn'):pill('Clear','ok'),'intakes'],
@@ -2219,7 +2225,7 @@ async function download(name,data){
   const b=data instanceof Blob?data:new Blob([data]);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
 /* One record as readable label → value pairs (Excel export and the Google Sheet's columns). */
 function recFlat(m,r){const o={Site:S().sites[r.site]?.name||r.site||''};
-  for(const f of fieldsOf(m)){const v=r[f.k];
+  for(const f of fieldsOf(m)){const v=r[f.k];if(f.restricted&&!CAN_ADMIN)continue;
     if(f.t==='yntable'&&f.vals){for(const lb of f.o.map(optLabel)){const x=(v||{})[lb]||{};o[lb]=(x.v||'')+(x.n?` – ${x.n}`:'')}continue} /* rating tables: one column per item */
     o[f.l]=f.t==='unit'?(r[f.k+'Label']||unitLabel(v)):f.t==='multi'?(v||[]).join('; '):f.t==='yntable'?f.o.map(optLabel).map(o2=>`${o2}: ${(v||{})[o2]?.v||'-'}${(v||{})[o2]?.n?' ('+v[o2].n+')':''}`).join('; '):(v??'')}
   Object.assign(o,{'On shift':(r.shiftStaff||[]).join(' & '),Created:r.createdAt||'','Created by':r.createdBy||'','Last edited':r.updatedAt||'','Edited by':r.updatedBy||''});return o}
