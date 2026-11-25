@@ -1646,6 +1646,8 @@ function renderDash(v){
   const A=[];
   if(CAN_PUBLISH)(SCHED[curSite()]||[]).filter(w=>w.submitted).forEach(w=>A.push(['warn',`Schedule for the week of ${fmtDate(w.week)} is waiting for your approval${w.submittedBy?` (from ${w.submittedBy})`:''}.`,'schedule','']));
   if(CAN_PUBLISH){const n=siteRecs('schedreq').filter(r=>!r.status||r.status==='Pending').length;if(n)A.push(['warn',`${n} schedule request${n>1?'s are':' is'} waiting for a decision.`,'schedreq',''])}
+  if(CAN_SCHEDULE){const wk=weekStart(today());const n=[wk,addDays(wk,7)].reduce((a,w)=>a+hoursReport(curSite(),w).filter(r=>r.issues.length).length,0);
+    if(n)A.push(['warn',`${n} hours issue${n>1?'s':''} on this week's or next week's schedule (over ${MAX_WEEK_H} h a week, over ${MAX_PAY_H} h a pay period, or Full-Time under ${FT_MIN_H} h).`,'schedule',''])}
   if(CAN_SCHEDULE){const gaps=schedGaps(curSite(),7);if(gaps)A.push(['warn',`${gaps} shift${gaps>1?'s':''} in the next 7 days ${gaps>1?'have':'has'} fewer than 2 staff scheduled.`,'schedule',''])}
   if(CAN_ADMIN&&CAN_WRITE){const c=archiveCandidates(12);const n=MODS.reduce((a,m)=>a+c[m].length,0);if(n)A.push(['info',`${n} closed entr${n===1?'y is':'ies are'} over a year old. Archive them to keep the app quick.`,'archive',''])}
   {const L=ioLatest(curSite());for(const [u,l] of Object.entries(L))if(l.t==='Out'&&(Date.now()-l.at)/36e5>24)A.push(['bad',`${unitLabel(u)} has been out since ${fmtDate(l.date)} ${l.time} (over 24 hours). Check the Missing Participant protocol.`,'inout',''])}
@@ -1888,6 +1890,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
    ${!isHousing()?`<div class="fld"><label for="si_ufreq">Unit Room Checks</label><select id="si_ufreq" ${ro}>${UNIT_FREQ.map(o=>`<option ${o===unitFreq()?'selected':''}>${o}</option>`).join('')}</select><span class="hint">How often this site completes the Unit Room Check Form.</span></div>
    ${unitFreq()==='Every second Thursday'?`<div class="fld"><label for="si_ustart">A Thursday when checks happen</label><input id="si_ustart" ${ro} type="date" value="${esc(s.unitCheckStart||'')}"><span class="hint">Sets which Thursdays are check days.</span></div>`:''}`:''}
    ${!isHousing()?`<div class="fld"><label for="si_fb">Foodbank order dates</label><input id="si_fb" ${ro} value="${esc(s.foodbankDates||'')}" placeholder="2026-12-15, 2027-01-19"><span class="hint">Dates as YYYY-MM-DD, separated by commas. Orders go in online 8–11 AM; pickup is the Friday of that week.</span></div>`:''}
+   ${CAN_SCHEDULE?`<div class="fld"><label for="si_pay">First day of a pay period</label><input id="si_pay" ${ro} type="date" value="${esc(s.payStart||'')}"><span class="hint">Any past or future start date. Pay periods run 14 days from it${s.payStart?'':` (until set: from ${esc(fmtDate(PAY_ANCHOR_DEFAULT))})`}.</span></div>`:''}
    <div class="fld"><label for="si_nonurgent">Non-urgent channel for the Site Manager</label><input id="si_nonurgent" ${ro} value="${esc(s.nonUrgent||'')}" placeholder="e.g. a shared email address or a named group chat"><span class="hint">For routine questions and updates; replies within 1–2 business days. The Site Manager's personal phone is for urgent and emergency contact only.</span></div>
    <div class="fld"><label for="si_restock">Restock orders go to (email)</label><input id="si_restock" ${ro} type="email" value="${esc(s.restockEmail||'')}" placeholder="manager@12neighbours.com"></div></div>
   <h2 style="font-size:18px">When to contact the Site Manager</h2>
@@ -1899,7 +1902,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
   </tbody></table></div>
   <div class="toolbar" style="margin-top:10px">${ro?'':`<button class="btn" type="button" id="addContact">＋ Add contact</button>`}<span class="meta" style="margin:0">Check this directory at each monthly review.</span></div>`;
   const k=curSite();const fld=(id,f,msg)=>{const el=$(id);el.onchange=()=>cfgSave(()=>{CFG.sites[k][f]=el.value.trim()},msg||'Saved')};
-  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');fld('#si_nonurgent','nonUrgent','Non-urgent channel saved');if($('#si_fb'))fld('#si_fb','foodbankDates','Foodbank dates saved');if($('#si_ufreq')){const e=$('#si_ufreq');e.onchange=()=>cfgSave(()=>{CFG.sites[k].unitCheckFreq=e.value},'Room check frequency saved')}if($('#si_ustart'))fld('#si_ustart','unitCheckStart','Saved');if($('#si_landlord')){fld('#si_landlord','landlord','Landlord partner saved');fld('#si_prob','probation','Saved')}
+  fld('#si_name','name','Site renamed');fld('#si_addr','address');fld('#si_phone','sitePhone');fld('#si_police','nonEmergency');fld('#si_open','opened');fld('#si_restock','restockEmail','Restock contact saved');fld('#si_nonurgent','nonUrgent','Non-urgent channel saved');if($('#si_fb'))fld('#si_fb','foodbankDates','Foodbank dates saved');if($('#si_pay'))fld('#si_pay','payStart','Pay period saved');if($('#si_ufreq')){const e=$('#si_ufreq');e.onchange=()=>cfgSave(()=>{CFG.sites[k].unitCheckFreq=e.value},'Room check frequency saved')}if($('#si_ustart'))fld('#si_ustart','unitCheckStart','Saved');if($('#si_landlord')){fld('#si_landlord','landlord','Landlord partner saved');fld('#si_prob','probation','Saved')}
   v.querySelectorAll('[data-c]').forEach(el=>el.onchange=()=>cfgSave(()=>{CFG.sites[k].contacts[+el.dataset.c][el.dataset.f]=el.value},'Contact saved'));
   v.querySelectorAll('[data-crm]').forEach(b=>b.onclick=async()=>{const c=s.contacts[+b.dataset.crm];if(await ask({title:'Remove this contact?',body:esc(`${c.role||''}${c.name?': '+c.name:''}`),ok:'Remove',danger:true}))cfgSave(()=>{CFG.sites[k].contacts.splice(+b.dataset.crm,1)},'Contact removed')});
   const ac=$('#addContact');if(ac)ac.onclick=()=>cfgSave(()=>{CFG.sites[k].contacts.push({role:'',name:'',reach:'',when:''})})}
@@ -1917,7 +1920,7 @@ function renderStaff(v){
   <div class="grid g4" style="margin-bottom:14px"><div class="card kpi"><div class="l">Active</div><div class="v">${n('Active')}</div></div><div class="card kpi"><div class="l">On leave</div><div class="v">${n('Inactive')}</div></div><div class="card kpi"><div class="l">Former staff</div><div class="v">${n('Archived')}</div></div><div class="card kpi"><div class="l">Active cleaners</div><div class="v">${all.filter(s=>s.status==='Active'&&isCleaner(s)).length}</div><div class="meta" style="margin:0">Total active personnel: ${n('Active')}</div></div></div>
   <div class="toolbar">${ed?`<button class="btn pri" type="button" id="addStaff">＋ Add staff member</button><button class="btn" type="button" id="copyStaff">Copy staff from another site…</button>`:''}
    <label class="chip ${showArchivedStaff?'on':''}" style="cursor:pointer"><input type="checkbox" id="showArch" ${showArchivedStaff?'checked':''} style="position:absolute;opacity:0">Show former staff</label></div>
-  <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Standards signed</th><th>Schedule preferences</th><th>Status</th></tr></thead><tbody>
+  <div class="tblwrap inv"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Email</th><th>Start</th><th>End</th><th>Standards signed</th>${CAN_SCHEDULE?'<th>Employment</th>':''}<th>Schedule preferences</th><th>Status</th></tr></thead><tbody>
    ${list.map(s=>`<tr><td><input ${ro} style="width:150px" value="${esc(s.name)}" data-s="${esc(s.id)}" data-f="name" aria-label="Name"></td>
     <td><input ${ro} style="width:170px" list="roleList" value="${esc(s.role)}" data-s="${esc(s.id)}" data-f="role" aria-label="Role, ${esc(s.name)}"></td>
     <td><input ${ro} type="tel" style="width:130px" value="${esc(s.phone)}" data-s="${esc(s.id)}" data-f="phone" aria-label="Phone, ${esc(s.name)}"></td>
@@ -1925,8 +1928,9 @@ function renderStaff(v){
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.start||'')}" data-s="${esc(s.id)}" data-f="start" aria-label="Start date, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.standards||'')}" data-s="${esc(s.id)}" data-f="standards" aria-label="Date ${esc(s.name)} signed the Staff Standards & Commitment Agreement"></td>
+    ${CAN_SCHEDULE?`<td><select ${ro} data-s="${esc(s.id)}" data-f="employment" aria-label="Employment, ${esc(s.name)}"><option value="">Not set</option>${EMPLOYMENT.map(o=>`<option ${o===s.employment?'selected':''}>${o}</option>`).join('')}</select></td>`:''}
     <td style="min-width:180px"><span class="meta" style="margin:0;white-space:normal">${esc(prefText(s.pref)||'Not set')}</span>${ed?` <button class="btn sm ghost" type="button" data-pref="${esc(s.id)}" aria-label="Edit schedule preferences for ${esc(s.name)}">✎</button>`:''}</td>
-    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="9" class="empty">No staff on this site's roster yet.</td></tr>`}
+    <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="${CAN_SCHEDULE?10:9}" class="empty">No staff on this site's roster yet.</td></tr>`}
   </tbody></table></div>
   <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Cleaner','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
@@ -1936,14 +1940,14 @@ function renderStaff(v){
   v.querySelectorAll('[data-s]').forEach(el=>el.onchange=async()=>{const s=clone(all.find(x=>x.id===el.dataset.s));const f=el.dataset.f;s[f]=el.value.trim();
     if(f==='status'&&s.status==='Archived'&&!s.end)s.end=today();if(f==='status'&&s.status==='Active')s.end='';
     try{await putSub(k,'staff',s);toast(f==='status'?`${s.name}: ${STAFF_LABEL[s.status]||s.status}`:'Roster saved')}catch(e){writeErr(e);render()}});
-  const a=$('#addStaff');if(a)a.onclick=async()=>{const r=await ask({title:`Add staff to ${site().name}`,ok:'Add',fields:[{l:'Name',req:1},{l:'Role',v:'Community Facilitator'},{l:'Phone',t:'tel'},{l:'Email',t:'email'},{l:'Start date',t:'date',v:today()}]});if(!r)return;
+  const a=$('#addStaff');if(a)a.onclick=async()=>{const r=await ask({title:`Add staff to ${site().name}`,ok:'Add',fields:[{l:'Name',req:1},{l:'Role',v:'Community Facilitator'},{l:'Phone',t:'tel'},{l:'Email',t:'email'},{l:'Start date',t:'date',v:today()},{l:'Employment',o:['Not set',...EMPLOYMENT],v:'Not set'}]});if(!r)return;
     if(all.some(s=>s.name.toLowerCase()===r[0].trim().toLowerCase()&&s.status!=='Archived'))return toast(`${r[0].trim()} is already on this roster.`,'err');
-    try{await putSub(k,'staff',{id:uid(),name:r[0].trim(),role:r[1].trim(),phone:r[2].trim(),email:r[3].trim(),start:r[4]||'',end:'',status:'Active'});toast('Added to roster')}catch(e){writeErr(e)}};
+    try{await putSub(k,'staff',{id:uid(),name:r[0].trim(),role:r[1].trim(),phone:r[2].trim(),email:r[3].trim(),start:r[4]||'',end:'',status:'Active',employment:EMPLOYMENT.includes(r[5])?r[5]:''});toast('Added to roster')}catch(e){writeErr(e)}};
   const c=$('#copyStaff');if(c)c.onclick=async()=>{const others=allowedSites().filter(x=>x!==k);if(!others.length)return toast('There is only one site.');
     const r=await ask({title:'Copy staff from another site',body:'Adds that site\'s active staff who aren\'t already on this roster, with their contact details.',ok:'Copy',fields:[{l:'From site',o:others.map(x=>S().sites[x].name),v:S().sites[others[0]].name}]});if(!r)return;
     const src=others.find(x=>S().sites[x].name===r[0]);const have=new Set(all.map(s=>s.name.toLowerCase()));
     const add=staffOf(src).filter(s=>s.status==='Active'&&s.name&&!have.has(s.name.toLowerCase()));if(!add.length)return toast('Everyone from that site is already on this roster.');
-    try{for(const s of add)await putSub(k,'staff',{id:uid(),name:s.name,role:s.role||'',phone:s.phone||'',email:s.email||'',start:today(),end:'',status:'Active'});toast(`Copied ${add.length} staff`)}catch(e){writeErr(e)}}}
+    try{for(const s of add)await putSub(k,'staff',{id:uid(),name:s.name,role:s.role||'',phone:s.phone||'',email:s.email||'',start:today(),end:'',status:'Active',employment:s.employment||''});toast(`Copied ${add.length} staff`)}catch(e){writeErr(e)}}}
 
 /* =========================================================
    ARCHIVE (old log entries, past participants, archived staff)
@@ -2009,6 +2013,21 @@ const pubDays=w=>w?(w.publishedDays||(w.published&&!('publishedDays' in w)?w.day
 function schedFor(k,ds,i,drafts){const w=schedWeek(k,weekStart(ds));const src=drafts?(w&&w.days):pubDays(w);if(!src)return [];return ((src[ds]||{})[i]||[]).filter(Boolean)}
 const schedNow=()=>schedFor(curSite(),today(),shiftIdx());
 function schedGaps(k,n){let g=0;for(let d=0;d<n;d++){const ds=addDays(today(),d);for(let i=0;i<3;i++){if(d===0&&i<shiftIdx()&&shiftIdx()!==2)continue;if(schedFor(k,ds,i,true).length<2)g++}}return g}
+/* Hours rules (agency): at most 44 h a week and 88 h a two-week pay period. Full-Time is guaranteed 32 h a week;
+   Part-Time isn't guaranteed more than 8 h. Every shift is 8 hours. Only Supervisors and up see employment status. */
+const SHIFT_H=8,MAX_WEEK_H=44,MAX_PAY_H=88,FT_MIN_H=32,PT_MIN_H=8,EMPLOYMENT=['Full-Time','Part-Time'];
+const PAY_ANCHOR_DEFAULT='2026-01-05';
+const payStart=(ds,k)=>{const a=(S().sites[k||curSite()]||{}).payStart||PAY_ANCHOR_DEFAULT;const n=Math.floor((new Date(ds+'T12:00')-new Date(a+'T12:00'))/864e5);return addDays(a,Math.floor(n/14)*14)};
+const employmentOf=(n,k)=>(staffRec(n,k)||{}).employment||'';
+function hoursIn(k,from,days){const c={};for(let d=0;d<days;d++){const ds=addDays(from,d);for(let i=0;i<3;i++)schedFor(k,ds,i,true).forEach(n=>c[n]=(c[n]||0)+SHIFT_H)}return c}
+/* One row per person scheduled this week or Active on the roster: hours this week and this pay period, with problems. */
+function hoursReport(k,wk){const week=hoursIn(k,wk,7);const pays=[...new Set([payStart(wk,k),payStart(addDays(wk,6),k)])];const pay=pays.map(ps=>({ps,h:hoursIn(k,ps,14)}));
+  const names=new Set([...Object.keys(week),...staffOf(k).filter(s=>s.status==='Active'&&!isCleaner(s)).map(s=>s.name)]);
+  return [...names].sort().map(n=>{const emp=employmentOf(n,k),w=week[n]||0,pp=Math.max(...pay.map(x=>x.h[n]||0)),worst=pay.find(x=>(x.h[n]||0)===pp);const issues=[];
+    if(w>MAX_WEEK_H)issues.push(['bad',`over ${MAX_WEEK_H} h this week`]);
+    if(pp>MAX_PAY_H)issues.push(['bad',`over ${MAX_PAY_H} h in the pay period from ${fmtDate(worst.ps)}`]);
+    if(emp==='Full-Time'&&w<FT_MIN_H)issues.push(['warn',`below the ${FT_MIN_H} h Full-Time guarantee`]);
+    return {n,emp,w,pp,ps:worst.ps,issues}})}
 let SCHED_WEEK='';
 function renderSchedule(v){
   const k=curSite();if(!SCHED_WEEK)SCHED_WEEK=weekStart(today());const wk=SCHED_WEEK;const days=weekDays(wk);
@@ -2018,8 +2037,9 @@ function renderSchedule(v){
   const changed=!!pub&&JSON.stringify(pub)!==JSON.stringify(w.days||{});
   const status=!doc?pill('Not started',''):w.submitted?pill('Waiting for approval','warn'):pub?(changed&&can?pill('Published · draft has changes','warn'):pill('Published','ok')):pill('Draft','');
   const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
+  const weekH=can?hoursIn(k,wk,7):{};
   const sel=(ds,i,j)=>{const cur=(((view[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
-    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k).unavailable||[]).includes(wdOf(ds))?" (can't work)":''}</option>`).join('')}</select>`};
+    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k).unavailable||[]).includes(wdOf(ds))?" (can't work)":''}${n!==cur&&(weekH[n]||0)+SHIFT_H>MAX_WEEK_H?` (${weekH[n]} h)`:''}</option>`).join('')}</select>`};
   const flags=(ds,i,a)=>a.map(n=>{const p=prefOf(n,k);if(offOn(n,ds,i,k))return pill(`${n}: approved day off`,'bad');if((p.unavailable||[]).includes(wdOf(ds)))return pill(`${n}: can't work ${wdOf(ds)}`,'warn');if((p.shifts||[]).length&&!p.shifts.includes(SHIFT_NAMES[i]))return pill(`${n}: prefers ${p.shifts.join('/')}`,'');return ''}).filter(Boolean).map(x=>`<div style="margin-top:4px">${x}</div>`).join('');
   const perWeek={};days.forEach(ds=>{for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>perWeek[n]=(perWeek[n]||0)+1)});
   const overMax=Object.entries(perWeek).filter(([n,c])=>+prefOf(n,k).maxPerWeek&&c>+prefOf(n,k).maxPerWeek);
@@ -2046,7 +2066,10 @@ function renderSchedule(v){
      return `<td style="min-width:110px;${now?'outline:2px solid var(--brand);outline-offset:-2px':''}">${can?sel(ds,i,0)+'<div style="height:4px"></div>'+sel(ds,i,1):(a.length?esc(a.join(' & ')):'<span class="meta" style="margin:0">—</span>')}
       ${can&&a.length<2?`<div style="margin-top:4px">${pill(a.length?'1 of 2':'Needs 2','warn')}</div>`:''}${can&&dbl.length?`<div style="margin-top:4px">${pill('2 shifts this day: '+dbl.join(', '),'warn')}</div>`:''}${can?flags(ds,i,a):''}</td>`}).join('')}</tr>`).join('')}
   </tbody></table></div>`}
-  ${can&&overMax.length?`<div class="card" style="margin-top:12px">${overMax.map(([n,c])=>pill(`${n}: ${c} shifts this week (prefers up to ${prefOf(n,k).maxPerWeek})`,'warn')).join(' ')}</div>`:''}
+  ${can?(()=>{const H=hoursReport(k,wk);const bad=H.filter(r=>r.issues.length).length;return `<details class="card" style="margin-top:12px" ${bad||overMax.length?'open':''}><summary><b>Hours this week</b> ${bad?pill(`${bad} to check`,H.some(r=>r.issues.some(x=>x[0]==='bad'))?'bad':'warn'):pill('Within limits','ok')}</summary>
+   <p class="meta" style="margin:6px 0 8px">Each shift counts as ${SHIFT_H} h. Agency limits: ${MAX_WEEK_H} h a week and ${MAX_PAY_H} h a pay period. Full-Time staff are guaranteed ${FT_MIN_H} h a week; Part-Time staff aren't guaranteed more than ${PT_MIN_H} h. Counts include draft changes.</p>
+   <div class="tblwrap"><table><thead><tr><th>Name</th><th>Status</th><th>This week</th><th>Pay period</th><th></th></tr></thead><tbody>${H.map(r=>`<tr><td><b>${esc(r.n)}</b></td><td>${esc(r.emp||'Not set')}</td><td style="font-variant-numeric:tabular-nums">${r.w} h</td><td style="font-variant-numeric:tabular-nums">${r.pp} h <span class="meta" style="margin:0">from ${esc(fmtDate(r.ps))}</span></td><td>${r.issues.map(x=>pill(x[1],x[0])).join(' ')}${overMax.some(([n])=>n===r.n)?' '+pill(`prefers up to ${prefOf(r.n,k).maxPerWeek} shifts`,'warn'):''}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No one scheduled.</td></tr>'}</tbody></table></div>
+   ${H.some(r=>!r.emp)?`<p class="meta">Set Full-Time or Part-Time on the <a href="#staff">Staff Roster</a>.</p>`:''}</details>`})():''}
   <div class="grid g2" style="margin-top:16px;align-items:start">
    ${can?`<div class="card"><b>Requests &amp; preferences</b>
      <p class="meta" style="margin:4px 0 8px">${pend.length?`<a href="#schedreq">${pend.length} request${pend.length>1?'s':''} waiting for a decision</a>${CAN_PUBLISH?'':' (a manager decides)'}`:'No requests waiting.'}</p>
