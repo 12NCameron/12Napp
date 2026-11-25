@@ -1517,12 +1517,13 @@ const CUSTOM={
    ${list.length?`<div class="tblwrap"><table><thead><tr><th>Unit</th><th>Participant</th><th>Now</th><th>This shift</th><th></th></tr></thead><tbody>${list.map(u=>{
      const r=siteRecs('inout').find(x=>x.id===ioId(k,d,s,u.no));const l=latest[String(u.no)];const hrs=l?(Date.now()-l.at)/36e5:0;
      const now=!l?'<span class="meta" style="margin:0">—</span>':l.t==='Out'?pill(`Out since ${l.date===today()?'':fmtDate(l.date)+' '}${l.time}`,hrs>24?'bad':'warn'):pill('In');
-     return `<tr><td><b>${u.no}</b></td><td>${esc(unitName(u)||'—')}</td><td>${now}</td><td>${esc(r?r.times:'')}</td>
+     return `<tr><td><b>${u.no}</b></td><td>${esc(unitName(u)||'—')}</td><td>${now}</td><td>${r&&(r.events||[]).length?(r.events||[]).map((e,i)=>`<span class="chip" style="cursor:default;margin:0 4px 4px 0">${esc(e.t)} ${esc(e.time)}${CAN_WRITE?` <button type="button" class="btn sm ghost" style="padding:0 4px;min-height:0;line-height:1.2" data-iodel="${esc(r.id)}" data-i="${i}" aria-label="Remove ${esc(e.t)} at ${esc(e.time)} for unit ${esc(u.no)}" title="Remove this entry">×</button>`:''}</span>`).join(''):esc(r?r.times:'')}</td>
       <td style="white-space:nowrap"><button class="btn sm" type="button" data-io="${u.no}" data-t="Out">Out</button> <button class="btn sm" type="button" data-io="${u.no}" data-t="In">In</button>${r?` <button class="btn sm ghost" type="button" data-ioedit="${esc(r.id)}">Edit</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`
      :`<div class="empty">No participants are moved in at this site yet.</div>`}</div>`;
   $('#ioDate').onchange=e=>{IO.date=e.target.value||today();render()};$('#ioShift').onchange=e=>{IO.shift=+e.target.value;render()};
   el.querySelectorAll('[data-io]').forEach(b=>b.onclick=()=>ioTap(units().find(u=>String(u.no)===b.dataset.io),b.dataset.t));
-  el.querySelectorAll('[data-ioedit]').forEach(b=>b.onclick=()=>openForm('inout',b.dataset.ioedit))},
+  el.querySelectorAll('[data-ioedit]').forEach(b=>b.onclick=()=>openForm('inout',b.dataset.ioedit));
+  el.querySelectorAll('[data-iodel]').forEach(b=>b.onclick=()=>ioRemove(b.dataset.iodel,+b.dataset.i))},
  shiftChange(el){const t0=today();const order=[2,0,1],lab={2:'N',0:'D',1:'E'};
   const row=i=>{const h=siteRecs('handoff').filter(r=>r.date===t0&&r.shift===SHIFTS[i]).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''))[0];
     const staff=h?[h.outgoing,h.outgoing2].filter(Boolean):schedFor(curSite(),t0,i);
@@ -1548,6 +1549,12 @@ async function ioTap(u,t){const k=curSite();if(!me())return toast('Set who is lo
   r.unitLabel=unitLabel(u.no);r.unitPid=u.participantId||'';if(!r.facilitators)r.facilitators=pair().join(', ');
   r.events=[...(r.events||[]),{t,time,by:me()}].sort((a,b)=>a.time.localeCompare(b.time));r.times=ioTimes(r.events);if(ex){r.updatedAt=now;r.updatedBy=me()}
   try{await putRec('inout',r);toast(`Unit ${u.no}: ${t} ${time}`)}catch(e){writeErr(e)}}
+/* Remove one Out/In tap entered by mistake or for testing. The change is saved like any edit, with who removed it and when. */
+async function ioRemove(id,i){const ex=recs('inout').find(x=>x.id===id);const e=ex&&(ex.events||[])[i];if(!e)return;
+  if(!await ask({title:`Remove ${e.t} ${e.time}?`,body:`Unit ${esc(ex.unit)} · ${esc(fmtDate(ex.date))} · ${esc(ex.shift)}. Use this for a tap entered by mistake or for testing.`,ok:'Remove',danger:true}))return;
+  const r=clone(ex);r.events=r.events.filter((_,j)=>j!==i);r.times=ioTimes(r.events);r.updatedAt=new Date().toISOString();r.updatedBy=me()||'';
+  r.removed=[...(r.removed||[]),{...e,removedBy:me()||'',removedAt:r.updatedAt}];
+  try{if(!r.events.length&&CAN_ADMIN&&CAN_WRITE){await removeRec('inout',id)}else await putRec('inout',r);toast(`Removed ${e.t} ${e.time}`)}catch(err){writeErr(err)}}
 const WB_PRESET={category:'Daily Whiteboard',activity:'Daily Whiteboard',boardType:'Quote',focus:'Reflection & Morale',location:'Admin Building'};
 async function bulkExempt(){
   const has=new Set(siteRecs('roomchecks').filter(r=>r.date===gridDate).map(r=>String(r.unit)));const rest=units().filter(u=>u.status==='Occupied'&&!has.has(String(u.no)));
