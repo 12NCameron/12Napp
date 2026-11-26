@@ -28,7 +28,7 @@ var DOC_COLS = ['Google Doc', 'Doc Updated'];
 var TAB_NAMES = {
   notes: 'Notes Data', handoff: 'Shift Handoff Log', patrols: 'Perimeter Check Data', incidents: 'Incident Reports',
   visitors: 'Visitor Log', roomchecks: 'Room Operations Data', wellness: 'Room Wellness Checks',
-  schedreq: 'Schedule Requests', requests: 'Participant Requests', intakes: 'Intake Data', engagement: 'Participant Engagement Data',
+  schedpref: 'Schedule Preferences', schedreq: 'Schedule Requests', requests: 'Participant Requests', intakes: 'Intake Data', engagement: 'Participant Engagement Data',
   workorders: 'Work Orders', requisitions: 'Requisitions', inout: 'Participant In-Out Log',
   guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks',
   trespass: 'No-Trespass List', notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Stabilization & Improvement Plans',

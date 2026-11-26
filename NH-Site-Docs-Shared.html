@@ -252,7 +252,7 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
 /* =========================================================
    STORE — shared db when available, else this browser only
    ========================================================= */
-const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','escalations','foodbank','schedreq','requests','intakes','engagement','workorders','requisitions'];
+const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','escalations','foodbank','schedpref','schedreq','requests','intakes','engagement','workorders','requisitions'];
 const AUDIT_KEYS=['sz','admin','laundry','baths','units','kitchen','utility','life','house','env','bldg','sec'];
 const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object.entries(o).filter(([,x])=>x&&x.v==='No').map(([k])=>k));
 const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
@@ -323,11 +323,25 @@ const contactGuideHTML=()=>{const ch=site().nonUrgent;return `<table>
   <tr><td><b>Urgent, non-emergency</b></td><td>A time-sensitive decision only the Site Manager can make: a same-day scheduling gap, a serious but not life-threatening incident.</td><td>Call or text during working hours. After hours only within a scheduled on-call window; otherwise the next business day.</td></tr>
   <tr><td><b>Routine / administrative</b></td><td>Schedule questions, policy or procedure lookups, how-do-I questions already answered in the SOPs.</td><td>Check the SOP Quick Reference or ask a peer first, then use ${ch?`<b>${esc(ch)}</b>`:'the site\'s non-urgent channel'}. Replies within 1–2 business days.</td></tr>
   <tr><td><b>Peer conflict / a coworker</b></td><td>Frustration with a coworker's conduct, comments or communication style.</td><td>Raise it with the coworker first, where safe. If it continues, bring it to your next 1:1 or team check-in, not a same-day call or text.</td></tr></table>`};
-/* Schedule preferences (kept on each staff record by managers) and Schedule Requests (days off, preference amendments). */
+/* Schedule preferences: each staff member keeps one Schedule Preferences entry (they or a manager edit it), with a
+   Week 1 / Week 2 pattern that follows the two-week pay period. Older preferences on the staff record still count
+   until an entry exists. Schedule Requests are for days off. */
 const WEEKDAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];const SHIFT_NAMES=['Day','Evening','Night'];
 const wdOf=ds=>WEEKDAYS[(dow(ds)+6)%7];
 const staffRec=(name,k)=>staffOf(k||curSite()).find(s=>s.name===name&&s.status!=='Archived');
-const prefOf=(name,k)=>((staffRec(name,k)||{}).pref)||{};
+const prefRec=(name,k)=>recs('schedpref').filter(r=>r.site===(k||curSite())&&r.staff===name).sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')))[0];
+const prefTwoWeeks=r=>!!r&&r.same==='Different each week';
+const payWeekNo=(ds,k)=>(new Date(ds+'T12:00')-new Date(payStart(ds,k)+'T12:00'))/864e5>=7?2:1;
+const prefWeek=(r,n)=>({shifts:r[`w${n}Shifts`]||[],days:r[`w${n}Days`]||[],unavailable:r[`w${n}Unavail`]||[]});
+/* Preferences for a person; with a date, the pattern for that date's pay-period week. */
+function prefOf(name,k,ds){const r=prefRec(name,k);if(!r)return ((staffRec(name,k)||{}).pref)||{};
+  const n=prefTwoWeeks(r)&&ds?payWeekNo(ds,k):1;return Object.assign(prefWeek(r,n),{maxPerWeek:r.maxPerWeek,notes:r.notes})}
+function prefSummary(name,k){const r=prefRec(name,k);if(!r)return prefText(((staffRec(name,k)||{}).pref)||{});return prefRecText(r)}
+function prefRecText(r){const tail=[r.maxPerWeek?`Up to ${r.maxPerWeek} shifts/week`:'',r.notes||''].filter(Boolean).join(' · ');
+  const body=prefTwoWeeks(r)?`Week 1: ${prefText(prefWeek(r,1))||'no preference'} | Week 2: ${prefText(prefWeek(r,2))||'no preference'}`:prefText(prefWeek(r,1));
+  return [body,tail].filter(Boolean).join(' · ')}
+function openPref(name){if(!name)return toast('Choose who is logging at the top first.','err');const r=prefRec(name);if(r)return openForm('schedpref',r.id);
+  const old=((staffRec(name)||{}).pref)||{};openForm('schedpref',null,{staff:name,w1Shifts:old.shifts||[],w1Days:old.days||[],w1Unavail:old.unavailable||[],maxPerWeek:old.maxPerWeek||'',notes:old.notes||''})}
 const prefText=p=>{p=p||{};const a=[];if((p.shifts||[]).length)a.push('Prefers '+p.shifts.join(' / '));if((p.days||[]).length)a.push('Best days: '+p.days.join(', '));if((p.unavailable||[]).length)a.push("Can't work: "+p.unavailable.join(', '));if(p.maxPerWeek)a.push(`Up to ${p.maxPerWeek} shifts/week`);if(p.notes)a.push(p.notes);return a.join(' · ')};
 const isOffReq=r=>r.type==='Day(s) off';
 const daysOffApproved=k=>recs('schedreq').filter(r=>r.site===(k||curSite())&&isOffReq(r)&&r.status==='Approved');
@@ -438,7 +452,7 @@ async function migrateLegacy(k){
 
 /* ---------- Archive: closed log entries older than a cutoff move out of the live log, kept and searchable ---------- */
 const recDate=r=>r.date||String(r.createdAt||'').slice(0,10);
-const IS_CLOSED={notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
+const IS_CLOSED={schedpref:()=>false,notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
   incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!roomFollow(r)||r.checkInDone==='Yes',inout:()=>true,
   requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
   requisitions:r=>['Received','Denied','Not approved'].includes(r.status),
@@ -1113,11 +1127,28 @@ foodbank:{kinds:['shelter'],title:'Foodbank Order',nav:'Foodbank Orders',sheet:'
   {k:'notes',l:'Notes',t:'textarea',full:1}],
  cols:['date','unit',{l:'Order',f:r=>esc([r.bread,r.drink,r.cereal,(r.protein||[]).join(' + '),r.staple].filter(Boolean).join(' · '))},{l:'Status',f:r=>pill(r.status,r.status==='Form filled out'?'warn':'ok')}],
  chips:[{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)},{l:'Not submitted yet',f:r=>r.status==='Form filled out'}]},
+schedpref:{title:'Schedule Preferences',nav:'Schedule Preferences',sheet:'Schedule Preferences',sop:'Scheduling · shift preferences',
+ desc:'Your preferred shifts and days, set by you and seen by your supervisors and managers when they build the schedule. Set one pattern, or a different one for each week of the two-week pay period. Update it whenever things change; there is one entry per person.',
+ fields:[
+  {k:'staff',l:'Staff member',t:'staff',req:1,def:D.me},{k:'date',l:'Last updated',t:'date',req:1,def:D.today},
+  {k:'same',l:'My preferences',t:'seg',full:1,o:['Same both weeks','Different each week'],def:'Same both weeks',hint:'Choose "Different each week" if your weeks alternate, for example custody of a child every second week.'},
+  {k:'w1Head',t:'info',full:1,show:prefTwoWeeks,html:()=>{const ps=payStart(today());return `<b>Week 1</b> · the first week of each pay period (this period: ${esc(fmtDate(ps))} to ${esc(fmtDate(addDays(ps,6)))})`}},
+  {k:'w1Shifts',l:'Preferred shifts',t:'multi',o:SHIFT_NAMES},
+  {k:'w1Days',l:'Preferred days',t:'multi',o:WEEKDAYS},
+  {k:'w1Unavail',l:"Days I can't work",t:'multi',o:WEEKDAYS},
+  {k:'w2Head',t:'info',full:1,show:prefTwoWeeks,html:()=>{const ps=addDays(payStart(today()),7);return `<b>Week 2</b> · the second week of each pay period (this period: ${esc(fmtDate(ps))} to ${esc(fmtDate(addDays(ps,6)))})`}},
+  {k:'w2Shifts',l:'Preferred shifts',t:'multi',o:SHIFT_NAMES,show:prefTwoWeeks},
+  {k:'w2Days',l:'Preferred days',t:'multi',o:WEEKDAYS,show:prefTwoWeeks},
+  {k:'w2Unavail',l:"Days I can't work",t:'multi',o:WEEKDAYS,show:prefTwoWeeks},
+  {k:'maxPerWeek',l:'Most shifts per week',t:'number'},
+  {k:'notes',l:'Anything else',t:'textarea',full:1,hint:'Optional. Share only what you are comfortable sharing. For specific dates off, send a Schedule Request instead.'}],
+ cols:['staff',{l:'Preferences',f:r=>esc(prefRecText(r))},'date'],
+ chips:[{l:'Mine',f:r=>r.staff===me()}]},
 schedreq:{title:'Schedule Request',nav:'Schedule Requests',sheet:'Schedule Requests',sop:'Scheduling · days off and shift preferences',
- desc:'Any staff member can ask for days off or update their shift preferences here. A manager approves or declines each request. Approved days off and preferences show in the schedule builder, so they are taken into account when the schedule is made.',
+ desc:'Any staff member can ask for days off here. A manager approves or declines each request, and approved days off show in the schedule builder. Shift preferences are kept separately, under Schedule Preferences.',
  fields:[
   {k:'date',l:'Submitted',t:'date',req:1,def:D.today},{k:'staff',l:'Staff member',t:'staff',req:1,def:D.me},
-  {k:'type',l:'Request',t:'seg',o:['Day(s) off','Preference amendment'],req:1},
+  {k:'type',l:'Request',t:'seg',o:['Day(s) off','Preference amendment'],def:'Day(s) off',req:1,show:r=>r.type==='Preference amendment',hint:'Preference amendments were replaced by Schedule Preferences.'},
   {k:'from',l:'First day off',t:'date',show:isOffReq,req:isOffReq},
   {k:'to',l:'Last day off',t:'date',show:isOffReq,hint:'Leave blank for a single day.'},
   {k:'offShifts',l:'Shifts affected',t:'multi',o:SHIFT_NAMES,show:isOffReq,hint:'Leave blank if you can\'t work any shift on those days.'},
@@ -1127,7 +1158,7 @@ schedreq:{title:'Schedule Request',nav:'Schedule Requests',sheet:'Schedule Reque
   {k:'maxPerWeek',l:'Most shifts per week',t:'number',show:r=>r.type==='Preference amendment'},
   {k:'effective',l:'Starting',t:'date',show:r=>r.type==='Preference amendment',def:D.today},
   {k:'reason',l:'Reason or details',t:'textarea',full:1,hint:'Optional. Share only what you are comfortable sharing.'},
-  {k:'status',l:'Manager decision',t:'seg',o:['Pending','Approved','Declined'],def:'Pending',show:()=>CAN_PUBLISH,hint:'Approved days off show in the schedule builder. Approving a preference amendment offers to update the staff member\'s profile.'},
+  {k:'status',l:'Manager decision',t:'seg',o:['Pending','Approved','Declined'],def:'Pending',show:()=>CAN_PUBLISH,hint:'Approved days off show in the schedule builder.'},
   {k:'decisionNote',l:'Note to the staff member',t:'textarea',full:1,show:()=>CAN_PUBLISH}],
  cols:['date','staff','type',{l:'Details',f:r=>esc(schedReqText(r))},{l:'Decision',f:r=>pill(r.status||'Pending',r.status==='Approved'?'ok':r.status==='Declined'?'bad':'warn')}],
  chips:[{l:'Pending',f:r=>!r.status||r.status==='Pending'},{l:'Upcoming days off',f:r=>isOffReq(r)&&r.status==='Approved'&&(r.to||r.from)>=today()},{l:'Mine',f:r=>r.staff===me()}]},
@@ -1238,7 +1269,7 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
 /* =========================================================
    NAV & HEADER
    ========================================================= */
-const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['tasks','Shift Tasks'],['notes'],['handoff'],['schedule','Schedule'],['schedreq']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
+const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['tasks','Shift Tasks'],['notes'],['handoff'],['schedule','Schedule'],['schedpref'],['schedreq']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
  ['Participants',[['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement'],['escalations'],['pathway','Escalation Pathway'],['foodbank']]],
  ['Residents',[['board','Community Dashboard'],['notices'],['inspections'],['plans'],['rent'],['pets'],['parking'],['entries']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
@@ -1253,7 +1284,7 @@ function badgeFor(id){
   if(id==='intakes')return siteRecs('intakes').filter(r=>r.status==='New Inquiry').length;
   if(id==='handoff')return siteRecs('handoff').filter(r=>r.status!=='Acknowledged').length;
   return 0}
-const PAGE_MIN={staff:'Supervisor',archive:'Supervisor',setup:'Manager',pathway:'Supervisor'};
+const PAGE_MIN={staff:'Supervisor',schedpref:'Supervisor',archive:'Supervisor',setup:'Manager',pathway:'Supervisor'};
 const PAGE_KIND={board:['housing'],pathway:['shelter'],tasks:['shelter']};
 (()=>{const keep=new Set(['date','time','unit','staff','staff2','result','exemptReason','notes']);
   for(const f of M.wellness.fields){if(keep.has(f.k))continue;const s=f.show,q=f.req;f.show=r=>r.result!=='Exempt'&&(!s||s(r));
@@ -1445,6 +1476,9 @@ async function saveForm(){
     if(!CAN_PUBLISH){d.status=ex.status||'Pending';d.decisionNote=ex.decisionNote||'';d.decidedBy=ex.decidedBy||'';d.decidedAt=ex.decidedAt||''}
     else{d.status=d.status||'Pending';if(d.status!==sqPrev){d.decidedBy=d.status==='Pending'?'':me();d.decidedAt=d.status==='Pending'?'':new Date().toISOString()}}
     if(isOffReq(d)&&d.to&&d.to<d.from){toast('The last day off is before the first.','err');return}}
+  if(m==='schedpref'){if(!prefTwoWeeks(d)){d.w2Shifts=[];d.w2Days=[];d.w2Unavail=[]}
+    if(isNew){const ex=prefRec(d.staff);if(ex){Object.assign(d,{id:ex.id,site:ex.site,createdAt:ex.createdAt,createdBy:ex.createdBy,updatedAt:new Date().toISOString(),updatedBy:me()});saving=true;
+      try{await putRec(m,d)}catch(e){saving=false;writeErr(e);return}saving=false;closeForm();toast('Preferences saved');return}}}
   if(m==='requisitions'){const inv=(INV[curSite()]||[]).find(i=>String(i.item).toLowerCase()===String(d.item||'').trim().toLowerCase());d.invId=inv?inv.id:(d.invId||'')}
   if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
     if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
@@ -1462,9 +1496,6 @@ async function saveForm(){
     openForm('notes',null,{type:'Incident Report filed',irStatus:'Filed',location:d.location,priority:/Violence|Medical|Missing|Police/.test(d.reportType)?'HIGH':'MEDIUM',participant:'Neighbourly Homes (general)',
       notes:`Incident Report filed: ${d.reportType} at ${d.location}${d.locationDetail?' ('+d.locationDetail+')':''}, ${fmtDate(d.date)} ${d.time}.`});
   if(m==='firstaid')await offerFaReq(d);
-  if(m==='schedreq'&&CAN_ADMIN&&d.type==='Preference amendment'&&d.status==='Approved'&&sqPrev!=='Approved'){const s=staffRec(d.staff);
-    if(s&&await ask({title:`Update ${d.staff}'s schedule preferences?`,body:`Their profile will read: ${esc(prefText({shifts:d.prefShifts,days:d.prefDays,unavailable:d.unavailable,maxPerWeek:d.maxPerWeek,notes:(s.pref||{}).notes}))||'no preferences'}`,ok:'Update profile',cancel:'Not now'}))
-      try{await putSub(curSite(),'staff',Object.assign(clone(s),{pref:{shifts:d.prefShifts||[],days:d.prefDays||[],unavailable:d.unavailable||[],maxPerWeek:d.maxPerWeek||'',notes:(s.pref||{}).notes||'',updated:today(),fromRequest:d.id}}));toast('Preferences updated')}catch(e){writeErr(e)}}
   if(m==='inspections'){const lvl=(d.result||'').split(':')[0];
     if(/^Green/.test(d.result||'')){const open=siteRecs('notices').filter(r=>r.pillar==='Home Upkeep'&&r.status==='Active'&&(d.unitPid?r.unitPid===d.unitPid:String(r.unit)===String(d.unit)));
       if(open.length&&await ask({title:'Close the Home Upkeep notice?',body:`This inspection found no concerns. Mark ${open.length>1?'the '+open.length+' open Home Upkeep notices':'the open Home Upkeep notice'} resolved? Home Upkeep returns to Green right away.`,ok:'Mark resolved',cancel:'Not now'}))
@@ -1914,14 +1945,12 @@ function renderStaff(v){
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.end||'')}" data-s="${esc(s.id)}" data-f="end" aria-label="End date, ${esc(s.name)}"></td>
     <td><input ${ro} type="date" style="width:140px" value="${esc(s.standards||'')}" data-s="${esc(s.id)}" data-f="standards" aria-label="Date ${esc(s.name)} signed the Staff Standards & Commitment Agreement"></td>
     ${CAN_SCHEDULE?`<td><select ${ro} data-s="${esc(s.id)}" data-f="employment" aria-label="Employment, ${esc(s.name)}"><option value="">Not set</option>${EMPLOYMENT.map(o=>`<option ${o===s.employment?'selected':''}>${o}</option>`).join('')}</select></td>`:''}
-    <td style="min-width:180px"><span class="meta" style="margin:0;white-space:normal">${esc(prefText(s.pref)||'Not set')}</span>${ed?` <button class="btn sm ghost" type="button" data-pref="${esc(s.id)}" aria-label="Edit schedule preferences for ${esc(s.name)}">✎</button>`:''}</td>
+    <td style="min-width:180px"><span class="meta" style="margin:0;white-space:normal">${esc(prefSummary(s.name,k)||'Not set')}</span>${CAN_WRITE&&site().status!=='Archived'?` <button class="btn sm ghost" type="button" data-pref="${esc(s.id)}" aria-label="Edit schedule preferences for ${esc(s.name)}">✎</button>`:''}</td>
     <td><select ${ro} data-s="${esc(s.id)}" data-f="status" aria-label="Status, ${esc(s.name)}">${STAFF_STATUSES.map(o=>`<option value="${o}" ${o===s.status?'selected':''}>${STAFF_LABEL[o]}</option>`).join('')}</select></td></tr>`).join('')||`<tr><td colspan="${CAN_SCHEDULE?10:9}" class="empty">No staff on this site's roster yet.</td></tr>`}
   </tbody></table></div>
   <datalist id="roleList">${['Community Facilitator','Site Supervisor','Manager of Neighbourly Homes','Safety & Operations Lead','Director of Neighbourly Homes','Support Staff','Intake Coordinator','Overnight Staff','Cleaner','Volunteer'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   $('#showArch').onchange=e=>{showArchivedStaff=e.target.checked;render()};
-  v.querySelectorAll('[data-pref]').forEach(b=>b.onclick=async()=>{const s=clone(all.find(x=>x.id===b.dataset.pref));const p=s.pref||{};
-    const r=await ask({title:`Schedule preferences · ${s.name}`,ok:'Save',fields:[{l:'Preferred shifts',multi:SHIFT_NAMES,v:p.shifts},{l:'Preferred days',multi:WEEKDAYS,v:p.days},{l:"Days they can't work",multi:WEEKDAYS,v:p.unavailable},{l:'Most shifts per week',t:'number',v:p.maxPerWeek||''},{l:'Notes',t:'textarea',v:p.notes||''}]});if(!r)return;
-    s.pref={shifts:r[0],days:r[1],unavailable:r[2],maxPerWeek:r[3],notes:r[4].trim(),updated:today()};try{await putSub(k,'staff',s);toast('Preferences saved')}catch(e){writeErr(e)}});
+  v.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>openPref((all.find(x=>x.id===b.dataset.pref)||{}).name));
   v.querySelectorAll('[data-s]').forEach(el=>el.onchange=async()=>{const s=clone(all.find(x=>x.id===el.dataset.s));const f=el.dataset.f;s[f]=el.value.trim();
     if(f==='status'&&s.status==='Archived'&&!s.end)s.end=today();if(f==='status'&&s.status==='Active')s.end='';
     try{await putSub(k,'staff',s);toast(f==='status'?`${s.name}: ${STAFF_LABEL[s.status]||s.status}`:'Roster saved')}catch(e){writeErr(e);render()}});
@@ -2024,8 +2053,8 @@ function renderSchedule(v){
   const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
   const weekH=can?hoursIn(k,wk,7):{};
   const sel=(ds,i,j)=>{const cur=(((view[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
-    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k).unavailable||[]).includes(wdOf(ds))?" (can't work)":''}${n!==cur&&(weekH[n]||0)+SHIFT_H>MAX_WEEK_H?` (${weekH[n]} h)`:''}</option>`).join('')}</select>`};
-  const flags=(ds,i,a)=>a.map(n=>{const p=prefOf(n,k);if(offOn(n,ds,i,k))return pill(`${n}: approved day off`,'bad');if((p.unavailable||[]).includes(wdOf(ds)))return pill(`${n}: can't work ${wdOf(ds)}`,'warn');if((p.shifts||[]).length&&!p.shifts.includes(SHIFT_NAMES[i]))return pill(`${n}: prefers ${p.shifts.join('/')}`,'');return ''}).filter(Boolean).map(x=>`<div style="margin-top:4px">${x}</div>`).join('');
+    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k,ds).unavailable||[]).includes(wdOf(ds))?" (can't work)":''}${n!==cur&&(weekH[n]||0)+SHIFT_H>MAX_WEEK_H?` (${weekH[n]} h)`:''}</option>`).join('')}</select>`};
+  const flags=(ds,i,a)=>a.map(n=>{const p=prefOf(n,k,ds);if(offOn(n,ds,i,k))return pill(`${n}: approved day off`,'bad');if((p.unavailable||[]).includes(wdOf(ds)))return pill(`${n}: can't work ${wdOf(ds)}`,'warn');if((p.shifts||[]).length&&!p.shifts.includes(SHIFT_NAMES[i]))return pill(`${n}: prefers ${p.shifts.join('/')}`,'');return ''}).filter(Boolean).map(x=>`<div style="margin-top:4px">${x}</div>`).join('');
   const perWeek={};days.forEach(ds=>{for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>perWeek[n]=(perWeek[n]||0)+1)});
   const overMax=Object.entries(perWeek).filter(([n,c])=>+prefOf(n,k).maxPerWeek&&c>+prefOf(n,k).maxPerWeek);
   const pend=recs('schedreq').filter(r=>r.site===k&&(!r.status||r.status==='Pending'));
@@ -2059,12 +2088,12 @@ function renderSchedule(v){
    ${can?`<div class="card"><b>Requests &amp; preferences</b>
      <p class="meta" style="margin:4px 0 8px">${pend.length?`<a href="#schedreq">${pend.length} request${pend.length>1?'s':''} waiting for a decision</a>${CAN_PUBLISH?'':' (a manager decides)'}`:'No requests waiting.'}</p>
      ${offWeek.length?`<div style="margin-bottom:8px"><b style="font-size:13px">Approved days off this week</b><ul style="margin:4px 0 0 18px;padding:0">${offWeek.map(r=>`<li>${esc(r.staff)}: ${esc(schedReqText(r))}</li>`).join('')}</ul></div>`:''}
-     <table><tbody>${staffOf(k).filter(s=>s.status==='Active'&&!isCleaner(s)).map(s=>`<tr><td style="white-space:nowrap"><b>${esc(s.name)}</b></td><td class="meta" style="margin:0">${esc(prefText(s.pref)||'No preferences recorded')}</td></tr>`).join('')}</tbody></table>
-     <p class="meta">Managers record preferences on the <a href="#staff">Staff Roster</a>.</p></div>`
+     <table><tbody>${staffOf(k).filter(s=>s.status==='Active'&&!isCleaner(s)).map(s=>`<tr><td style="white-space:nowrap"><b>${esc(s.name)}</b></td><td class="meta" style="margin:0">${esc(prefSummary(s.name,k)||'No preferences recorded')}</td></tr>`).join('')}</tbody></table>
+     <p class="meta">Staff set their own preferences; you can also edit them from the <a href="#staff">Staff Roster</a>. This week is Week ${payWeekNo(wk,k)} of the pay period.</p></div>`
     :`<div class="card"><b>My preferences &amp; requests</b>
-     <p class="meta" style="margin:4px 0 8px">${me()?esc(prefText(prefOf(me(),k))||'No preferences recorded yet.'):'Choose who is logging at the top first.'}</p>
+     <p class="meta" style="margin:4px 0 8px">${me()?esc(prefSummary(me(),k)||'No preferences recorded yet.'):'Choose who is logging at the top first.'}</p>
      ${myReqs.length?`<ul style="margin:0 0 8px 18px;padding:0">${myReqs.map(r=>`<li>${esc(r.type)} · ${esc(schedReqText(r))} · <b>${esc(r.status||'Pending')}</b>${r.decisionNote?' · '+esc(r.decisionNote):''}</li>`).join('')}</ul>`:''}
-     ${CAN_WRITE?`<button class="btn sm pri" type="button" id="schedReq">Request days off or change my preferences</button>`:''}</div>`}
+     ${CAN_WRITE?`<div class="toolbar" style="margin:0"><button class="btn sm pri" type="button" id="myPref">${me()&&prefRec(me())?'Edit my preferences':'Set my preferences'}</button><button class="btn sm" type="button" id="schedReq">Request days off</button></div>`:''}</div>`}
    <div class="card"><b>My upcoming shifts</b>${me()?(mine.length?`<ul style="margin:8px 0 0 18px;padding:0">${mine.slice(0,10).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="meta">No published shifts for you in the next two weeks.</p>'):'<p class="meta">Choose who is logging at the top to see your shifts.</p>'}</div>
    <div class="card"><b>Notes for this week</b>${can?`<textarea id="wkNotes" aria-label="Notes for this week" style="width:100%;min-height:90px;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel)">${esc(w.notes||'')}</textarea>`:`<p style="white-space:pre-wrap">${esc(pub?(w.notes||'—'):'—')}</p>`}</div></div>`;
   const who=()=>me()||MY_UID||'';
@@ -2086,7 +2115,8 @@ function renderSchedule(v){
   const wu=$('#wkUnpub');if(wu)wu.onclick=async()=>{if(!await ask({title:'Unpublish this week?',body:'Facilitators will no longer see it until it is published again. The draft is kept.',ok:'Unpublish'}))return;
     save(d=>{d.publishedDays=null;d.published=false},'Schedule unpublished')};
   const nt=$('#wkNotes');if(nt)nt.onchange=()=>save(d=>{d.notes=nt.value});
-  const sr=$('#schedReq');if(sr)sr.onclick=()=>openForm('schedreq',null,{staff:me()})}
+  const sr=$('#schedReq');if(sr)sr.onclick=()=>openForm('schedreq',null,{staff:me()});
+  const mp=$('#myPref');if(mp)mp.onclick=()=>openPref(me())}
 
 /* =========================================================
    COMMUNITY DASHBOARD (permanent housing): each resident's status in every policy area
