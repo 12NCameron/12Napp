@@ -2579,7 +2579,15 @@ async function bootApi(){
       else if(e.code==='unauthenticated'&&!started){AFTER_SIGNIN=refresh;showSignIn()}else if(!started){GAS_OFFLINE=true;showSignIn('No connection. Connect to the internet for the first sign-in on this device.')}}};
   if(sess){applySess(sess);startApp();refresh()}
   else{AFTER_SIGNIN=refresh;showSignIn();if(TOKEN)refresh()}
-  if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{})}
+  if('serviceWorker' in navigator&&location.protocol!=='file:'){
+    /* Pick up new versions while the app stays open: check when it comes back to the foreground and every 30 minutes.
+       When a new version takes over, reload, unless a form is open, so nothing typed is lost. */
+    const hadSW=!!navigator.serviceWorker.controller;let pendingReload=false;
+    const reloadIfIdle=()=>{if(document.querySelector('#scrim')){if(!pendingReload)toast('A new version of the app is ready. It loads after you save or close this form.');pendingReload=true;return}location.reload()};
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadSW)reloadIfIdle()});
+    setInterval(()=>{if(pendingReload)reloadIfIdle()},5000);
+    navigator.serviceWorker.register('sw.js').then(reg=>{const check=()=>reg.update().catch(()=>{});
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')check()});setInterval(check,30*60*1000)}).catch(()=>{})}}
 
 (async function boot(){
   if(window.NH_CONFIG){await bootApi();return}

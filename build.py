@@ -99,9 +99,9 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin === location.origin) {
     const shell = req.mode === 'navigate' || url.pathname.endsWith('/config.js') || url.pathname.endsWith('/index.html');
-    if (shell) {                                       // network first, so updates arrive; cached copy when offline
+    if (shell) {                                       // network first (revalidated, skipping the browser's 10-minute cache) so updates arrive; cached copy when offline
       const key = req.mode === 'navigate' ? './index.html' : req;
-      e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(key, copy)); } return r; })
+      e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(key, copy)); } return r; })
         .catch(() => caches.match(key)));
     } else {
       e.respondWith(caches.match(req).then(r => r || fetch(req)));
