@@ -33,7 +33,8 @@ var TAB_NAMES = {
   guestunit: 'Guest Unit Bookings', safetyaudit: 'Safety Audits', firstaid: 'First Aid Kit Checks',
   trespass: 'No-Trespass List', notices: 'Community Notices', inspections: 'Home Inspections', plans: 'Stabilization & Improvement Plans',
   rent: 'Rent Checks', pets: 'Pet Registrations', parking: 'Parking Concerns', entries: 'Emergency Entry Records',
-  escalations: 'Resident Escalations', foodbank: 'Foodbank Orders'
+  escalations: 'Resident Escalations', foodbank: 'Foodbank Orders',
+  tplan: 'Transition Plans', session: 'Programming Sessions', eventprop: 'Event Proposals', moveon: 'Move-On Checklists'
 };
 /* Logs that also get a Google Doc per entry, and the Drive folder each goes in. */
 var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', workorders: 'Work Orders', handoff: 'Shift Handoffs', safetyaudit: 'Safety Audits',
@@ -200,6 +201,17 @@ function checkScheduleRequest_(u, c, id, data) {
     if (was !== now) throw new Error('DENIED: Only a manager can approve or decline schedule requests.');
   });
 }
+/* Participant-led event proposals: only a manager approves, asks for changes or declines. */
+var EVENT_DECISION = ['decision', 'decisionNote', 'decidedBy', 'decidedAt'];
+function checkEventProposal_(u, c, id, data) {
+  if (atLeast_(u, 'Manager')) return;
+  var old = readRecord_(c, id);
+  EVENT_DECISION.forEach(function (k) {
+    var was = old ? String(old[k] || '') : '', now = String(data[k] || '');
+    if (!old && k === 'decision' && (now === '' || now === 'Pending')) return;
+    if (was !== now) throw new Error('DENIED: Only a manager can approve or decline event proposals.');
+  });
+}
 /* Resident Escalation forms: who may complete each one (NH Behaviour Escalation Framework). */
 var ESC_MIN = { 'Room Status Update': 'Supervisor', 'Community Accountability Review (CAR)': 'Supervisor', '10-Day Final Improvement Notice': 'Supervisor',
   'Debrief & lessons learned': 'Supervisor', 'Urgent Warning (Final Written Notice)': 'Manager', 'Eviction Request': 'Manager' };
@@ -310,6 +322,7 @@ function put(c, id, json, flatJson) {
   else if (/^sites\/[^/]+\/schedule$/.test(c)) checkScheduleChange_(u, c, id, data);
   else if (c === 'log-escalations') checkEscalation_(u, c, id, data);
   else if (c === 'log-schedreq') checkScheduleRequest_(u, c, id, data);
+  else if (c === 'log-eventprop') checkEventProposal_(u, c, id, data);
   else if (c.indexOf('sites/') === 0) need_(u, 'Manager', 'Only managers can change staff rosters and participants.');
   if (!siteOk_(allowedIds_(u), siteOf_(c, id, data))) throw new Error('DENIED: Your account is not set up for that site.');
   var flat = {};

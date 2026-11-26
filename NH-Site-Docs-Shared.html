@@ -252,7 +252,7 @@ function normalizeCfg(c){if(!c||!c.sites)return c;
 /* =========================================================
    STORE — shared db when available, else this browser only
    ========================================================= */
-const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','escalations','foodbank','schedpref','schedreq','requests','intakes','engagement','workorders','requisitions'];
+const MODS=['notes','handoff','patrols','incidents','visitors','trespass','safetyaudit','firstaid','roomchecks','wellness','inout','guestunit','notices','inspections','plans','rent','pets','parking','entries','escalations','foodbank','schedpref','schedreq','tplan','session','eventprop','moveon','requests','intakes','engagement','workorders','requisitions'];
 const AUDIT_KEYS=['sz','admin','laundry','baths','units','kitchen','utility','life','house','env','bldg','sec'];
 const auditNo=r=>AUDIT_KEYS.map(k=>(r||{})[k]).filter(Boolean).flatMap(o=>Object.entries(o).filter(([,x])=>x&&x.v==='No').map(([k])=>k));
 const faLow=r=>Object.keys(r||{}).filter(k=>/^fa\d$/.test(k)).flatMap(k=>Object.entries(r[k]||{}).filter(([,x])=>x&&(x.v==='Low'||x.v==='Missing')).map(([i,x])=>({item:i,v:x.v})));
@@ -471,7 +471,7 @@ async function migrateLegacy(k){
 
 /* ---------- Archive: closed log entries older than a cutoff move out of the live log, kept and searchable ---------- */
 const recDate=r=>r.date||String(r.createdAt||'').slice(0,10);
-const IS_CLOSED={schedpref:()=>false,notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
+const IS_CLOSED={schedpref:()=>false,tplan:r=>(r.status||'Active')!=='Active',session:r=>r.status!=='Planned',eventprop:r=>r.decision==='Declined'||!!r.held,moveon:r=>(r.status||'In progress')!=='In progress',notes:r=>r.followUp!=='Yes'||r.followUpStatus==='Resolved',handoff:r=>r.status==='Acknowledged',patrols:()=>true,
   incidents:r=>r.review==='Closed',visitors:r=>!!r.timeOut,roomchecks:()=>true,wellness:r=>!roomFollow(r)||r.checkInDone==='Yes',inout:()=>true,
   requests:r=>r.approval!=='Pending',intakes:r=>['Admitted','Closed'].includes(r.status),engagement:()=>true,workorders:r=>r.stage==='Completed',
   requisitions:r=>['Received','Denied','Not approved'].includes(r.status),
@@ -579,6 +579,56 @@ const pill=(v,cls)=>v?`<span class="pill p-${cls??PILL[v]??''}">${esc(say(v))}</
    MODULE DEFINITIONS
    ========================================================= */
 const D={me:()=>me(),today:()=>today(),now:()=>nowTime(),shift:()=>shiftFor(),other:()=>pair().find(n=>n!==me())||'',pairText:()=>pair().join(', ')};
+/* ---------- Transitional Housing program (Site 3 Transitional Program Staff Guide) ---------- */
+const isTransitional=k=>siteProgram(k)==='transitional';
+const TP_AREAS=[
+ ['housing','Housing search','Knows what they can afford and where; applications in','Housing search hour, help with forms and calls, viewing prep'],
+ ['tenant','Being a tenant','Understands a lease, rent, repairs, neighbours, guests','Tenancy workshop; practise with site routines (repair requests, Guest Unit rules)'],
+ ['money','Income & money','Steady income source; a simple budget they use','Budgeting session, referral to income support, bank account set-up'],
+ ['id','ID & documents','Health card, ID, SIN and birth certificate in hand','Help ordering replacements, a safe place to keep copies'],
+ ['home','Home skills','Cooks simple meals, keeps the unit clean, does laundry','Cooking together, cleaning support after a Unit Room Check follow-up'],
+ ['health','Health & wellness','Connected to a doctor, clinic or supports they choose','Help booking and remembering appointments; referrals'],
+ ['community','Community & connection','Has people and places outside the program','Participant-led events, community outings, peer support'],
+ ['purpose','Purpose','School, work, volunteering or another goal of their own','Job search help, referrals to training and volunteer roles']];
+const TP_AREA_NAMES=TP_AREAS.map(a=>a[1]);
+const tpGoalFields=()=>TP_AREAS.flatMap(([key,name,ready,help])=>{const sh=r=>(r.areas||[]).includes(name);return [
+  {t:'sect',l:name,show:sh},
+  {t:'info',full:1,show:sh,html:()=>`<b>Ready can look like:</b> ${esc(ready)}<br><b>Ways staff help:</b> ${esc(help)}`},
+  {k:`g_${key}_goal`,l:`${name}: goal`,t:'textarea',full:1,show:sh,req:sh,hint:'In the participant\'s own words.'},
+  {k:`g_${key}_step`,l:`${name}: first step`,t:'text',show:sh,req:sh},
+  {k:`g_${key}_who`,l:`${name}: who helps`,t:'text',show:sh,list:()=>['The participant','Key staff','Any staff on shift','Case management partner',...staffNames()]},
+  {k:`g_${key}_by`,l:`${name}: by when`,t:'date',show:sh}]});
+const tpActive=()=>siteRecs('tplan').filter(r=>(r.status||'Active')==='Active');
+const tpCheckins=r=>siteRecs('notes').filter(n=>n.type==='Weekly Check-in'&&(n.participantPid&&r.unitPid?n.participantPid===r.unitPid:String(n.participant)===String(r.unit))).map(n=>n.date).filter(Boolean).sort();
+const tpLast=r=>tpCheckins(r).pop()||'';
+const tpGap=r=>{const s=[tpLast(r),r.date].filter(Boolean).sort().pop();return s?daysBetween(s,today()):0};
+const tpForUnit=unit=>{const pid=unitPid(unit);return tpActive().filter(r=>pid&&r.unitPid?r.unitPid===pid:String(r.unit)===String(unit)).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0]};
+const tpNeeded=()=>{const plans=tpActive();return pplOf(curSite()).filter(p=>p.status==='Active'&&!plans.some(r=>forResident(r,p)))};
+const tpGoalText=r=>TP_AREAS.filter(a=>(r.areas||[]).includes(a[1])).map(([key,name])=>`${name}${r[`g_${key}_step`]?`: first step, ${r[`g_${key}_step`]}${r[`g_${key}_by`]?` (by ${fmtDate(r[`g_${key}_by`])})`:''}`:''}`);
+const CHECKIN_PROMPTS=['How has your week been, and how are you settling in?','What moved on your plan since we last talked?','What got in the way? Is there anything we could do differently?','What\'s the one step for this week, and what help do you want with it?','Anything coming up we should know about (appointments, viewings, visitors)?'];
+/* The eight-week programming cycle: topic, hands-on part, a good partner to invite. */
+const CYCLE=[['Finding a place','Search listings together; work out what\'s affordable','Housing support or landlord-liaison worker'],
+ ['Applications and viewings','Fill in a sample application; practise a viewing','Housing support worker'],
+ ['Your lease, rights and duties','Read a sample lease line by line','Tenant-rights or legal-aid organization'],
+ ['Money and rent','Build a one-page monthly budget','Credit counselling or a bank'],
+ ['Cooking on a budget','Cook one meal together from a set grocery list','Foodbank or community kitchen'],
+ ['Keeping a home','Cleaning routine, laundry, pests, when to call a landlord','C&M team (what a repair request needs)'],
+ ['Health and supports','Booking appointments, finding a clinic, prescriptions','Community health centre'],
+ ['Neighbours and community','Noise, guests, conflict, getting involved locally','A participant or graduate who has moved on']];
+const SOCIAL_OPT='Social: games, movie, outing or shared meal';
+const CYCLE_OPTS=CYCLE.map((c,i)=>`Week ${i+1} · ${c[0]}`).concat([SOCIAL_OPT,'Other']);
+const cycleIdx=r=>{const i=CYCLE_OPTS.indexOf(r.cycle||'');return i>=0&&i<CYCLE.length?i:-1};
+const sessionTitle=r=>{const i=cycleIdx(r);return i>=0?CYCLE[i][0]:(r.topic||r.cycle||'Session')};
+const nextCycle=()=>{const l=siteRecs('session').filter(r=>r.status!=='Cancelled'&&cycleIdx(r)>=0&&r.date).sort((a,b)=>a.date.localeCompare(b.date)).pop();return l?(cycleIdx(l)+1)%CYCLE.length:0};
+const sessionDue=r=>r.status==='Planned'&&r.date&&r.date<today();
+const evStatus=r=>r.held==='Yes'?'Held':r.held==='No, cancelled'?'Cancelled':(r.decision||'Pending')==='Pending'?'Waiting for approval':r.decision;
+const EV_CLS={Held:'ok',Approved:'ok',Cancelled:'',Declined:'bad','Changes requested':'warn','Waiting for approval':'warn'};
+const evAhead=r=>r.date?daysBetween((r.createdAt||new Date().toISOString()).slice(0,10),r.date):99;
+const MOVEON_ITEMS=['Lease or housing offer reviewed together; rent and move-in date confirmed','Income in place for the first month\'s rent; budget updated for the new costs','ID and documents in hand; mailing address change planned','Furniture and household basics arranged (donation programs, start-up kits)','Utilities, phone and internet set up or planned','Supports confirmed after the move: case manager, doctor or clinic, other services','Transport for moving day arranged through approved agency channels (staff never use personal vehicles)','Participant knows who to call after they leave, through official 12N channels'];
+const MOVEDAY_ITEMS=['Walked through the unit with the participant; condition noted, keys collected','Site Manager recorded the move-out in Participants & Units (exit reason: Moved to permanent housing)','Shift Notes entry for the incoming shift; work order if the unit needs turnover repairs'];
+const moDone=r=>MOVEON_ITEMS.filter(o=>['Done','N/A'].includes(((r.items||{})[o]||{}).v)).length;
+const shortList=a=>a.length>5?`${a.slice(0,5).join(', ')} and ${a.length-5} more`:a.join(', ');
+let progWk=null;
 const M={
 notes:{title:'Shift Notes',nav:'Shift Notes',sheet:'Notes Data',sop:'Guide · Note-Taking · NH 3.3.5',
  desc:'Log what staff need to know to support a participant, respond to a concern, or carry work into the next shift. Routine comings and goings, greetings and casual conversation stay out. Urgent concerns are escalated first, then logged.',
@@ -594,6 +644,8 @@ notes:{title:'Shift Notes',nav:'Shift Notes',sheet:'Notes Data',sop:'Guide · No
   {k:'location',l:'Location',t:'select',o:LOCATIONS},
   {k:'type',l:'Entry type',t:'select',o:INTERACTION,req:1},
   {k:'irInfo',t:'info',full:1,warn:1,show:r=>NOTE_IR_TYPES.includes(r.type),html:()=>'<b>Keep this entry brief.</b> The full account (sequence of events, observations, actions taken, who was notified) goes in the <b>Incident Report</b>. Here, reference the report and add any immediate instructions or open follow-up the incoming team needs. Escalate urgent concerns first.'},
+  {t:'info',full:1,show:r=>r.type==='Weekly Check-in'&&isTransitional(),html:r=>{const pl=r.participant&&tpForUnit(r.participant);
+    return `<b>Weekly check-in prompts</b><ol style="margin:6px 0 0 18px;padding:0">${CHECKIN_PROMPTS.map(q=>`<li>${esc(q)}</li>`).join('')}</ol>${pl?`<b>Plan:</b> ${esc(tpGoalText(pl).join(' · ')||'no areas yet')} (key staff: ${esc(pl.keyStaff||'')})<br>`:r.participant&&!isNaN(+r.participant)?'<b>No transition plan yet</b> for this participant.<br>':''}Record the step agreed and who does what, not the whole conversation. If a step needs another shift's help, set Open follow-up to Yes with who and by when.`}},
   {k:'irStatus',l:'Incident Report',t:'seg',o:['Filed','To be filed','Not required'],show:r=>NOTE_IR_TYPES.includes(r.type),req:r=>NOTE_IR_TYPES.includes(r.type)},
   {k:'notes',l:'What happened, what staff did, and the outcome',t:'textarea',full:1,req:1,ph:'e.g. At 2:15 p.m., the participant in Unit 08 reported water pooling under the sink. Staff submitted a work order.',
    hint:'Describe what you observed, e.g. “Participant declined room cleaning assistance.” Attribute second-hand information to its source. Quote exact words only when they matter to the response. Leave out guesses, diagnoses and unrelated personal details.'},
@@ -1146,6 +1198,100 @@ foodbank:{kinds:['shelter'],title:'Foodbank Order',nav:'Foodbank Orders',sheet:'
   {k:'notes',l:'Notes',t:'textarea',full:1}],
  cols:['date','unit',{l:'Order',f:r=>esc([r.bread,r.drink,r.cereal,(r.protein||[]).join(' + '),r.staple].filter(Boolean).join(' · '))},{l:'Status',f:r=>pill(r.status,r.status==='Form filled out'?'warn':'ok')}],
  chips:[{l:'This month',f:r=>(r.date||'').slice(0,7)===today().slice(0,7)},{l:'Not submitted yet',f:r=>r.status==='Form filled out'}]},
+tplan:{kinds:['shelter'],programs:['transitional'],title:'Transition Plan',nav:'Transition Plans',sheet:'Transition Plans',sop:'Site 3 Transitional Program Staff Guide · Supporting participants',copy:1,custom:'tplanTop',
+ desc:'Every participant has a written transition plan and a weekly check-in with their key staff member. The plan belongs to the participant: they choose two or three areas and the goals; staff help break them into steps. Write the first plan within 14 days of move-in, check in weekly (log it in Shift Notes as a Weekly Check-in), and review the plan monthly with the Site Manager.',
+ fields:[
+  {k:'unit',l:'Participant',t:'unit',req:1},
+  {k:'keyStaff',l:'Key staff member',t:'staff',req:1,def:D.me,hint:'Assigned by the Site Manager. Holds the weekly check-in and keeps the plan current.'},
+  {k:'backupStaff',l:'Backup',t:'staff'},
+  {k:'date',l:'Date written',t:'date',req:1,def:D.today},
+  {k:'review',l:'Next review',t:'date',req:1,def:()=>addDays(today(),30),hint:'Monthly, with the Site Manager; update the goals with the participant.'},
+  {k:'goodHome',l:'In the participant\'s own words, what does a good home look like for you?',t:'textarea',full:1},
+  {k:'areas',l:'Areas to work on now',t:'multi',full:1,o:TP_AREA_NAMES,req:1,hint:'Pick the two or three that matter most to the participant right now. Nobody works on all eight at once.'},
+  ...tpGoalFields(),
+  {t:'sect',l:'Getting there'},
+  {k:'barriers',l:'What might get in the way, and what would help?',t:'textarea',full:1},
+  {k:'status',l:'Plan status',t:'seg',o:['Active','Moved on','Closed'],def:'Active',req:1},
+  {k:'notes',l:'Notes',t:'textarea',full:1,hint:'Use unit numbers or initials, never full names, on anything posted or printed for shared areas.'}],
+ cols:['unit','keyStaff',{l:'Areas',f:r=>esc((r.areas||[]).join(', '))},
+  {l:'Last check-in',f:r=>{if((r.status||'Active')!=='Active')return '';const l=tpLast(r),g=tpGap(r);return `${l?esc(fmtDate(l)):'None yet'} ${g>=14?pill('2 missed','bad'):g>=7?pill('Due','warn'):''}`}},
+  {l:'Review',f:r=>r.review?((r.status||'Active')==='Active'&&r.review<=today()?pill(`Due ${fmtDate(r.review)}`,'bad'):esc(fmtDate(r.review))):''},
+  {l:'Status',f:r=>pill(r.status||'Active',(r.status||'Active')==='Active'?'info':'ok')}],
+ chips:[{l:'Active',f:r=>(r.status||'Active')==='Active'},{l:'Check-in due',f:r=>(r.status||'Active')==='Active'&&tpGap(r)>=7},{l:'Review due',f:r=>(r.status||'Active')==='Active'&&r.review&&r.review<=today()},{l:'Mine',f:r=>r.keyStaff===me()||r.backupStaff===me()}]},
+session:{kinds:['shelter'],programs:['transitional'],title:'Programming Session',nav:'Programming',sheet:'Programming Sessions',sop:'Site 3 Transitional Program Staff Guide · Programming',copy:1,custom:'progCal',
+ desc:'Short, practical sessions on the skills a tenant needs, run on a repeating eight-week cycle so new participants can join at any point. The staff lead plans each session at least a week ahead. Attendance is voluntary: invite, remind on the day, and never single anyone out for not coming. Games nights, movie nights, outings and shared meals count as programming too.',
+ fields:[
+  {k:'cycle',l:'Topic and cycle week',t:'select',o:CYCLE_OPTS,req:1,def:()=>CYCLE_OPTS[nextCycle()]},
+  {t:'info',full:1,show:r=>cycleIdx(r)>=0,html:r=>{const c=CYCLE[cycleIdx(r)];return `<b>Hands-on part:</b> ${esc(c[1])}<br><b>Good partner to invite:</b> ${esc(c[2])}`}},
+  {k:'topic',l:'Session title',t:'text',show:r=>!!r.cycle&&cycleIdx(r)<0,req:r=>!!r.cycle&&cycleIdx(r)<0,ph:'e.g. Games night'},
+  {k:'date',l:'Date',t:'date',req:1,def:()=>addDays(today(),7)},{k:'start',l:'Start time',t:'time',req:1,hint:'45 to 60 minutes. Daytime sessions usually 13:00, evening 18:00.'},
+  {k:'place',l:'Place',t:'text',list:()=>PLACES},
+  {k:'lead',l:'Staff lead',t:'staff',req:1,def:D.me},{k:'support',l:'Staff support',t:'staff'},
+  {k:'partner',l:'Partner or guest',t:'text',hint:'Book any partner through the Site Manager, and sign them in on the Visitor Log on the day.'},
+  {k:'supplies',l:'Supplies (food, printing, materials)',t:'textarea',full:1},
+  {k:'reqDate',l:'Supplies requested on',t:'date',hint:'Through Requisitions, at least 5 days before the session.'},
+  {k:'activity',l:'Hands-on activity',t:'textarea',full:1,def:r=>{const i=cycleIdx(r);return i>=0?CYCLE[i][1]:''}},
+  {k:'takeaway',l:'The one take-away',t:'text',full:1,hint:'One thing people can do this week. Offer a take-home sheet for anyone who couldn\'t make it.'},
+  {t:'sect',l:'After the session'},
+  {k:'status',l:'Status',t:'seg',o:['Planned','Held','Cancelled'],def:'Planned',req:1},
+  {k:'attended',l:'Number attending',t:'number',show:r=>r.status==='Held'},
+  {k:'notes',l:'What worked, follow-ups, ideas for next time',t:'textarea',full:1,show:r=>r.status!=='Planned',hint:'Ask at the end: "What should we do next time?" Add any participant\'s next step to their transition plan at their next check-in.'}],
+ cols:['date','start',{l:'Topic',f:r=>esc(sessionTitle(r))+(cycleIdx(r)>=0?` <span class="meta" style="margin:0">week ${cycleIdx(r)+1}</span>`:'')},'lead',
+  {l:'Status',f:r=>sessionDue(r)?pill('Record how it went','warn'):pill(r.status||'Planned',r.status==='Held'?'ok':r.status==='Cancelled'?'':'info')},'attended'],
+ chips:[{l:'Upcoming',f:r=>r.status==='Planned'&&r.date>=today()},{l:'Needs an update',f:sessionDue},{l:'Mine',f:r=>r.lead===me()||r.support===me()}]},
+eventprop:{kinds:['shelter'],programs:['transitional'],title:'Participant-Led Event',nav:'Event Proposals',sheet:'Event Proposals',sop:'Site 3 Transitional Program Staff Guide · Participant-led events',copy:1,custom:'progCal',
+ desc:'Participants plan and host events; staff sponsor, keep it safe, and handle money and approvals. Any participant can suggest an idea. It becomes a proposal once a participant lead and a staff sponsor fill this in together; the Site Manager approves it or asks for changes.',
+ fields:[
+  {t:'info',full:1,html:()=>'<b>Ground rules</b><ol style="margin:6px 0 0 18px;padding:0"><li>Proposals in at least 7 days before the event, so supplies can be ordered.</li><li>Supplies and food come through Requisitions. No one collects money from participants, and staff never pay out of pocket.</li><li>Guests follow the visitor sign-in and the Guest Unit policy. Former participants can\'t attend as guests.</li><li>Off-site events need Site Manager approval and approved agency transport; staff never drive participants.</li><li>Events end by 22:00 so the Evening Site Check runs on time, unless the Site Manager agrees otherwise.</li><li>The event is open to all residents who want to come; nobody is left off a list.</li></ol>'},
+  {k:'name',l:'Event name',t:'text',req:1,ph:'e.g. Chili night'},
+  {k:'idea',l:'The idea',t:'textarea',full:1},
+  {k:'lead',l:'Participant lead',t:'unit',req:1},{k:'colead',l:'Co-lead',t:'unit'},
+  {k:'sponsor',l:'Staff sponsor',t:'staff',req:1,def:D.me,hint:'Helps with the proposal, puts in the supply request, checks the plan against site rules, and is on shift for the event.'},
+  {k:'date',l:'Date',t:'date',req:1,def:()=>addDays(today(),7)},
+  {t:'info',full:1,warn:1,show:r=>!!r.date&&evAhead(r)<7,html:()=>'<b>Less than 7 days ahead.</b> Proposals go in at least 7 days before the event so supplies can be ordered.'},
+  {k:'start',l:'Start time',t:'time',req:1},{k:'end',l:'End time',t:'time',req:1,hint:'By 22:00 unless the Site Manager agrees otherwise.'},
+  {t:'info',full:1,warn:1,show:r=>!!r.end&&(r.end>'22:00'||(!!r.start&&r.end<r.start)),html:()=>'<b>Ends after 22:00.</b> Events end by 22:00 so the Evening Site Check runs on time, unless the Site Manager agrees otherwise.'},
+  {k:'where',l:'Where',t:'seg',o:['On site','Off site'],def:'On site',req:1},
+  {k:'place',l:'Place',t:'text',list:()=>PLACES},
+  {t:'info',full:1,warn:1,show:r=>r.where==='Off site',html:()=>'<b>Off site:</b> needs Site Manager approval and approved agency transport. Staff never drive participants.'},
+  {k:'invited',l:'Who\'s invited',t:'seg',o:['Residents only','Residents and approved guests'],def:'Residents only',req:1},
+  {t:'info',full:1,warn:1,show:r=>r.invited==='Residents and approved guests',html:()=>'<b>Guests:</b> the Site Manager decides on anything involving guests. Guests sign in, and former participants can\'t attend as guests.'},
+  {k:'supplies',l:'Supplies',t:'textarea',full:1},
+  {k:'cost',l:'Estimated cost ($)',t:'number'},
+  {k:'reqDate',l:'Supply request put in on',t:'date',hint:'The sponsor puts it in through Requisitions.'},
+  {k:'food',l:'Food?',t:'seg',o:['No','Yes'],def:'No'},
+  {k:'foodWho',l:'Who prepares it',t:'text',show:r=>r.food==='Yes',req:r=>r.food==='Yes'},
+  {k:'crew',l:'Set-up and clean-up crew',t:'text',full:1,hint:'The participant lead leads clean-up.'},
+  {k:'care',l:'Anything that needs extra care',t:'multi',full:1,o:['Guests','Off site','Cooking','Noise','Late finish']},
+  {k:'careNotes',l:'How it will be handled',t:'textarea',full:1,show:r=>(r.care||[]).length>0},
+  {t:'sect',l:'Site Manager decision'},
+  {t:'info',full:1,show:()=>!CAN_ADMIN,html:r=>`<b>${esc(evStatus(r))}</b>${r.decidedBy?` · ${esc(r.decidedBy)}${r.decidedAt?', '+esc(fmtDate(String(r.decidedAt).slice(0,10))):''}`:''}${r.decisionNote?`<br>${esc(r.decisionNote)}`:''}`},
+  {k:'decision',l:'Decision',t:'seg',o:['Pending','Approved','Changes requested','Declined'],def:'Pending',show:()=>CAN_ADMIN,hint:'Approves the proposal and any spending; decides on anything off site or involving guests.'},
+  {k:'decisionNote',l:'Note to the lead and sponsor',t:'textarea',full:1,show:()=>CAN_ADMIN},
+  {t:'sect',l:'After the event',show:r=>r.decision==='Approved'},
+  {k:'held',l:'Did it go ahead?',t:'seg',o:['Yes','No, cancelled'],show:r=>r.decision==='Approved'},
+  {k:'attended',l:'Number attending',t:'number',show:r=>r.held==='Yes'},
+  {k:'debrief',l:'Debrief: what worked, what to change, who would host next',t:'textarea',full:1,show:r=>r.held==='Yes',hint:'The lead and sponsor take 10 minutes after the event. Credit the host at the next community meeting.'}],
+ cols:['date',{l:'Event',f:r=>esc(r.name||'')+(r.where==='Off site'?' '+pill('Off site','warn'):'')},'lead','sponsor',{l:'Status',f:r=>pill(evStatus(r),EV_CLS[evStatus(r)]??'')}],
+ chips:[{l:'Waiting for approval',f:r=>(r.decision||'Pending')==='Pending'},{l:'Upcoming',f:r=>r.date>=today()&&r.decision!=='Declined'&&!r.held},{l:'Mine',f:r=>r.sponsor===me()}]},
+moveon:{kinds:['shelter'],programs:['transitional'],title:'Move-On Checklist',nav:'Move-On Checklists',sheet:'Move-On Checklists',sop:'Site 3 Transitional Program Staff Guide · Move-on and graduation',copy:1,
+ desc:'A move into permanent housing is the program working, so plan it early and mark it well. Start the checklist as soon as a participant has a likely place, usually 4 to 6 weeks before the move. The key staff member and the participant work through it together.',
+ fields:[
+  {k:'unit',l:'Participant',t:'unit',req:1},
+  {k:'keyStaff',l:'Key staff member',t:'staff',req:1,def:D.me},
+  {k:'started',l:'Started',t:'date',req:1,def:D.today},
+  {k:'moveDate',l:'Planned move date',t:'date'},
+  {k:'housing',l:'Where they are moving',t:'text',full:1,hint:'Only what the participant is comfortable sharing. Some people want privacy about where they are going.'},
+  {t:'sect',l:'Move-on checklist'},
+  {k:'items',l:'Move-on checklist',t:'yntable',full:1,vals:['Done','In progress','N/A'],o:MOVEON_ITEMS},
+  {t:'sect',l:'Moving day'},
+  {k:'day',l:'Moving day',t:'yntable',full:1,vals:['Done','Not yet'],o:MOVEDAY_ITEMS},
+  {k:'sendoff',l:'Send-off (the participant\'s choice)',t:'seg',o:['Not asked yet','A card from neighbours and staff','A shared meal','Quiet, no send-off'],def:'Not asked yet',hint:'Ask first; some people prefer it quiet.'},
+  {t:'info',full:1,html:()=>'<b>After they leave:</b> former participants can\'t be Guest Unit guests, and staff keep the boundaries policy: no personal contact, rides or social media. Any planned follow-up goes through official 12N channels only.'},
+  {k:'status',l:'Status',t:'seg',o:['In progress','Moved','Plan fell through'],def:'In progress',req:1},
+  {k:'notes',l:'Notes',t:'textarea',full:1}],
+ cols:['unit','moveDate',{l:'Checklist',f:r=>{const n=moDone(r);return pill(`${n} of ${MOVEON_ITEMS.length}`,n===MOVEON_ITEMS.length?'ok':'warn')}},'keyStaff',{l:'Status',f:r=>pill(r.status||'In progress',r.status==='Moved'?'ok':r.status==='Plan fell through'?'':'info')}],
+ chips:[{l:'In progress',f:r=>(r.status||'In progress')==='In progress'},{l:'Moving in the next 2 weeks',f:r=>(r.status||'In progress')==='In progress'&&r.moveDate&&r.moveDate<=addDays(today(),14)}]},
 schedpref:{title:'Schedule Preferences',nav:'Schedule Preferences',sheet:'Schedule Preferences',sop:'Scheduling · shift preferences',
  desc:'Your preferred shifts and days, set by you and seen by your supervisors and managers when they build the schedule. Set one pattern, or a different one for each week of the two-week pay period. Update it whenever things change; there is one entry per person.',
  fields:[
@@ -1299,6 +1445,7 @@ function ask({title,body='',ok='OK',cancel='Cancel',danger=false,fields=[]}){
    ========================================================= */
 const NAV=[['Today',[['dash','Today · Dashboard']]],['Shift',[['tasks','Shift Tasks'],['notes'],['handoff'],['schedule','Schedule'],['schedpref'],['schedreq']]],['Safety & Security',[['patrols'],['incidents'],['visitors'],['trespass'],['safetyaudit'],['firstaid']]],
  ['Participants',[['wellness'],['inout'],['guestunit'],['requests'],['intakes'],['engagement'],['escalations'],['pathway','Escalation Pathway'],['foodbank']]],
+ ['Program',[['tplan'],['session'],['eventprop'],['moveon']]],
  ['Residents',[['board','Community Dashboard'],['notices'],['inspections'],['plans'],['rent'],['pets'],['parking'],['entries']]],['Facilities',[['workorders'],['inventory','Inventory & Par Levels'],['requisitions']]],
  ['This site',[['site','Participants & Units'],['staff','Staff Roster'],['info','Site Info & Contacts']]],
  ['Reference',[['sop','SOP Quick Reference'],['archive','Archive'],['setup','Sites & Export']]]];
@@ -1317,7 +1464,7 @@ const PAGE_KIND={board:['housing'],pathway:['shelter'],tasks:['shelter']};
 (()=>{const keep=new Set(['date','time','unit','staff','staff2','result','exemptReason','notes']);
   for(const f of M.wellness.fields){if(keep.has(f.k))continue;const s=f.show,q=f.req;f.show=r=>r.result!=='Exempt'&&(!s||s(r));
     if(q)f.req=typeof q==='function'?(r=>r.result!=='Exempt'&&q(r)):(r=>r.result!=='Exempt')}})();
-const kindOk=id=>{const w=(M[id]&&M[id].kinds)||PAGE_KIND[id];return !w||w.includes(siteKind())};
+const kindOk=id=>{const w=(M[id]&&M[id].kinds)||PAGE_KIND[id];const pg=M[id]&&M[id].programs;return (!w||w.includes(siteKind()))&&(!pg||pg.includes(siteProgram()))};
 const pageOk=id=>kindOk(id)&&(!PAGE_MIN[id]||(RANK[ROLE]??0)>=RANK[PAGE_MIN[id]]);
 function renderNav(){let h=`<div class="logo"><img src="${LOGO}" alt="the 12 neighbours community" width="400" height="177"><small>NH Site Docs · Neighbourly Homes</small></div>`;
   for(const [g,items0] of NAV){const items=items0.filter(([id])=>pageOk(id));if(!items.length)continue;h+=`<div class="ngrp">${g==='Participants'&&isHousing()?'Community':g}</div>`;for(const [id,lab] of items){const b=badgeFor(id);
@@ -1460,6 +1607,7 @@ function onChange(f){
     else if(!draft._statusSet&&(f.t==='yntable'||['unapproved','panelOk','smokeResult','bedding'].includes(f.k))){draft.roomStatus=roomAutoStatus(draft);const i=M.wellness.fields.findIndex(x=>x.k==='roomStatus');const el=$('#f'+i);if(el)el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===draft.roomStatus))}}
   if(draftMod==='notes'&&f.k==='time'){draft.shift=shiftFor(draft.time);const i=M.notes.fields.findIndex(x=>x.k==='shift');const s=$('#f'+i);if(s)s.value=draft.shift}
   if(draftMod==='roomchecks'&&f.k==='status'&&rcFollow(draft.status)&&draft.followUp!=='Yes'){draft.followUp='Yes';const i=M.roomchecks.fields.findIndex(x=>x.k==='followUp');$('#f'+i).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='Yes'))}
+  if(draftMod==='session'&&f.k==='cycle'){const i=cycleIdx(draft);const prev=CYCLE.map(c=>c[1]);if(i>=0&&(!draft.activity||prev.includes(draft.activity))){draft.activity=CYCLE[i][1];const j=M.session.fields.findIndex(x=>x.k==='activity');const el=$('#f'+j);if(el)el.value=draft.activity}}
   refreshVis()}
 function refreshVis(){M[draftMod].fields.forEach((f,i)=>{const w=$(`#fgrid [data-i="${i}"]`);if(!w)return;const vis=!f.show||!!f.show(draft);w.hidden=!vis;
   if(w.dataset.info&&vis)w.innerHTML=f.html(draft);const r=w.querySelector('[data-dynreq]');if(r)r.style.visibility=f.req(draft)?'visible':'hidden'})}
@@ -1507,6 +1655,18 @@ async function saveForm(){
   if(m==='schedpref'){['w1Shifts','w1Days','w1Unavail','w2Shifts','w2Days','w2Unavail'].forEach(x=>delete d[x]);if(!prefTwoWeeks(d))WEEKDAYS.forEach(x=>delete d['w2_'+x]);
     if(isNew){const ex=prefRec(d.staff);if(ex){Object.assign(d,{id:ex.id,site:ex.site,createdAt:ex.createdAt,createdBy:ex.createdBy,updatedAt:new Date().toISOString(),updatedBy:me()});saving=true;
       try{await putRec(m,d)}catch(e){saving=false;writeErr(e);return}saving=false;closeForm();toast('Preferences saved');return}}}
+  const progPrev=isNew?{}:clone(recs(m).find(x=>x.id===d.id)||{});
+  if(m==='tplan'){TP_AREAS.forEach(([key,name])=>{if(!(d.areas||[]).includes(name))['goal','step','who','by'].forEach(x=>delete d[`g_${key}_${x}`])});
+    if((d.areas||[]).length>3&&!await ask({title:'More than three areas',body:'Participants pick the two or three areas that matter most right now; nobody works on all eight at once.',ok:'Save anyway',cancel:'Edit plan'}))return;
+    if(isNew){const ex=tpForUnit(d.unit);if(ex&&!await ask({title:'Already has a plan',body:`${unitLabel(d.unit)} already has an active transition plan, written ${fmtDate(ex.date)}. Update that one instead?`,ok:'Add another',cancel:'Cancel'}))return}}
+  if(m==='session'&&d.status==='Planned'&&d.reqDate&&d.date&&daysBetween(d.reqDate,d.date)<5&&!await ask({title:'Supplies requested late',body:'Supplies go in through Requisitions at least 5 days before the session.',ok:'Save anyway',cancel:'Edit'}))return;
+  if(m==='eventprop'){const prev=progPrev.decision||'Pending';
+    if(!CAN_ADMIN){d.decision=progPrev.decision||'Pending';d.decisionNote=progPrev.decisionNote||'';d.decidedBy=progPrev.decidedBy||'';d.decidedAt=progPrev.decidedAt||''}
+    else{d.decision=d.decision||'Pending';if(d.decision!==prev){d.decidedBy=d.decision==='Pending'?'':me();d.decidedAt=d.decision==='Pending'?'':new Date().toISOString()}}
+    if(d.decision!=='Approved'){delete d.held;delete d.attended;delete d.debrief}
+    if(isNew&&evAhead(d)<7&&!await ask({title:'Less than 7 days ahead',body:'Proposals go in at least 7 days before the event, so supplies can be ordered. The Site Manager can still agree to a shorter lead time.',ok:'Submit anyway',cancel:'Edit'}))return}
+  if(m==='moveon'&&isNew){const ex=siteRecs('moveon').find(r=>(r.status||'In progress')==='In progress'&&String(r.unit)===String(d.unit));
+    if(ex&&!await ask({title:'Already started',body:`${unitLabel(d.unit)} already has a move-on checklist in progress, started ${fmtDate(ex.started)}. Update that one instead?`,ok:'Add another',cancel:'Cancel'}))return}
   if(m==='requisitions'){const inv=(INV[curSite()]||[]).find(i=>String(i.item).toLowerCase()===String(d.item||'').trim().toLowerCase());d.invId=inv?inv.id:(d.invId||'')}
   if(m==='roomchecks'&&isNew){const dup=siteRecs('roomchecks').find(r=>r.date===d.date&&String(r.unit)===String(d.unit));
     if(dup&&!await ask({title:'Already checked',body:`${unitLabel(d.unit)} already has a check for ${fmtDate(d.date)}.`,ok:'Add another'}))return}
@@ -1524,6 +1684,13 @@ async function saveForm(){
     openForm('notes',null,{type:'Incident Report filed',irStatus:'Filed',location:d.location,priority:/Violence|Medical|Missing|Police/.test(d.reportType)?'HIGH':'MEDIUM',participant:'Neighbourly Homes (general)',
       notes:`Incident Report filed: ${d.reportType} at ${d.location}${d.locationDetail?' ('+d.locationDetail+')':''}, ${fmtDate(d.date)} ${d.time}.`});
   if(m==='firstaid')await offerFaReq(d);
+  if(m==='session'&&d.status==='Held'&&progPrev.status!=='Held'&&await ask({title:'Log it in Shift Notes?',body:'Each session gets one Shift Notes entry: topic, number attending, what worked and follow-ups.',ok:'Add Shift Notes entry',cancel:'Not now'}))
+    openForm('notes',null,{date:d.date,type:d.cycle===SOCIAL_OPT?'12N Community':'Group Activity',participant:'Neighbourly Homes (general)',notes:`Programming: ${sessionTitle(d)}. ${d.attended!==''&&d.attended!=null?d.attended+' attending. ':''}${d.notes||''}`.trim()});
+  if(m==='eventprop'&&d.held==='Yes'&&progPrev.held!=='Yes'&&await ask({title:'Log it in Shift Notes?',body:'The sponsor logs the event in Shift Notes: event, number attending, any follow-ups. Credit the host at the next community meeting.',ok:'Add Shift Notes entry',cancel:'Not now'}))
+    openForm('notes',null,{date:d.date,type:'Celebration',participant:'Neighbourly Homes (general)',notes:`Participant-led event: ${d.name}. ${d.attended!==''&&d.attended!=null?d.attended+' attending. ':''}${d.debrief||''}`.trim()});
+  if(m==='moveon'&&d.status==='Moved'&&progPrev.status!=='Moved'){const pl=tpForUnit(d.unit);
+    if(await ask({title:'Moved: next steps',body:`The Site Manager records the move-out in Participants & Units with the exit reason "Moved to permanent housing", so the roster matches HIFIS.${pl?'\n\nMark the transition plan as Moved on?':''}`,ok:pl?'Mark plan Moved on':'Got it',cancel:pl?'Not now':''})&&pl)
+      try{await putRec('tplan',Object.assign(clone(pl),{status:'Moved on',updatedAt:new Date().toISOString(),updatedBy:me()}));toast('Transition plan marked Moved on')}catch(e){writeErr(e)}}
   if(m==='inspections'){const lvl=(d.result||'').split(':')[0];
     if(/^Green/.test(d.result||'')){const open=siteRecs('notices').filter(r=>r.pillar==='Home Upkeep'&&r.status==='Active'&&(d.unitPid?r.unitPid===d.unitPid:String(r.unit)===String(d.unit)));
       if(open.length&&await ask({title:'Close the Home Upkeep notice?',body:`This inspection found no concerns. Mark ${open.length>1?'the '+open.length+' open Home Upkeep notices':'the open Home Upkeep notice'} resolved? Home Upkeep returns to Green right away.`,ok:'Mark resolved',cancel:'Not now'}))
@@ -1575,6 +1742,30 @@ function autoSummaryHTML(){const o=openItems();return o.length?`<b>${o.length} o
    ========================================================= */
 let gridDate=today();
 const CUSTOM={
+ tplanTop(el){const need=tpNeeded(),due=tpActive().filter(r=>tpGap(r)>=7).sort((a,b)=>tpGap(b)-tpGap(a));const t=today();
+  const row=(lab,meta,btn)=>`<div class="toolbar" style="margin:4px 0;gap:8px"><span>${lab}</span>${meta}<span style="flex:1"></span>${btn}</div>`;
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><b style="font-size:15px">This week</b>
+   ${need.length?`<p class="meta" style="margin:10px 0 2px">Need a transition plan (within 14 days of move-in)</p>${need.map(p=>{const dd=p.moveIn?addDays(p.moveIn,14):'';return row(esc(unitLabel(p.unit)),dd?(dd<t?pill(`Overdue since ${fmtDate(dd)}`,'bad'):`<span class="meta" style="margin:0">due ${esc(fmtDate(dd))}</span>`):'',`<button class="btn sm" type="button" data-tpnew="${esc(p.unit)}">Write plan</button>`)}).join('')}`:''}
+   ${due.length?`<p class="meta" style="margin:10px 0 2px">Weekly check-in due</p>${due.map(r=>{const g=tpGap(r),l=tpLast(r);return row(esc(r.unitLabel||unitLabel(r.unit)),`<span class="meta" style="margin:0">key staff ${esc(r.keyStaff||'?')} · last ${l?esc(fmtDate(l)):'none yet'}</span>${g>=14?pill('2 missed: tell the Site Manager','bad'):''}`,`<button class="btn sm" type="button" data-tpci="${esc(r.unit)}">Log check-in</button>`)}).join('')}`:''}
+   ${!need.length&&!due.length?'<p class="meta">Every active participant has a plan, and every weekly check-in is up to date.</p>':''}</div>`;
+  el.querySelectorAll('[data-tpnew]').forEach(b=>b.onclick=()=>openForm('tplan',null,{unit:b.dataset.tpnew}));
+  el.querySelectorAll('[data-tpci]').forEach(b=>b.onclick=()=>openForm('notes',null,{participant:b.dataset.tpci,type:'Weekly Check-in'}))},
+ progCal(el){const wk=progWk||weekStart(today());const days=weekDays(wk);
+  const ss=siteRecs('session').filter(r=>r.status!=='Cancelled'&&days.includes(r.date));
+  const ev=siteRecs('eventprop').filter(r=>days.includes(r.date)&&r.decision!=='Declined'&&r.held!=='No, cancelled');
+  const lnk=(k,id,txt)=>`<button class="btn ghost sm" type="button" style="padding:0 2px;text-decoration:underline" data-${k}="${esc(id)}">${esc(txt)}</button>`;
+  const rows=days.map(ds=>{const items=[...ss.filter(r=>r.date===ds).map(r=>({t:r.start||'',h:`${lnk('pso',r.id,sessionTitle(r))} · ${esc(r.lead||'')}${r.status==='Held'?' '+pill('Held','ok'):''}`})),
+     ...ev.filter(r=>r.date===ds).map(r=>({t:r.start||'',h:`${lnk('pev',r.id,r.name||'Event')} · participant-led${(r.decision||'Pending')!=='Approved'?' '+pill(evStatus(r),'warn'):''}`}))].sort((a,b)=>a.t.localeCompare(b.t));
+    return `<tr${ds===today()?' style="background:var(--hi,rgba(0,0,0,.04))"':''}><td style="white-space:nowrap;width:1%"><b>${esc(FULL_DAY[wdOf(ds)])}</b> ${esc(fmtDate(ds))}</td><td>${items.length?items.map(x=>`<div>${x.t?esc(x.t)+' · ':''}${x.h}</div>`).join(''):'<span class="meta" style="margin:0">—</span>'}</td></tr>`}).join('');
+  const nx=nextCycle();
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="toolbar" style="margin-bottom:8px"><b style="font-size:15px">Programming calendar</b><span style="flex:1"></span>
+    <button class="btn sm" type="button" data-pw="-7" aria-label="Previous week">‹</button><span>${esc(fmtDate(wk))} to ${esc(fmtDate(addDays(wk,6)))}</span><button class="btn sm" type="button" data-pw="7" aria-label="Next week">›</button>${wk!==weekStart(today())?'<button class="btn sm" type="button" data-pw="0">This week</button>':''}</div>
+   <div class="tblwrap"><table><tbody>${rows}</tbody></table></div>
+   <p class="meta">Next in the eight-week cycle: <b>Week ${nx+1} · ${esc(CYCLE[nx][0])}</b> <button class="btn sm" type="button" data-pnext>Plan it</button> · Repost next week's calendar on the community board every Friday.</p></div>`;
+  el.querySelectorAll('[data-pw]').forEach(b=>b.onclick=()=>{const n=+b.dataset.pw;progWk=n?addDays(wk,n):null;render()});
+  el.querySelectorAll('[data-pso]').forEach(b=>b.onclick=()=>openForm('session',b.dataset.pso));
+  el.querySelectorAll('[data-pev]').forEach(b=>b.onclick=()=>openForm('eventprop',b.dataset.pev));
+  el.querySelector('[data-pnext]').onclick=()=>openForm('session',null,{cycle:CYCLE_OPTS[nx],activity:CYCLE[nx][1]})},
  roomGrid(el){const by={};sorted(siteRecs('wellness').filter(r=>r.date===gridDate)).reverse().forEach(r=>{by[r.unit]=r});
   const tag=r=>!r?null:r.result==='Exempt'?['Exempt','Exempt']:r.roomStatus==='Urgent'?['Urgent','Urgent']:roomFollow(r)?['Follow-up','Needs Follow-Up']:['Pass','All Clear'];
   const occ=units().filter(u=>u.status==='Occupied');const done=occ.filter(u=>by[u.no]).length;const due=unitCheckDue(gridDate);
@@ -1705,6 +1896,22 @@ function renderDash(v){
     if(d===t)A.push([nowTime()<'11:00'?'bad':'warn',`Foodbank orders go in online today, 8–11 AM (${subd} submitted so far).`,'foodbank','']);
     else if(d&&d<=addDays(t,3))A.push(['info',`Foodbank order day ${fmtDate(d)}: help registered participants fill out their forms.`,'foodbank','']);
     if(fbDates().some(x=>fbPickup(x)===t&&x<=t))A.push(['info','Foodbank orders are picked up today.','foodbank',''])}
+  if(isTransitional()){const lb=p=>unitLabel(p.unit)||'a participant';
+    const need=tpNeeded(),late=need.filter(p=>!p.moveIn||addDays(p.moveIn,14)<t),soon=need.filter(p=>p.moveIn&&addDays(p.moveIn,14)>=t);
+    if(late.length)A.push(['bad',`Transition plan overdue (more than 14 days since move-in): ${shortList(late.map(lb))}.`,'tplan','']);
+    if(soon.length)A.push(['info',`Transition plan to write: ${shortList(soon.map(p=>`${lb(p)} by ${fmtDate(addDays(p.moveIn,14))}`))}.`,'tplan','']);
+    need.filter(p=>p.moveIn&&p.moveIn>=addDays(t,-3)).forEach(p=>A.push(['info',`New move-in, ${lb(p)}: the key staff member does a welcome conversation by ${fmtDate(addDays(p.moveIn,3))} (site tour, Guest Unit, how to ask for help).`,'tplan','']));
+    const act=tpActive(),ci=act.filter(r=>tpGap(r)>=7),miss=act.filter(r=>tpGap(r)>=14);
+    if(ci.length)A.push(['info',`Weekly check-ins due: ${shortList(ci.map(r=>`${r.unitLabel||unitLabel(r.unit)} (${r.keyStaff||'no key staff'})`))}.`,'tplan','']);
+    if(CAN_ADMIN&&miss.length)A.push(['warn',`Two weekly check-ins missed in a row: ${shortList(miss.map(r=>r.unitLabel||unitLabel(r.unit)))}. Routine item: try a different approach with the team.`,'tplan','']);
+    act.filter(r=>r.review&&r.review<=t&&(CAN_ADMIN||r.keyStaff===me())).forEach(r=>A.push(['warn',`Monthly transition plan review due: ${r.unitLabel||unitLabel(r.unit)} (key staff ${r.keyStaff||'?'}).`,'tplan',r.id]));
+    if(CAN_ADMIN){const n=siteRecs('eventprop').filter(r=>(r.decision||'Pending')==='Pending'&&r.date>=t).length;if(n)A.push(['warn',`${n} event proposal${n>1?'s are':' is'} waiting for your decision.`,'eventprop',''])}
+    siteRecs('eventprop').filter(r=>r.decision==='Approved'&&!r.held&&!r.reqDate&&r.date>=t&&r.date<=addDays(t,7)&&(r.sponsor===me()||CAN_REVIEW)).forEach(r=>A.push(['warn',`No supply request yet for ${r.name} on ${fmtDate(r.date)} (sponsor ${r.sponsor||'?'}).`,'eventprop',r.id]));
+    siteRecs('eventprop').filter(r=>r.decision==='Approved'&&!r.held&&r.date<t&&(r.sponsor===me()||CAN_REVIEW)).forEach(r=>A.push(['info',`Record how ${r.name} went (${fmtDate(r.date)}): attendance and debrief.`,'eventprop',r.id]));
+    siteRecs('session').filter(r=>sessionDue(r)&&(r.lead===me()||CAN_REVIEW)).forEach(r=>A.push(['info',`Record how the ${sessionTitle(r)} session went (${fmtDate(r.date)}).`,'session',r.id]));
+    const todayP=[...siteRecs('session').filter(r=>r.date===t&&r.status!=='Cancelled').map(r=>`${r.start||''} ${sessionTitle(r)}`),...siteRecs('eventprop').filter(r=>r.date===t&&r.decision==='Approved'&&r.held!=='No, cancelled').map(r=>`${r.start||''} ${r.name}`)].sort();
+    if(todayP.length)A.push(['info',`Programming today: ${todayP.map(x=>x.trim()).join(' · ')}.`,'session','']);
+    siteRecs('moveon').filter(r=>(r.status||'In progress')==='In progress'&&r.moveDate&&r.moveDate<=addDays(t,7)&&moDone(r)<MOVEON_ITEMS.length).forEach(r=>A.push(['warn',`${r.unitLabel||unitLabel(r.unit)} moves on ${fmtDate(r.moveDate)}: ${moDone(r)} of ${MOVEON_ITEMS.length} checklist items done.`,'moveon',r.id]))}
   if(!isHousing()){const esc12=siteRecs('escalations').filter(r=>r.date>=addDays(t,-365));
     esc12.filter(r=>escOpenDate(r)&&escOpenDate(r)<=t).forEach(r=>A.push([escOpenDate(r)<t?'bad':'warn',`${r.step==='10-Day Final Improvement Notice'?'10-day review':r.step==='Room Status Update'?'Room status check-in':'CAR follow-up'} ${escOpenDate(r)<t?'overdue':'due today'}: ${r.unitLabel||''}`,'escalations',r.id]));
     if(CAN_ADMIN)esc12.filter(r=>isEV(r)&&r.status==='Open'&&(r.decision||'Pending')==='Pending').forEach(r=>A.push(['warn',`Eviction Request waiting for a Program Review decision: ${r.unitLabel||''}`,'escalations',r.id]));
