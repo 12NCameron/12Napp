@@ -341,8 +341,8 @@ const contactGuideHTML=()=>{const ch=site().nonUrgent;return `<table>
 /* Schedule preferences: each staff member keeps one Schedule Preferences entry (they or a manager edit it), with a
    Week 1 / Week 2 pattern that follows the two-week pay period. Older preferences on the staff record still count
    until an entry exists. Schedule Requests are for days off. */
-const WEEKDAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];const SHIFT_NAMES=['Day','Evening','Night'];
-const wdOf=ds=>WEEKDAYS[(dow(ds)+6)%7];
+const WEEKDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const SHIFT_NAMES=['Day','Evening','Night'];
+const wdOf=ds=>WEEKDAYS[dow(ds)];
 const staffRec=(name,k)=>staffOf(k||curSite()).find(s=>s.name===name&&s.status!=='Archived');
 const prefRec=(name,k)=>recs('schedpref').filter(r=>r.site===(k||curSite())&&r.staff===name).sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')))[0];
 const prefTwoWeeks=r=>!!r&&r.same==='Different each week';
@@ -351,7 +351,7 @@ const payWeekNo=(ds,k)=>(new Date(ds+'T12:00')-new Date(payStart(ds,k)+'T12:00')
 const DAY_PREFS=['Morning','Evening','Overnight','Any shift',"Can't work"];
 const DAY_PREF_SHIFT={Morning:'Day',Evening:'Evening',Overnight:'Night'};
 const SHIFT_PREF_NAME={Day:'Morning',Evening:'Evening',Night:'Overnight'};
-const FULL_DAY={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
+const FULL_DAY={Sun:'Sunday',Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday'};
 const hasDayPrefs=(r,n)=>WEEKDAYS.some(d=>r[`w${n}_${d}`]);
 function prefWeek(r,n){
   if(!hasDayPrefs(r,n)&&(r[`w${n}Shifts`]||r[`w${n}Days`]||r[`w${n}Unavail`]))return {shifts:r[`w${n}Shifts`]||[],days:r[`w${n}Days`]||[],unavailable:r[`w${n}Unavail`]||[]};
@@ -1166,21 +1166,21 @@ schedpref:{title:'Schedule Preferences',nav:'Schedule Preferences',sheet:'Schedu
   {k:'staff',l:'Staff member',t:'staff',req:1,def:D.me},{k:'date',l:'Last updated',t:'date',req:1,def:D.today},
   {k:'same',l:'My preferences',t:'seg',full:1,o:['Same both weeks','Different each week'],def:'Same both weeks',hint:'For each day, choose the shift you prefer: Morning (8 AM–4 PM), Evening (4 PM–midnight) or Overnight (midnight–8 AM). Leave a day blank for no preference. Choose "Different each week" if your weeks alternate, for example custody of a child every second week.'},
   {k:'w1Head',t:'info',full:1,show:prefTwoWeeks,html:()=>{const ps=payStart(today());return `<b>Week 1</b> · the first week of each pay period (this period: ${esc(fmtDate(ps))} to ${esc(fmtDate(addDays(ps,6)))})`}},
+  {k:'w1_Sun',l:FULL_DAY.Sun,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Mon',l:FULL_DAY.Mon,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Tue',l:FULL_DAY.Tue,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Wed',l:FULL_DAY.Wed,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Thu',l:FULL_DAY.Thu,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Fri',l:FULL_DAY.Fri,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Sat',l:FULL_DAY.Sat,t:'select',o:DAY_PREFS,blank:'No preference'},
-  {k:'w1_Sun',l:FULL_DAY.Sun,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w2Head',t:'info',full:1,show:prefTwoWeeks,html:()=>{const ps=addDays(payStart(today()),7);return `<b>Week 2</b> · the second week of each pay period (this period: ${esc(fmtDate(ps))} to ${esc(fmtDate(addDays(ps,6)))})`}},
+  {k:'w2_Sun',l:FULL_DAY.Sun,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Mon',l:FULL_DAY.Mon,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Tue',l:FULL_DAY.Tue,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Wed',l:FULL_DAY.Wed,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Thu',l:FULL_DAY.Thu,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Fri',l:FULL_DAY.Fri,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'w2_Sat',l:FULL_DAY.Sat,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
-  {k:'w2_Sun',l:FULL_DAY.Sun,t:'select',o:DAY_PREFS,blank:'No preference',show:prefTwoWeeks},
   {k:'maxPerWeek',l:'Most shifts per week',t:'number'},
   {k:'notes',l:'Anything else',t:'textarea',full:1,hint:'Optional. Share only what you are comfortable sharing. For specific dates off, send a Schedule Request instead.'}],
  cols:['staff',{l:'Preferences',f:r=>esc(prefRecText(r))},'date'],
@@ -1947,7 +1947,7 @@ function renderInfo(v){const s=site();const ro=siteEditable()?'':'disabled';
    ${!isHousing()?`<div class="fld"><label for="si_ufreq">Unit Room Checks</label><select id="si_ufreq" ${ro}>${UNIT_FREQ.map(o=>`<option ${o===unitFreq()?'selected':''}>${o}</option>`).join('')}</select><span class="hint">How often this site completes the Unit Room Check Form.</span></div>
    ${unitFreq()==='Every second Thursday'?`<div class="fld"><label for="si_ustart">A Thursday when checks happen</label><input id="si_ustart" ${ro} type="date" value="${esc(s.unitCheckStart||'')}"><span class="hint">Sets which Thursdays are check days.</span></div>`:''}`:''}
    ${!isHousing()?`<div class="fld"><label for="si_fb">Foodbank order dates</label><input id="si_fb" ${ro} value="${esc(s.foodbankDates||'')}" placeholder="2026-12-15, 2027-01-19"><span class="hint">Dates as YYYY-MM-DD, separated by commas. Orders go in online 8–11 AM; pickup is the Friday of that week.</span></div>`:''}
-   ${CAN_SCHEDULE?`<div class="fld"><label for="si_pay">First day of a pay period</label><input id="si_pay" ${ro} type="date" value="${esc(s.payStart||'')}"><span class="hint">Any past or future start date. Pay periods run 14 days from it${s.payStart?'':` (until set: from ${esc(fmtDate(PAY_ANCHOR_DEFAULT))})`}.</span></div>`:''}
+   ${CAN_SCHEDULE?`<div class="fld"><label for="si_pay">First day of a pay period</label><input id="si_pay" ${ro} type="date" value="${esc(s.payStart||'')}"><span class="hint">Any day in the first week of a pay period, past or future. Pay periods run two weeks, Sunday to Saturday${s.payStart?'':` (until set: from ${esc(fmtDate(PAY_ANCHOR_DEFAULT))})`}.</span></div>`:''}
    <div class="fld"><label for="si_nonurgent">Non-urgent channel for the Site Manager</label><input id="si_nonurgent" ${ro} value="${esc(s.nonUrgent||'')}" placeholder="e.g. a shared email address or a named group chat"><span class="hint">For routine questions and updates; replies within 1–2 business days. The Site Manager's personal phone is for urgent and emergency contact only.</span></div>
    <div class="fld"><label for="si_restock">Restock orders go to (email)</label><input id="si_restock" ${ro} type="email" value="${esc(s.restockEmail||'')}" placeholder="manager@12neighbours.com"></div></div>
   <h2 style="font-size:18px">When to contact the Site Manager</h2>
@@ -2058,21 +2058,28 @@ function renderArchive(v){
 /* =========================================================
    SCHEDULE (two staff per shift; managers and supervisors edit, everyone views once published)
    ========================================================= */
-const weekStart=ds=>{const d=new Date(ds+'T12:00');return addDays(ds,-((d.getDay()+6)%7))};
+/* Schedule weeks run Sunday to Saturday. Weeks saved before 26 Nov 2026 were Monday to Sunday; their shifts are
+   still read by date, and opening such a week shows them so the first save carries them into the Sunday week. */
+const weekStart=ds=>addDays(ds,-dow(ds));
 const weekDays=w=>Array.from({length:7},(_,i)=>addDays(w,i));
 const dayName=ds=>new Date(ds+'T12:00').toLocaleDateString(undefined,{weekday:'short'});
 const schedWeek=(k,w)=>(SCHED[k]||[]).find(x=>x.id===w);
 /* Scheduled pair for a date/shift (published weeks only, unless asked). */
 /* What facilitators see: the approved copy. Weeks saved before approvals existed used days + published. */
 const pubDays=w=>w?(w.publishedDays||(w.published&&!('publishedDays' in w)?w.days:null)):null;
-function schedFor(k,ds,i,drafts){const w=schedWeek(k,weekStart(ds));const src=drafts?(w&&w.days):pubDays(w);if(!src)return [];return ((src[ds]||{})[i]||[]).filter(Boolean)}
+function schedFor(k,ds,i,drafts){const own=schedWeek(k,weekStart(ds));
+  for(const w of [own,...(SCHED[k]||[]).filter(x=>x!==own)]){if(!w)continue;const src=drafts?w.days:pubDays(w);if(src&&src[ds])return ((src[ds]||{})[i]||[]).filter(Boolean)}return []}
+/* The week's own record, or one put together from Monday-start weeks saved earlier. */
+function weekDoc(k,wk){const own=schedWeek(k,wk);if(own)return own;const days={},pub={};let any=false,anyPub=false;
+  for(const x of SCHED[k]||[])for(const ds of weekDays(wk)){if((x.days||{})[ds]&&!days[ds]){days[ds]=clone(x.days[ds]);any=true}const pd=pubDays(x);if(pd&&pd[ds]&&!pub[ds]){pub[ds]=clone(pd[ds]);anyPub=true}}
+  if(!any&&!anyPub)return undefined;return Object.assign({id:wk,week:wk,days,notes:''},anyPub?{publishedDays:pub,published:true}:{})}
 const schedNow=()=>schedFor(curSite(),today(),shiftIdx());
 function schedGaps(k,n){let g=0;for(let d=0;d<n;d++){const ds=addDays(today(),d);for(let i=0;i<3;i++){if(d===0&&i<shiftIdx()&&shiftIdx()!==2)continue;if(schedFor(k,ds,i,true).length<2)g++}}return g}
 /* Hours rules (agency): at most 44 h a week and 88 h a two-week pay period. Full-Time is guaranteed 32 h a week;
    Part-Time isn't guaranteed more than 8 h. Every shift is 8 hours. Only Supervisors and up see employment status. */
 const SHIFT_H=8,MAX_WEEK_H=44,MAX_PAY_H=88,FT_MIN_H=32,PT_MIN_H=8,EMPLOYMENT=['Full-Time','Part-Time'];
-const PAY_ANCHOR_DEFAULT='2026-01-05';
-const payStart=(ds,k)=>{const a=(S().sites[k||curSite()]||{}).payStart||PAY_ANCHOR_DEFAULT;const n=Math.floor((new Date(ds+'T12:00')-new Date(a+'T12:00'))/864e5);return addDays(a,Math.floor(n/14)*14)};
+const PAY_ANCHOR_DEFAULT='2026-01-04';
+const payStart=(ds,k)=>{const a=weekStart((S().sites[k||curSite()]||{}).payStart||PAY_ANCHOR_DEFAULT);const n=Math.floor((new Date(ds+'T12:00')-new Date(a+'T12:00'))/864e5);return addDays(a,Math.floor(n/14)*14)};
 const employmentOf=(n,k)=>(staffRec(n,k)||{}).employment||'';
 function hoursIn(k,from,days){const c={};for(let d=0;d<days;d++){const ds=addDays(from,d);for(let i=0;i<3;i++)schedFor(k,ds,i,true).forEach(n=>c[n]=(c[n]||0)+SHIFT_H)}return c}
 /* One row per person scheduled this week or Active on the roster: hours this week and this pay period, with problems. */
@@ -2086,7 +2093,7 @@ function hoursReport(k,wk){const week=hoursIn(k,wk,7);const pays=[...new Set([pa
 let SCHED_WEEK='';
 function renderSchedule(v){
   const k=curSite();if(!SCHED_WEEK)SCHED_WEEK=weekStart(today());const wk=SCHED_WEEK;const days=weekDays(wk);
-  const can=CAN_SCHEDULE&&CAN_WRITE&&site().status!=='Archived';const doc=schedWeek(k,wk);
+  const can=CAN_SCHEDULE&&CAN_WRITE&&site().status!=='Archived';const doc=weekDoc(k,wk);
   const w=doc?clone(doc):{id:wk,week:wk,days:{},notes:''};const pub=pubDays(w);
   const view=can?(w.days||{}):(pub||{});const names=staffNames();const t0=today(),si=shiftIdx();
   const changed=!!pub&&JSON.stringify(pub)!==JSON.stringify(w.days||{});
@@ -2144,7 +2151,7 @@ function renderSchedule(v){
   v.querySelectorAll('[data-sd]').forEach(el=>el.onchange=()=>{const ds=el.dataset.sd,i=+el.dataset.si,j=+el.dataset.sj;
     const other=((((w.days||{})[ds]||{})[i])||[])[1-j];if(el.value&&el.value===other){toast('Pick two different people for this shift.','err');render();return}
     save(d=>{d.days=d.days||{};d.days[ds]=d.days[ds]||{};const a=(d.days[ds][i]||['','']).slice(0,2);while(a.length<2)a.push('');a[j]=el.value;d.days[ds][i]=a})});
-  const wc=$('#wkCopy');if(wc)wc.onclick=async()=>{const prev=schedWeek(k,addDays(wk,-7));if(!prev)return toast('There is no schedule for the previous week.','err');
+  const wc=$('#wkCopy');if(wc)wc.onclick=async()=>{const prev=weekDoc(k,addDays(wk,-7));if(!prev)return toast('There is no schedule for the previous week.','err');
     if(doc&&Object.keys(doc.days||{}).length&&!await ask({title:'Replace this week\'s draft?',body:'This week already has shifts filled in. Copy the previous week over them?',ok:'Copy'}))return;
     save(d=>{d.days={};weekDays(prev.week).forEach((ds,n)=>{if((prev.days||{})[ds])d.days[addDays(wk,n)]=clone(prev.days[ds])})},'Copied the previous week into the draft')};
   const gaps=()=>days.reduce((g,ds)=>g+[0,1,2].filter(i=>(((w.days||{})[ds]||{})[i]||[]).filter(Boolean).length<2).length,0);
@@ -2403,7 +2410,7 @@ function exportExcel(){
   for(const k in S().sites)add('Inventory '+S().sites[k].name,invRows(k));
   add('Site Details Data',[['Site','Site status','Address','Unit','Unit status','Current participant','Unit notes'],...Object.entries(S().sites).flatMap(([k,s])=>s.units.map(u=>[s.name,s.status==='Archived'?'Closed':'Open',s.address,u.no,u.status,(pplOf(k).find(p=>p.id===u.participantId)||{}).name||u.name||'',u.notes]))]);
   add('Participants',[['Site','Participant','Status','Unit','Moved in','Moved out','Exit reason','Approved appliances','Notes','History'],...Object.entries(S().sites).flatMap(([k,s])=>pplOf(k).map(p=>[s.name,p.name,p.status==='Active'?'Current':'Past',p.unit,p.moveIn,p.moveOut,p.exitReason,p.appliances,p.notes,(p.history||[]).map(h=>`${h.date} ${h.event}`).join('; ')]))]);
-  add('Schedule',[['Site','Date','Shift','Staff 1','Staff 2','Published'],...Object.entries(S().sites).flatMap(([k,s])=>(SCHED[k]||[]).flatMap(w=>weekDays(w.week).flatMap(ds=>SHIFTS.map((sh,i)=>{const pd=pubDays(w);const a=((pd||w.days||{})[ds]||{})[i]||[];return [s.name,ds,sh,a[0]||'',a[1]||'',pd?'Yes':'No']}).filter(r=>r[3]||r[4]))))]);
+  add('Schedule',[['Site','Date','Shift','Staff 1','Staff 2','Published'],...Object.entries(S().sites).flatMap(([k,s])=>(SCHED[k]||[]).flatMap(w=>weekDays(w.week).filter(ds=>weekStart(ds)===w.week||!schedWeek(k,weekStart(ds))).flatMap(ds=>SHIFTS.map((sh,i)=>{const pd=pubDays(w);const a=((pd||w.days||{})[ds]||{})[i]||[];return [s.name,ds,sh,a[0]||'',a[1]||'',pd?'Yes':'No']}).filter(r=>r[3]||r[4]))))]);
   add('Staff Roster',[['Site','Name','Role','Phone','Email','Start','End','Status'],...Object.entries(S().sites).flatMap(([k,s])=>staffOf(k).map(x=>[s.name,x.name,x.role,x.phone,x.email,x.start||'',x.end||'',x.status]))]);
   add('Contacts',[['Site','Role','Contact name','Phone / email','Escalate for'],...Object.values(S().sites).flatMap(s=>[[s.name,'Police non-emergency','',s.nonEmergency,''],[s.name,'Site phone','',s.sitePhone,''],...(s.contacts||[]).map(c=>[s.name,c.role,c.name,c.reach,c.when])])]);
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});download(`12N-NH-Site-Operations-${today()}.xlsx`,new Blob([buf]))}
