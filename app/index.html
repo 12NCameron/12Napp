@@ -346,6 +346,7 @@ const wdOf=ds=>WEEKDAYS[dow(ds)];
 const staffRec=(name,k)=>staffOf(k||curSite()).find(s=>s.name===name&&s.status!=='Archived');
 const prefRec=(name,k)=>recs('schedpref').filter(r=>r.site===(k||curSite())&&r.staff===name).sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')))[0];
 const prefTwoWeeks=r=>!!r&&r.same==='Different each week';
+const noOvernight=r=>!!r&&(r.noOvernight||[]).length>0;
 const payWeekNo=(ds,k)=>(new Date(ds+'T12:00')-new Date(payStart(ds,k)+'T12:00'))/864e5>=7?2:1;
 /* Each day of a week is one choice. Morning = Day shift (08–16), Evening (16–00), Overnight = Night shift (00–08). */
 const DAY_PREFS=['Morning','Evening','Overnight','Any shift','Off',"Can't work"];  /* Off = would like the day off; Can't work = unavailable */
@@ -361,9 +362,9 @@ function prefWeek(r,n){
 const prefShiftOn=(p,wd)=>DAY_PREF_SHIFT[(p.byDay||{})[wd]]||'';
 /* Preferences for a person; with a date, the pattern for that date's pay-period week. */
 function prefOf(name,k,ds){const r=prefRec(name,k);if(!r)return ((staffRec(name,k)||{}).pref)||{};
-  const n=prefTwoWeeks(r)&&ds?payWeekNo(ds,k):1;return Object.assign(prefWeek(r,n),{maxPerWeek:r.maxPerWeek,notes:r.notes})}
+  const n=prefTwoWeeks(r)&&ds?payWeekNo(ds,k):1;return Object.assign(prefWeek(r,n),{maxPerWeek:r.maxPerWeek,notes:r.notes,noNight:noOvernight(r)})}
 function prefSummary(name,k){const r=prefRec(name,k);if(!r)return prefText(((staffRec(name,k)||{}).pref)||{});return prefRecText(r)}
-function prefRecText(r){const tail=[r.maxPerWeek?`Up to ${r.maxPerWeek} shifts/week`:'',r.notes||''].filter(Boolean).join(' · ');
+function prefRecText(r){const tail=[noOvernight(r)?'No Overnight shifts':'',r.maxPerWeek?`Up to ${r.maxPerWeek} shifts/week`:'',r.notes||''].filter(Boolean).join(' · ');
   const body=prefTwoWeeks(r)?`Week 1: ${prefText(prefWeek(r,1))||'no preference'} | Week 2: ${prefText(prefWeek(r,2))||'no preference'}`:prefText(prefWeek(r,1));
   return [body,tail].filter(Boolean).join(' · ')}
 function openPref(name){if(!name)return toast('Choose who is logging at the top first.','err');const r=prefRec(name);if(r){if(hasDayPrefs(r,1)||!(r.w1Shifts||r.w1Days||r.w1Unavail))return openForm('schedpref',r.id);
@@ -1165,6 +1166,7 @@ schedpref:{title:'Schedule Preferences',nav:'Schedule Preferences',sheet:'Schedu
  fields:[
   {k:'staff',l:'Staff member',t:'staff',req:1,def:D.me},{k:'date',l:'Last updated',t:'date',req:1,def:D.today},
   {k:'same',l:'My preferences',t:'seg',full:1,o:['Same both weeks','Different each week'],def:'Same both weeks',hint:'For each day, choose the shift you prefer: Morning (8 AM–4 PM), Evening (4 PM–midnight) or Overnight (midnight–8 AM). Choose Off for days you would like off, and Can\'t work for days you aren\'t available. Leave a day blank for no preference. Choose "Different each week" if your weeks alternate, for example custody of a child every second week.'},
+  {k:'noOvernight',l:'Overnight shifts',t:'multi',full:1,o:['Not available for Overnight shifts'],hint:'Tick this if you can\'t work any Overnight shift (midnight–8 AM), in either week.'},
   {k:'w1Head',t:'info',full:1,show:prefTwoWeeks,html:()=>{const ps=payStart(today());return `<b>Week 1</b> · the first week of each pay period (this period: ${esc(fmtDate(ps))} to ${esc(fmtDate(addDays(ps,6)))})`}},
   {k:'w1_Sun',l:FULL_DAY.Sun,t:'select',o:DAY_PREFS,blank:'No preference'},
   {k:'w1_Mon',l:FULL_DAY.Mon,t:'select',o:DAY_PREFS,blank:'No preference'},
@@ -2101,8 +2103,8 @@ function renderSchedule(v){
   const dayLoad={};days.forEach(ds=>{const c={};for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>c[n]=(c[n]||0)+1);dayLoad[ds]=c});
   const weekH=can?hoursIn(k,wk,7):{};
   const sel=(ds,i,j)=>{const cur=(((view[ds]||{})[i])||[])[j]||'';const list=names.includes(cur)||!cur?names:[cur,...names];
-    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k,ds).unavailable||[]).includes(wdOf(ds))?" (can't work)":(prefOf(n,k,ds).off||[]).includes(wdOf(ds))?' (prefers off)':prefShiftOn(prefOf(n,k,ds),wdOf(ds))===SHIFT_NAMES[i]?' (prefers)':''}${n!==cur&&(weekH[n]||0)+SHIFT_H>MAX_WEEK_H?` (${weekH[n]} h)`:''}</option>`).join('')}</select>`};
-  const flags=(ds,i,a)=>a.map(n=>{const p=prefOf(n,k,ds);const want=prefShiftOn(p,wdOf(ds));if(offOn(n,ds,i,k))return pill(`${n}: approved day off`,'bad');if((p.unavailable||[]).includes(wdOf(ds)))return pill(`${n}: can't work ${wdOf(ds)}`,'warn');if((p.off||[]).includes(wdOf(ds)))return pill(`${n}: prefers ${wdOf(ds)} off`,'');if(want&&want!==SHIFT_NAMES[i])return pill(`${n}: prefers ${SHIFT_PREF_NAME[want]}`,'');if(!p.byDay&&(p.shifts||[]).length&&!p.shifts.includes(SHIFT_NAMES[i]))return pill(`${n}: prefers ${p.shifts.join('/')}`,'');return ''}).filter(Boolean).map(x=>`<div style="margin-top:4px">${x}</div>`).join('');
+    return `<select data-sd="${ds}" data-si="${i}" data-sj="${j}" aria-label="${dayName(ds)} ${ds} ${SHIFTS[i]} staff ${j+1}" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:4px;background:var(--panel)"><option value="">—</option>${list.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}${offOn(n,ds,i,k)?' (day off)':(prefOf(n,k,ds).unavailable||[]).includes(wdOf(ds))?" (can't work)":i===2&&prefOf(n,k,ds).noNight?' (no Overnights)':(prefOf(n,k,ds).off||[]).includes(wdOf(ds))?' (prefers off)':prefShiftOn(prefOf(n,k,ds),wdOf(ds))===SHIFT_NAMES[i]?' (prefers)':''}${n!==cur&&(weekH[n]||0)+SHIFT_H>MAX_WEEK_H?` (${weekH[n]} h)`:''}</option>`).join('')}</select>`};
+  const flags=(ds,i,a)=>a.map(n=>{const p=prefOf(n,k,ds);const want=prefShiftOn(p,wdOf(ds));if(offOn(n,ds,i,k))return pill(`${n}: approved day off`,'bad');if((p.unavailable||[]).includes(wdOf(ds)))return pill(`${n}: can't work ${wdOf(ds)}`,'warn');if(i===2&&p.noNight)return pill(`${n}: not available for Overnights`,'warn');if((p.off||[]).includes(wdOf(ds)))return pill(`${n}: prefers ${wdOf(ds)} off`,'');if(want&&want!==SHIFT_NAMES[i])return pill(`${n}: prefers ${SHIFT_PREF_NAME[want]}`,'');if(!p.byDay&&(p.shifts||[]).length&&!p.shifts.includes(SHIFT_NAMES[i]))return pill(`${n}: prefers ${p.shifts.join('/')}`,'');return ''}).filter(Boolean).map(x=>`<div style="margin-top:4px">${x}</div>`).join('');
   const perWeek={};days.forEach(ds=>{for(let i=0;i<3;i++)((view[ds]||{})[i]||[]).filter(Boolean).forEach(n=>perWeek[n]=(perWeek[n]||0)+1)});
   const overMax=Object.entries(perWeek).filter(([n,c])=>+prefOf(n,k).maxPerWeek&&c>+prefOf(n,k).maxPerWeek);
   const pend=recs('schedreq').filter(r=>r.site===k&&(!r.status||r.status==='Pending'));
