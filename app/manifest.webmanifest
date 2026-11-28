@@ -2,6 +2,7 @@
   "name": "NH Site Docs",
   "short_name": "NH Site Docs",
   "description": "Shift documentation for 12 Neighbours Neighbourly Homes sites.",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

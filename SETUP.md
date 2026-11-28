@@ -2,30 +2,35 @@
 
 NH Site Docs is an installable app for Neighbourly Homes sites. It runs on any computer, tablet or phone, keeps working without internet, and saves everything to Google Drive:
 
-- **A Google Sheet** with every record, one tab per log (named like the 12N Site Operations template).
+- **A central Google Sheet** (the Housing Director's): who can use the app (Access tab), the sites and settings, and a **Files** tab listing every file the app uses.
+- **One spreadsheet per site** with that site's live records, one tab per log (named like the 12N Site Operations template). Each site's managers get view access to their site's folder.
 - **A Google Doc for each formal report:** incident reports, room wellness checks, work orders and shift handoffs, filed by site, year and report type.
-- **A yearly archive spreadsheet per site** for older closed entries.
+- **One archive spreadsheet per year** for every site's older closed entries, kept centrally.
+- **Weekly backups** of all of the above.
 
 ```
-NH Site Docs – Records/           (next to the data sheet in your Drive)
-  Site A/
-    2026/
-      Incident Reports/           one Google Doc per report
-      Room Wellness Checks/
-      Work Orders/
-      Shift Handoffs/
+NH Site Docs/                       (the Housing Director's folder, or a shared drive)
+  NH Site Docs – Data               central sheet: Access, Setup, Files, Removed
+  NH Site Docs – Records/
+    Site A/                         shared (view) with Site A's managers
+      NH Site Docs – Site A         Site A's live records
+      2026/
+        Incident Reports/           one Google Doc per report
+        Room Wellness Checks/ …
+    Site B/ …
     Archive/
-      NH Site Docs Archive – Site A – 2025   (spreadsheet)
-  Site B/ …
+      NH Site Docs Archive – 2025   every site's archived entries for 2025
+    Backups/
+      2026-11-30/                   copies of the central sheet and each site's sheet (newest 8 kept)
 ```
 
 ## How it fits together
 
 | Piece | What it is | Where it lives |
 |---|---|---|
-| **Data sheet + server** | A Google Sheet with a script (`Code.gs`) that checks sign-ins and writes to Drive | Your 12N Google Drive |
+| **Central sheet + server** | A Google Sheet with a script (`Code.gs`) that checks sign-ins and writes each site's records to its own file | The Housing Director's 12N Google Drive, or a shared drive |
 | **Sign-in client** | Lets the app use "Sign in with Google", limited to 12N accounts | Google Cloud (free) |
-| **The app** | The files in the `app/` folder | GitHub Pages, from the 12NCameron/12Napp repository |
+| **The app** | The files in the `app/` folder | GitHub Pages, currently from the 12NCameron/12Napp repository (see "Moving the app to a new repository or address") |
 
 Setup takes about 45 minutes, once for the whole organization. **Use your 12 Neighbours Google Workspace account (@12neighbours.com) for every step.**
 
@@ -37,9 +42,11 @@ Setup takes about 45 minutes, once for the whole organization. **Use your 12 Nei
 2. In the sheet, open **Extensions → Apps Script**. Replace everything in `Code.gs` with the contents of **Code.gs** from this folder. Click **Save**.
 3. Choose **setup** in the function menu, then click **Run**. Authorize when asked (if you see "Google hasn't verified this app", choose **Advanced → Go to …**; it's your own script).
 4. Setup creates:
-   - the Access tab and the log tabs in the sheet
-   - the **NH Site Docs – Records** folder next to it
-   - a timer that writes the Google Docs every 5 minutes
+   - the Access, Setup, Files and Removed tabs in the sheet
+   - the **NH Site Docs – Records** folder next to it, and a spreadsheet for each site in its own folder
+   - a timer that writes the Google Docs every 5 minutes, and a daily one that keeps managers' folder access current and makes the weekly backup
+
+   Setup is safe to run again at any time. When upgrading from the single-sheet version, it moves each site's records into the site's own spreadsheet. It skips anything already moved; if it says "Run again to continue", run it again.
 
 Staff never need access to the sheet or the folder. The server writes to them on their behalf.
 
@@ -175,7 +182,7 @@ The app's menu links to the Staff Portal (you can change the link under **Sites 
   - Deleting an entry marks its Doc as deleted rather than removing it.
   - The Doc's link is in the **Google Doc** column of the sheet.
 - **Archiving** (Archive page → Archive old entries, managers and administrators):
-  - Moves **closed** entries older than the cutoff (12 months is a good default) into that site's archive spreadsheet for that year.
+  - Moves **closed** entries older than the cutoff (12 months is a good default) into the central archive spreadsheet for that year (one per year, for all sites, in Records/Archive).
   - Open items are never archived.
   - Archived entries stay searchable and can be restored.
   - Doing this about once a year keeps the app fast.
@@ -200,5 +207,42 @@ The app's menu links to the Staff Portal (you can change the link under **Sites 
 ## Good to know
 
 - **Device security:** the installed app keeps a copy of its sites' records on the device so it can work offline. Use a passcode or screen lock on every device, and sign out of personal devices.
-- **Limits:** about 30 people can save at the same moment. Docs are written in batches of up to 40 every 5 minutes. Yearly archiving keeps the live sheet small.
-- **Privacy:** the data sheet, the Docs and the archive spreadsheets hold participant names, intake details and incident reports. Keep the NH Site Docs folder restricted to managers.
+- **Limits:** about 30 people can save at the same moment. Docs are written in batches of up to 40 every 5 minutes. Each site has its own spreadsheet, so one busy site doesn't slow the others, and yearly archiving keeps each one small. (A Google Sheet holds up to 10 million cells; a site file with yearly archiving stays far below that.)
+- **Privacy:** the site sheets, the Docs, the archive spreadsheets and the backups hold participant names, intake details and incident reports. Keep the NH Site Docs folder restricted to the Housing Director; managers see only their own site's folder.
+- **Don't edit the data tabs by hand.** The app reads only its own hidden copy of each entry, so edits in the sheet don't reach the app, and deleted rows can confuse it. Each data tab shows a warning if someone tries. Make changes in the app.
+
+## Site files and managers' folders
+
+- Each site's spreadsheet is made when setup runs, or the first time anything is saved for a new site. Its link is in the **Files** tab, and managers see it under **Sites & Export**.
+- Managers on the Access tab (role **Manager**, with the site in **Sites**, or Sites blank) get **view** access to their site's folder, checked daily. Take someone off the Access tab and the access the app gave them is removed the next day. Access you add by hand in Drive is left alone.
+- To keep a site's folder somewhere else (for example a shared drive for that site), move the folder in Drive. The app finds files by ID, which doesn't change when they move. The account that owns the script must still be able to edit it.
+
+## Backups
+
+- Every week the daily timer copies the central sheet and each site's sheet into **Records/Backups/(date)**, plus the archive spreadsheets once a month. The newest 8 backups are kept; older ones go to the Drive bin (recoverable for 30 days).
+- To back up right away: in Apps Script, run **backupNow**.
+- To recover a site, copy rows from the backup into the site's sheet, or put the backup copy's ID on the site's **book** row in the Files tab and run **setup**.
+- Google Sheets also keeps its own version history (**File → Version history**).
+
+## Handing everything to a new owner (for example, the Housing Director)
+
+The safest home is a **shared drive** owned by 12 Neighbours: files there belong to the organization, so nothing is lost when someone leaves. If you use one, move the NH Site Docs folder into it and skip step 1.
+
+1. As the current owner, open Apps Script, set `var NEW_OWNER = 'jamie@12neighbours.com';` at the top of `Code.gs`, save, and run **transferOwnership**. It hands over the central sheet, the Records folder and everything in it. If it says "Run again to continue", run it again until it says Done.
+2. The new owner opens the central sheet → **Extensions → Apps Script** and runs **setup**. This puts the timers under their account (timers always run as the person who made them).
+3. The new owner chooses **Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy**. Edit the existing deployment rather than making a new one, so the `/exec` address stays the same and installed apps keep working. If the address does change, put the new one in `app/config.js` (`apiUrl`) and push.
+4. In **Google Cloud** (console.cloud.google.com → the NH Site Docs project → IAM), add the new owner as **Owner** of the project. The sign-in client lives there; if its only owner's account is closed, sign-in stops working.
+5. On the central sheet's Access tab, check the new owner is listed as Administrator.
+
+Nothing in the app depends on who owns the files. Every file is listed by ID in the **Files** tab of the central sheet (not inside the script), so the setup survives a transfer, pasting a new version of `Code.gs`, or a copy of the script. If a file's ID ever stops working, the app looks for it by name in its folder before making a new one.
+
+## Moving the app to a new repository or address
+
+The app's files only use relative links, so the `app/` folder works from any address.
+
+1. Copy or transfer the repository (for example to a 12 Neighbours GitHub organization). In the new repository turn on **Settings → Pages → Source: GitHub Actions**, then push once to publish.
+   - Best: give the app its own domain (for example `docs.12neighbours.com`) under **Settings → Pages → Custom domain**. Future moves then keep the same address, and nobody has to reinstall.
+2. In **Google Cloud → Credentials → the OAuth client**, add the new origin (for example `https://12neighbours.github.io`) to **Authorized JavaScript origins**. Keep the old one until everyone has moved.
+3. Set `APP_URL` at the top of `Code.gs` to the new address (it's only used for a link) and deploy a new version.
+4. Installed apps belong to their address, so each device opens the new address, signs in and installs again. To tell people, set `movedTo` in the **old** copy's `app/config.js` to the new address and push it there before retiring it. The old app then shows a notice with the link, and asks people to let any waiting entries sync first. Records are on the server, so reinstalling loses nothing.
+5. Update the Staff Portal button and any bookmarks.

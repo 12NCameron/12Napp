@@ -56,7 +56,8 @@ if not cfg.exists():
         "window.NH_CONFIG = {\n"
         "  apiUrl: '',     // Apps Script web app URL, ending in /exec\n"
         "  clientId: '',   // Google OAuth Web client ID, ending in .apps.googleusercontent.com\n"
-        "  domain: '12neighbours.com'  // only accounts from this Google Workspace domain can sign in\n"
+        "  domain: '12neighbours.com',  // only accounts from this Google Workspace domain can sign in\n"
+        "  movedTo: ''     // after moving the app to a new address, put the new address here in the OLD copy\n"
         "};\n", encoding='utf-8')
     print('Created app/config.js (fill it in)')
 
@@ -64,6 +65,7 @@ manifest = {
     "name": "NH Site Docs",
     "short_name": "NH Site Docs",
     "description": "Shift documentation for 12 Neighbours Neighbourly Homes sites.",
+    "id": "./",
     "start_url": "./",
     "scope": "./",
     "display": "standalone",

@@ -374,7 +374,7 @@ const ROLE_ALIAS={Admin:'Administrator',Staff:'Facilitator'};
 let ROLE='Administrator',CAN_ORG=true,CAN_REVIEW=true,CAN_PUBLISH=true;
 function applyRole(r){ROLE=ROLE_ALIAS[r]||r||'Viewer';const n=RANK[ROLE]??0;
   CAN_WRITE=n>=1;CAN_REVIEW=n>=2;CAN_SCHEDULE=n>=2;CAN_ADMIN=n>=3;CAN_PUBLISH=n>=3;CAN_ORG=n>=4}
-let MODE='local',GAS_OFFLINE=false,SHEET_URL='',WEBAPP_URL='',ARCHIVE_URL='',GAS=null,ALLOWED_RAW=null,LAUNCH_SITE='',PENDING=0,SIGNIN_NEEDED=false,API=null,INSTALL_PROMPT=null;
+let MODE='local',GAS_OFFLINE=false,SHEET_URL='',SITE_SHEETS={},SITE_FOLDERS={},WEBAPP_URL='',ARCHIVE_URL='',GAS=null,ALLOWED_RAW=null,LAUNCH_SITE='',PENDING=0,SIGNIN_NEEDED=false,API=null,INSTALL_PROMPT=null;
 const SERVER=()=>MODE==='gas'||MODE==='api';
 let CFG=null,CFG_READY=false;const CACHE={};MODS.forEach(m=>CACHE[m]=[]);
 const STAFF={},PPL={},SCHED={};const SUBREADY=new Set();
@@ -1495,6 +1495,8 @@ async function setPair(i,v){const p=pair2();p[i]=v;if(p[0]&&p[0]===p[1]){toast('
 $('#on1').onchange=e=>setPair(0,e.target.value);$('#on2').onchange=e=>setPair(1,e.target.value);
 $('#meSel').onchange=e=>{PREF.meBy=PREF.meBy||{};PREF.meBy[curSite()]=e.target.value;savePref();toast(e.target.value?`Signed in as ${e.target.value}`:'Signed out')};
 function renderBanner(){let h='';
+  const moved=window.NH_CONFIG&&NH_CONFIG.movedTo;
+  if(moved&&/^https:\/\//.test(moved)&&!location.href.startsWith(moved)){$('#banner').innerHTML=`<div class="banner"><b>NH Site Docs has a new address.</b> ${PENDING?`First let the ${PENDING} entr${PENDING===1?'y':'ies'} waiting on this device sync (stay online with this copy open). Then o`:'O'}pen <a href="${esc(moved)}">${esc(moved)}</a>, sign in, and install the app from there. After that, this copy can be removed.</div>`;return}
   if(!SHARED)h=`<div class="banner">Shared storage isn't available here, so entries are saved in <b>this browser only</b>. Use the site's NH Site Docs web address (or the claude.ai page) to work from the shared log.</div>`;
   else if(MODE==='api'&&SIGNIN_NEEDED)h=`<div class="banner">Your Google sign-in has expired. Entries are being kept on this device${PENDING?` (${PENDING} waiting)`:''} and will sync after you sign in again. <span id="gisBanner" style="display:inline-block;vertical-align:middle"></span></div>`;
   else if(MODE==='api'&&GAS_OFFLINE)h=`<div class="banner">No connection right now. You can keep working: entries are saved on this device${PENDING?` (${PENDING} waiting)`:''} and sync automatically when the connection is back. Archive searches need a connection.</div>`;
@@ -2536,7 +2538,8 @@ function renderSetup(v){const ad=CAN_ORG&&CAN_WRITE&&!!CFG;const dis=ad?'':'disa
     ${ad?`<button class="btn pri" type="button" id="addSite" style="margin-top:10px">＋ Open a new site</button>`:''}</div>
    <div class="card"><b style="font-size:16px">Export</b>
     <div class="qa" style="margin-top:10px"><button class="btn acc" type="button" id="xlsx">⇩ Export all to Excel (.xlsx)</button><button class="btn" type="button" id="json">⇩ Backup (.json)</button></div>
-    ${SHEET_URL||ARCHIVE_URL?`<div class="qa" style="margin-top:8px">${SHEET_URL?`<a class="btn" href="${esc(SHEET_URL)}" target="_blank" rel="noopener">Open the data sheet ↗</a>`:''}${ARCHIVE_URL?`<a class="btn" href="${esc(ARCHIVE_URL)}" target="_blank" rel="noopener">Open the records folder in Drive ↗</a>`:''}</div>`:''}
+    ${(()=>{const ln=(u,l)=>u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${l} ↗</a>`:'';const ss=SITE_SHEETS[curSite()],sf=SITE_FOLDERS[curSite()];
+      return SHEET_URL||ARCHIVE_URL||ss||sf?`<div class="qa" style="margin-top:8px">${ln(ss,`${esc(site().name)} data sheet`)}${ln(sf,`${esc(site().name)} folder in Drive`)}${ln(SHEET_URL,'Central sheet (access and settings)')}${ln(ARCHIVE_URL,'All records in Drive')}</div>`:''})()}
     <p class="meta">Excel has one tab per log (named like the 12N Site Operations template), plus Participants, Staff Roster and Contacts. Keep exports in an access-restricted folder.</p>
     <table style="margin-top:8px">${MODS.map(m=>`<tr><td>${esc(M[m].nav)}</td><td style="text-align:right;font-variant-numeric:tabular-nums">${recs(m).length}</td></tr>`).join('')}</table>
     <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
@@ -2767,7 +2770,7 @@ async function bootApi(){
   try{LAUNCH_SITE=new URLSearchParams(location.search).get('site')||''}catch(e){}
   API=makeApiDb();GAS=API;await API.load();
   let sess=null;try{sess=JSON.parse(localStorage.getItem('nh-session')||'null')}catch(e){}
-  const applySess=u=>{MY_UID=u.email||null;applyRole(u.role);SHEET_URL=u.sheetUrl||'';ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
+  const applySess=u=>{MY_UID=u.email||null;applyRole(u.role);SHEET_URL=u.sheetUrl||'';SITE_SHEETS=u.siteSheets||{};SITE_FOLDERS=u.siteFolders||{};ARCHIVE_URL=u.recordsUrl||'';ALLOWED_RAW=Array.isArray(u.sites)&&u.sites.length?u.sites:null};
   let started=false;const startApp=()=>{if(started)return;started=true;API_STARTED=true;DBX=API.db;SHARED=true;CFG_READY=false;subscribeAll();API.start();render()};
   const refresh=async()=>{try{const u=await API.run('whoami');if(sess&&sess.email&&u.email!==sess.email){await API.clearAll()}sess=u;localStorage.setItem('nh-session',JSON.stringify(u));applySess(u);startApp();render()}
     catch(e){if(e.code==='invalid_argument'){forgetToken();try{localStorage.removeItem('nh-session')}catch(x){}await API.clearAll();showSignIn(e.message)}
