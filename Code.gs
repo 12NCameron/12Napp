@@ -46,6 +46,7 @@ var FORMAL = { incidents: 'Incident Reports', wellness: 'Room Wellness Checks', 
 var COLLECTION_RE = /^((log|arch)-[a-z]+|inv-[A-Za-z0-9_-]+|config|checks|sites\/[A-Za-z0-9_-]+\/(staff|participants|schedule))$/;
 var ID_RE = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 var REQ_EMAIL = null; // set per request from the verified Google sign-in
+var REQ_DEVICE = null; // {id, label} the app sends with every request (see Devices below)
 
 /* ---------------- Web entry points ---------------- */
 
@@ -63,6 +64,7 @@ function doPost(e) {
     var fn = API_[req.fn];
     if (!fn) throw new Error('DENIED: Unknown request.');
     REQ_EMAIL = verifyToken_(req.token);
+    REQ_DEVICE = { id: /^[A-Za-z0-9_-]{20,64}$/.test(String(req.device || '')) ? String(req.device) : '', label: String(req.label || '').slice(0, 80) };
     out = { ok: true, result: fn.apply(null, req.args || []) };
   } catch (err) {
     out = { ok: false, error: String(err && err.message || err) };
@@ -100,14 +102,16 @@ function setup() {
   var owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
   var access = ss.getSheetByName('Access') || ss.insertSheet('Access', 0);
   if (access.getLastRow() < 1) {
-    access.getRange(1, 1, 1, 4).setValues([['Email', 'Role', 'Sites', 'Notes']]).setFontWeight('bold');
-    var rows = [[owner, 'Administrator', '', 'Owner of the data sheet · blank Sites = every site']];
-    var domain = owner.split('@')[1] || '';
-    if (domain && !/^(gmail|googlemail)\.com$/.test(domain)) rows.push(['*@' + domain, 'Facilitator', '', 'Everyone with a ' + domain + ' account can log entries at any site']);
-    access.getRange(2, 1, rows.length, 4).setValues(rows);
+    access.getRange(1, 1, 1, 5).setValues([['Email', 'Role', 'Sites', 'Notes', 'Site account']]).setFontWeight('bold');
+    access.getRange(2, 1, 1, 5).setValues([[owner, 'Administrator', '', 'Owner of the data sheet · blank Sites = every site', '']]);
     access.setFrozenRows(1);
-    access.setColumnWidths(1, 4, 240);
+    access.setColumnWidths(1, 5, 240);
   }
+  // Site account (column E): Yes for a site's own Google account. Facilitators and Viewers can only sign in with one,
+  // on a device registered to the site. Supervisors and up use their own accounts anywhere.
+  if (String(access.getRange(1, 5).getValue()) !== 'Site account') access.getRange(1, 5).setValue('Site account').setFontWeight('bold');
+  access.getRange('E2:E500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Yes'], true).build());
+  devicesTab_();
   // Roles, lowest to highest: Viewer, Facilitator, Supervisor, Manager, Administrator. Re-applied on every run.
   access.getRange('B2:B500').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Administrator', 'Manager', 'Supervisor', 'Facilitator', 'Viewer'], true).build());
   ['Setup', 'Removed'].forEach(function (n) { tabByName_(ss, n); });
@@ -144,12 +148,12 @@ function user_() {
   var email = String(REQ_EMAIL || Session.getActiveUser().getEmail() || '').toLowerCase();
   var owner = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Access');
-  var rows = sh && sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues() : [];
+  var rows = sh && sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues() : [];
   var own = null, wild = null;
   rows.forEach(function (r) {
     var who = String(r[0] || '').trim().toLowerCase(), role = normRole_(r[1]);
     if (!who || !role) return;
-    var entry = { role: role, sites: parseSites_(r[2]) };
+    var entry = { role: role, sites: parseSites_(r[2]), siteAccount: /^(yes|y|true)$/i.test(String(r[4] || '').trim()) && who.indexOf('*') < 0 };
     if (email && who === email) own = entry;
     else if (!wild && email && who.indexOf('*@') === 0 && email.split('@')[1] === who.slice(2)) wild = entry;
   });
@@ -157,7 +161,98 @@ function user_() {
   if (email === owner) return { email: email, role: 'Administrator', sites: own ? own.sites : null };
   var e = own || wild;
   if (!e) throw new Error('DENIED: ' + email + ' is not on the NH Site Docs access list. Ask a manager to add you.');
-  return { email: email, role: e.role, sites: e.sites };
+  var u = { email: email, role: e.role, sites: e.sites, siteAccount: !!e.siteAccount };
+  if (!atLeast_(u, 'Supervisor')) deviceGate_(u);
+  return u;
+}
+
+/* ---------------- Devices: Facilitators and Viewers work only from registered site devices ----------------
+   The app makes a random ID for each device and sends it with every request. A device signed in with a site
+   account appears on the Devices tab as Waiting; a supervisor or manager of that site approves it in the app
+   (Devices page). Supervisors, managers and administrators can sign in from any device with their own accounts. */
+var DEV_COLS = ['Device ID', 'Code', 'Site', 'Name', 'Status', 'Requested by', 'Requested', 'Approved by', 'Approved', 'Last seen'];
+function devicesTab_() {
+  var ss = central_(), sh = ss.getSheetByName('Devices');
+  if (!sh) {
+    sh = ss.insertSheet('Devices');
+    sh.getRange(1, 1, 1, DEV_COLS.length).setValues([DEV_COLS]).setFontWeight('bold').setBackground('#efe2d4');
+    sh.setFrozenRows(1);
+    warnProtect_(sh);
+  }
+  return sh;
+}
+function deviceCode_(id) { var s = String(id || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); return s.slice(0, 4) + '-' + s.slice(4, 8); }
+function deviceRows_() {
+  var sh = central_().getSheetByName('Devices');
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, DEV_COLS.length).getValues().map(function (r, i) {
+    return { row: i + 2, id: String(r[0]), code: String(r[1]), site: String(r[2]), name: String(r[3]), status: String(r[4]), requestedBy: String(r[5]),
+      requested: r[6] ? new Date(r[6]).toISOString() : '', approvedBy: String(r[7]), approved: r[8] ? new Date(r[8]).toISOString() : '', lastSeen: r[9] ? new Date(r[9]).toISOString() : '' };
+  });
+}
+function deviceRow_(id) { if (!id) return null; var all = deviceRows_(); for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i]; return null; }
+function deviceGate_(u) {
+  if (!u.siteAccount) throw new Error('DENIED: ' + u.email + ' is a personal account. Facilitators sign in with the site\'s own account, on a device registered to the site. (Supervisors, managers and administrators can use their own accounts on any device.)');
+  var id = REQ_DEVICE && REQ_DEVICE.id;
+  if (!id) throw new Error('DEVICE: This copy of the app is out of date. Reload it, then try again.||');
+  var dev = deviceRow_(id), allowed = allowedIds_(u);
+  if (dev && dev.status === 'Active' && dev.site && siteOk_(allowed, dev.site)) {
+    if (!dev.lastSeen || Date.now() - new Date(dev.lastSeen).getTime() > 3600000) {
+      try { withLock_(function () { central_().getSheetByName('Devices').getRange(dev.row, 10).setValue(new Date()); }); } catch (e) {}
+    }
+    return;
+  }
+  var guess = '';
+  if (allowed) { var ks = Object.keys(allowed); if (ks.length === 1) guess = ks[0]; }
+  if (!dev) {
+    try { withLock_(function () {
+      if (deviceRow_(id)) return;
+      var sh = devicesTab_();
+      sh.getRange(sh.getLastRow() + 1, 1, 1, DEV_COLS.length).setValues([[id, deviceCode_(id), guess, REQ_DEVICE.label || '', 'Waiting', u.email, new Date(), '', '', new Date()]]);
+    }); } catch (e) {}
+  }
+  var why = dev && dev.status === 'Revoked' ? 'This device\'s access was removed.' : dev && dev.status === 'Active' ? 'This device is registered to a different site.' : 'This device isn\'t registered to a site yet.';
+  throw new Error('DEVICE: ' + why + '||' + deviceCode_(id));
+}
+function devCanSite_(u, site) { return siteOk_(allowedIds_(u), site); }
+/** The Devices page: this device, and the devices of the sites this account may manage. */
+function devices() {
+  var u = user_();
+  need_(u, 'Supervisor', 'Only supervisors and managers can register devices.');
+  var allowed = allowedIds_(u), me = REQ_DEVICE && REQ_DEVICE.id;
+  var list = deviceRows_().filter(function (d) { return !d.site || siteOk_(allowed, d.site); }).map(function (d) { delete d.row; d.mine = d.id === me; return d; });
+  var self = list.filter(function (d) { return d.mine; })[0] || null;
+  return { me: me ? { id: me, code: deviceCode_(me), status: self ? self.status : 'Not registered', site: self ? self.site : '' } : null, list: list };
+}
+/** Approves a device for a site (or registers this device). */
+function registerDevice(id, site, name) {
+  var u = user_();
+  need_(u, 'Supervisor', 'Only supervisors and managers can register devices.');
+  id = String(id || '');
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) throw new Error('DENIED: Unknown device.');
+  var cfg = readConfig_();
+  if (!cfg || !cfg.sites || !cfg.sites[site]) throw new Error('DENIED: Unknown site.');
+  if (!devCanSite_(u, site)) throw new Error('DENIED: Your account is not set up for that site.');
+  return withLock_(function () {
+    var sh = devicesTab_(), d = deviceRow_(id);
+    if (d && d.site && d.site !== site && !devCanSite_(u, d.site)) throw new Error('DENIED: That device belongs to a site you don\'t manage.');
+    var row = d ? d.row : sh.getLastRow() + 1;
+    var vals = [id, deviceCode_(id), site, String(name || (d && d.name) || '').slice(0, 80), 'Active', d ? d.requestedBy : u.email, d && d.requested ? new Date(d.requested) : new Date(), u.email, new Date(), d && d.lastSeen ? new Date(d.lastSeen) : ''];
+    sh.getRange(row, 1, 1, DEV_COLS.length).setValues([vals]);
+    return { ok: true };
+  });
+}
+/** Takes a device's access away (lost, replaced, or no longer at the site). */
+function revokeDevice(id) {
+  var u = user_();
+  need_(u, 'Supervisor', 'Only supervisors and managers can remove devices.');
+  return withLock_(function () {
+    var d = deviceRow_(String(id || ''));
+    if (!d) throw new Error('DENIED: Unknown device.');
+    if (d.site && !devCanSite_(u, d.site)) throw new Error('DENIED: That device belongs to a site you don\'t manage.');
+    central_().getSheetByName('Devices').getRange(d.row, 5).setValue('Revoked');
+    return { ok: true };
+  });
 }
 /* Layers, lowest to highest. "Admin" and "Staff" are the names used before Nov 2026 and still work. */
 var RANK = { Viewer: 0, Facilitator: 1, Supervisor: 2, Manager: 3, Administrator: 4 };
@@ -595,7 +690,7 @@ function writeDocCells_(sh, c, id, url, ts, iDoc, iUpd) {
    name in its folder before a new one is made.
    ===================================================================== */
 
-var CENTRAL_ONLY = { Access: true, Files: true }; // central tabs that are never sent to the app
+var CENTRAL_ONLY = { Access: true, Files: true, Devices: true }; // central tabs that are never sent to the app
 var REG_ = null, BOOK_ = {};
 function central_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 
@@ -809,7 +904,7 @@ function moveToSiteFiles() {
   withLock_(function () {
     central_().getSheets().forEach(function (sh) {
       var name = sh.getName();
-      if (left || /^(Access|Setup|Files|Removed|Other)$/.test(name) || sh.getLastRow() < 2) return;
+      if (left || /^(Access|Setup|Files|Removed|Devices|Other)$/.test(name) || sh.getLastRow() < 2) return;
       if (Date.now() - started > 4 * 60 * 1000) { left = true; return; }
       var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
       var vals = sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues(), bySite = {};
@@ -1004,4 +1099,5 @@ function child_(parent, name) {
 }
 
 /* Functions the app may call (doPost). */
-var API_ = { whoami: whoami, changes: changes, put: put, remove: remove, archiveMove: archiveMove, archiveRestore: archiveRestore, archiveQuery: archiveQuery };
+var API_ = { whoami: whoami, changes: changes, put: put, remove: remove, archiveMove: archiveMove, archiveRestore: archiveRestore, archiveQuery: archiveQuery,
+  devices: devices, registerDevice: registerDevice, revokeDevice: revokeDevice };

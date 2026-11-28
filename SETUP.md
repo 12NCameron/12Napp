@@ -108,14 +108,21 @@ The app files contain no participant data. Records live only in Google Drive and
 
 ## Who can use it (Access tab in the data sheet)
 
-| Email | Role | Sites | What it means |
-|---|---|---|---|
-| you@12neighbours.com | Administrator | *(blank)* | Everything at every site, including opening and closing sites |
-| `*@12neighbours.com` | Facilitator | *(blank)* | Everyone at 12N can log entries at any site |
-| manager@12neighbours.com | Manager | Site A | Runs one site: rosters, participants, publishing the schedule |
-| supervisor@12neighbours.com | Supervisor | Site A | Reviews reports and drafts that site's schedule |
-| sitea-tablet@12neighbours.com | Facilitator | Site A | A shared site device, locked to that site |
-| someone@12neighbours.com | Viewer | | Read only |
+| Email | Role | Sites | Site account | What it means |
+|---|---|---|---|---|
+| you@12neighbours.com | Administrator | *(blank)* | | Everything at every site, including opening and closing sites |
+| manager@12neighbours.com | Manager | Site A | | Runs one site: rosters, participants, publishing the schedule |
+| supervisor@12neighbours.com | Supervisor | Site A | | Reviews reports and drafts that site's schedule |
+| sitea@12neighbours.com | Facilitator | Site A | **Yes** | Site A's own account, used by facilitators on Site A's approved devices |
+
+**Site accounts and approved devices.** Facilitators and Viewers can't sign in with their personal accounts. They use their site's own account (marked **Yes** under **Site account**), and only on a device a supervisor or manager has approved for that site. Supervisors, managers and administrators sign in with their own accounts on any device.
+
+- A `*@12neighbours.com` row no longer lets anyone in as a Facilitator. You can delete it.
+- **Approving a device:** sign the site account in on the shared device. It shows **This device needs to be approved** and a code such as `K7QX-2FMB`. A supervisor or manager of the site opens **This site → Devices**, checks the code matches, and chooses **Approve** (giving it a name like *Office tablet*). Or they can sign in on that device with their own account and choose **Approve this device**, then sign out so the site account can sign in.
+- **Removing a device** (lost, replaced, retired): **This site → Devices → Remove**. It stops working at once, and its stored records are cleared the next time it connects.
+- Approved devices are listed on the **Devices** tab of the central sheet.
+- Approve only shared devices that stay at the site, never a personal phone or computer.
+- Clearing the browser's data or reinstalling the app gives a device a new code, so it needs approving again.
 
 **Roles** (each layer can do everything the layers below it can):
 
@@ -129,10 +136,12 @@ The app files contain no participant data. Records live only in Google Drive and
 | Approve and publish the schedule | | | | ✓ | ✓ |
 | Edit rosters, participants and site contacts | | | | ✓ | ✓ |
 | Delete, archive and restore entries; export and import | | | | ✓ | ✓ |
+| Approve and remove the site's devices | | | ✓ | ✓ | ✓ |
+| Sign in with their own account on any device | | | ✓ | ✓ | ✓ |
 | Open data sheet and records folder links | | | | ✓ | ✓ |
 | Open or close sites, add or remove units, organization settings | | | | | ✓ |
 
-- Facilitators don't see the schedule builder, review fields, rosters, the archive or Sites & Export.
+- Facilitators don't see the schedule builder, review fields, rosters, the archive, Devices or Sites & Export.
 - Supervisors' drafts stay private until a manager approves them. Managers see a reminder on the dashboard when a week is waiting.
 - The older names still work: **Admin** counts as Administrator and **Staff** as Facilitator. Change them in the Access tab when convenient.
 - The server enforces every limit, so hiding a button is never the only protection.
@@ -152,7 +161,7 @@ Open the app's address on the device (or a site's **launch link** from **Sites &
 | **Android** | Chrome menu ⋮ → **Install app** (or **Add to Home screen**) |
 | **iPad / iPhone** | Safari Share button → **Add to Home Screen** |
 
-The app gets its own **NH Site Docs** icon and window. It remembers its site, so the icon opens straight to that site's dashboard. For a shared site device, sign it in with a site Google account that's locked to that site on the Access tab.
+The app gets its own **NH Site Docs** icon and window. It remembers its site, so the icon opens straight to that site's dashboard. For a shared site device, sign it in with the site's own account (Site account **Yes** on the Access tab), then have a supervisor or manager approve the device (see above).
 
 ## Working offline
 
